@@ -29,9 +29,12 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="lg">
         <Title>Recipes</Title>
-        <Button component={Link} to="/recipes/new" leftSection={<IconPlus size={16} />}>
-          New
-        </Button>
+        <Group gap="xs">
+          <Button component={Link} to="/items" variant="subtle" size="sm">Manage items</Button>
+          <Button component={Link} to="/recipes/new" leftSection={<IconPlus size={16} />}>
+            New
+          </Button>
+        </Group>
       </Group>
 
       <Table highlightOnHover>
