@@ -5,3 +5,8 @@
 # React Router
 /.react-router/
 /build/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
