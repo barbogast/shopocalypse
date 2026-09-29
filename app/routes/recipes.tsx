@@ -40,10 +40,11 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
       <Table highlightOnHover>
         <Table.Tbody>
           {all.map((recipe) => (
-            <Table.Tr key={recipe.id}>
+            <Table.Tr key={recipe.id} style={{ position: "relative" }}>
               <Table.Td>
                 <Link to={`/recipes/${recipe.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                   {recipe.name}
+                  <span aria-hidden="true" style={{ position: "absolute", inset: 0 }} />
                 </Link>
               </Table.Td>
               <Table.Td c="dimmed" style={{ width: 80 }}>
@@ -52,7 +53,7 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
               <Table.Td style={{ width: 40 }}>
                 <Form method="post">
                   <input type="hidden" name="id" value={recipe.id} />
-                  <ActionIcon variant="subtle" color="red" type="submit">
+                  <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="red" type="submit" aria-label={`Delete ${recipe.name}`}>
                     <IconTrash size={16} />
                   </ActionIcon>
                 </Form>
