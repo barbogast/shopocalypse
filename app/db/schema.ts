@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const stores = sqliteTable("stores", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -33,7 +33,7 @@ export const recipeIngredients = sqliteTable("recipe_ingredients", {
     .notNull()
     .references(() => items.id),
   quantity: integer("quantity").notNull(),
-});
+}, (t) => [primaryKey({ columns: [t.recipeId, t.itemId] })]);
 
 export const stock = sqliteTable("stock", {
   itemId: integer("item_id")
