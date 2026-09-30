@@ -76,14 +76,21 @@ export async function loader() {
       quantityBought: shoppingListItems.quantityBought,
       source: shoppingListItems.source,
       storeName: stores.name,
-      categoryName: itemCategories.name,
+      shelfName: itemCategories.name,
     })
     .from(shoppingListItems)
     .innerJoin(items, eq(shoppingListItems.itemId, items.id))
     .leftJoin(stores, eq(items.storeId, stores.id))
     .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
     .where(eq(shoppingListItems.shoppingListId, activeList.id))
-    .orderBy(stores.name, itemCategories.name, items.name);
+    // Stores alphabetically, then shelves in walking order; items without a store or shelf go last
+    .orderBy(
+      sql`${stores.name} is null`,
+      stores.name,
+      sql`${itemCategories.position} is null`,
+      itemCategories.position,
+      items.name,
+    );
 
   const listedItemIds = new Set(listItems.map((i) => i.itemId));
   const allItems = await db
@@ -303,13 +310,16 @@ export async function action({ request }: Route.ActionArgs) {
   return null;
 }
 
-// Group list items by store
-function groupByStore<T extends { storeName: string | null }>(listItems: T[]) {
-  const groups = new Map<string, T[]>();
+// Group list items by store, then by shelf (keeps the loader's order)
+function groupByStoreAndShelf<T extends { storeName: string | null; shelfName: string | null }>(listItems: T[]) {
+  const groups = new Map<string, Map<string | null, T[]>>();
   for (const item of listItems) {
-    const key = item.storeName ?? "Other";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(item);
+    const storeKey = item.storeName ?? "Other";
+    const shelfKey = item.shelfName;
+    if (!groups.has(storeKey)) groups.set(storeKey, new Map());
+    const shelves = groups.get(storeKey)!;
+    if (!shelves.has(shelfKey)) shelves.set(shelfKey, []);
+    shelves.get(shelfKey)!.push(item);
   }
   return groups;
 }
@@ -433,7 +443,7 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
   if (!loaderData.activeList) return <PrepareList scheduled={loaderData.scheduled} />;
   const { createdAt, listRecipes, listItems, allItems } = loaderData;
 
-  const groups = groupByStore(listItems);
+  const groups = groupByStoreAndShelf(listItems);
   const allTicked = listItems.length > 0 && listItems.every((i) => i.quantityBought != null);
   const tickedCount = listItems.filter((i) => i.quantityBought != null).length;
 
@@ -459,66 +469,78 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
         <Text c="dimmed" mb="lg">No items on the list.</Text>
       )}
 
-      {[...groups.entries()].map(([storeName, storeItems]) => (
+      {[...groups.entries()].map(([storeName, shelves]) => (
         <Stack key={storeName} mb="lg" gap="xs">
           <Text fw={600} size="sm" c="dimmed">{storeName}</Text>
           <Table>
             <Table.Tbody>
-              {storeItems.map((item) => {
-                const ticked = item.quantityBought != null;
-                return (
-                  <Table.Tr key={item.id} opacity={ticked ? 0.5 : 1}>
-                    <Table.Td>
-                      <Text td={ticked ? "line-through" : undefined}>{item.itemName}</Text>
-                      {recipesByItem.has(item.itemId) && (
-                        <Text size="xs" c="dimmed">{recipesByItem.get(item.itemId)!.join(", ")}</Text>
-                      )}
-                      {item.source === "stock_deficit" && (
-                        <Badge size="xs" variant="outline" color="gray">stock</Badge>
-                      )}
-                      {item.source === "manual" && (
-                        <Badge size="xs" variant="outline" color="gray">manual</Badge>
-                      )}
-                    </Table.Td>
-                    <Table.Td style={{ width: 40 }} c="dimmed">
-                      {ticked ? item.quantityBought : item.quantityNeeded}×
-                    </Table.Td>
-                    <Table.Td style={{ width: 120 }}>
-                      {!ticked ? (
-                        <Form method="post" style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                          <input type="hidden" name="intent" value="tick" />
+              {[...shelves.entries()].flatMap(([shelfName, shelfItems]) => [
+                // No heading when nothing in this store has a shelf
+                ...(shelfName != null || shelves.size > 1
+                  ? [
+                      <Table.Tr key={`shelf-${shelfName ?? ""}`}>
+                        <Table.Td colSpan={4} pt="md" pb={4}>
+                          <Text size="xs" fw={600} tt="uppercase" c="dimmed">{shelfName ?? "Other"}</Text>
+                        </Table.Td>
+                      </Table.Tr>,
+                    ]
+                  : []),
+                ...shelfItems.map((item) => {
+                  const ticked = item.quantityBought != null;
+                  return (
+                    <Table.Tr key={item.id} opacity={ticked ? 0.5 : 1}>
+                      <Table.Td>
+                        <Text td={ticked ? "line-through" : undefined}>{item.itemName}</Text>
+                        {recipesByItem.has(item.itemId) && (
+                          <Text size="xs" c="dimmed">{recipesByItem.get(item.itemId)!.join(", ")}</Text>
+                        )}
+                        {item.source === "stock_deficit" && (
+                          <Badge size="xs" variant="outline" color="gray">stock</Badge>
+                        )}
+                        {item.source === "manual" && (
+                          <Badge size="xs" variant="outline" color="gray">manual</Badge>
+                        )}
+                      </Table.Td>
+                      <Table.Td style={{ width: 40 }} c="dimmed">
+                        {ticked ? item.quantityBought : item.quantityNeeded}×
+                      </Table.Td>
+                      <Table.Td style={{ width: 120 }}>
+                        {!ticked ? (
+                          <Form method="post" style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            <input type="hidden" name="intent" value="tick" />
+                            <input type="hidden" name="id" value={item.id} />
+                            <NumberInput
+                              name="quantityBought"
+                              defaultValue={item.quantityNeeded}
+                              min={0}
+                              style={{ width: 70 }}
+                              size="xs"
+                            />
+                            <Button type="submit" size="xs" color="green" px={6}>
+                              <IconCheck size={14} />
+                            </Button>
+                          </Form>
+                        ) : (
+                          <Form method="post">
+                            <input type="hidden" name="intent" value="untick" />
+                            <input type="hidden" name="id" value={item.id} />
+                            <Button type="submit" size="xs" variant="subtle">Undo</Button>
+                          </Form>
+                        )}
+                      </Table.Td>
+                      <Table.Td style={{ width: 32 }}>
+                        <Form method="post">
+                          <input type="hidden" name="intent" value="remove-item" />
                           <input type="hidden" name="id" value={item.id} />
-                          <NumberInput
-                            name="quantityBought"
-                            defaultValue={item.quantityNeeded}
-                            min={0}
-                            style={{ width: 70 }}
-                            size="xs"
-                          />
-                          <Button type="submit" size="xs" color="green" px={6}>
-                            <IconCheck size={14} />
+                          <Button type="submit" size="xs" variant="subtle" color="red" px={4}>
+                            <IconTrash size={12} />
                           </Button>
                         </Form>
-                      ) : (
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="untick" />
-                          <input type="hidden" name="id" value={item.id} />
-                          <Button type="submit" size="xs" variant="subtle">Undo</Button>
-                        </Form>
-                      )}
-                    </Table.Td>
-                    <Table.Td style={{ width: 32 }}>
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="remove-item" />
-                        <input type="hidden" name="id" value={item.id} />
-                        <Button type="submit" size="xs" variant="subtle" color="red" px={4}>
-                          <IconTrash size={12} />
-                        </Button>
-                      </Form>
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              })}
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                }),
+              ])}
             </Table.Tbody>
           </Table>
         </Stack>

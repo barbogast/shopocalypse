@@ -7,17 +7,19 @@
 - id
 - name
 
-### ItemCategory
+### ItemCategory _(a shelf in a store; shown as "Shelf" in the app)_
 
 - id
-- name
+- name (e.g. "Produce", "Dairy")
+- store_id — each store has its own shelves
+- position — the order you walk past the shelves in that store
 
 ### Item
 
 - id
 - name
-- category_id (e.g. "produce", "dairy", "canned goods" — used to sort shopping list)
 - store_id
+- category_id — the shelf; must be one of the item's store's shelves
 
 ### Recipe
 
@@ -86,11 +88,12 @@ A recipe appears once per scheduled meal, so it can be listed more than once.
 - MealHistory → Recipe: many-to-one
 - ShoppingListRecipe → ShoppingList, Recipe: many-to-one
 - ShoppingListItem → Item: many-to-one (nullable)
+- ItemCategory → Store: many-to-one
 
 ## Notes and assumptions
 
 - Single shared instance — no user accounts or authentication
 - All quantities are plain integers (no units)
 - Only one ShoppingList can be active at a time; completing it archives the old one
-- Item.category_id and item.store_id is the basis for shop/aisle sorting on the shopping list
+- The shopping list is grouped by store, then by shelf in the store's shelf order
 - "Cook meal" is the sole mechanism that advances the schedule and writes CookHistory

@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   Button,
+  Card,
   Container,
   Divider,
   Group,
@@ -10,10 +11,12 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconCheck, IconChevronDown, IconChevronUp, IconPencil, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
+import { useState } from "react";
 import { eq } from "drizzle-orm";
 import { Form, Link } from "react-router";
 import { db } from "~/db/client";
+import { addShelf, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
 import { itemCategories, items, stores } from "~/db/schema";
 import type { Route } from "./+types/items";
 
@@ -26,7 +29,7 @@ export async function loader() {
     .select({
       id: items.id,
       name: items.name,
-      categoryName: itemCategories.name,
+      shelfName: itemCategories.name,
       storeName: stores.name,
     })
     .from(items)
@@ -34,10 +37,10 @@ export async function loader() {
     .leftJoin(stores, eq(items.storeId, stores.id))
     .orderBy(items.name);
 
-  const allCategories = await db.select().from(itemCategories).orderBy(itemCategories.name);
+  const allShelves = listShelves();
   const allStores = await db.select().from(stores).orderBy(stores.name);
 
-  return { allItems, allCategories, allStores };
+  return { allItems, allShelves, allStores };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -48,13 +51,22 @@ export async function action({ request }: Route.ActionArgs) {
     await db.delete(items).where(eq(items.id, Number(form.get("id"))));
   }
 
-  if (intent === "add-category") {
+  if (intent === "add-shelf") {
     const name = String(form.get("name")).trim();
-    if (name) await db.insert(itemCategories).values({ name });
+    if (name) addShelf(Number(form.get("storeId")), name);
   }
 
-  if (intent === "delete-category") {
-    await db.delete(itemCategories).where(eq(itemCategories.id, Number(form.get("id"))));
+  if (intent === "rename-shelf") {
+    const name = String(form.get("name")).trim();
+    if (name) await db.update(itemCategories).set({ name }).where(eq(itemCategories.id, Number(form.get("id"))));
+  }
+
+  if (intent === "move-shelf") {
+    moveShelf(Number(form.get("id")), form.get("direction") === "up");
+  }
+
+  if (intent === "delete-shelf") {
+    deleteShelf(Number(form.get("id")));
   }
 
   if (intent === "add-store") {
@@ -62,15 +74,83 @@ export async function action({ request }: Route.ActionArgs) {
     if (name) await db.insert(stores).values({ name });
   }
 
+  if (intent === "rename-store") {
+    const name = String(form.get("name")).trim();
+    if (name) await db.update(stores).set({ name }).where(eq(stores.id, Number(form.get("id"))));
+  }
+
   if (intent === "delete-store") {
-    await db.delete(stores).where(eq(stores.id, Number(form.get("id"))));
+    deleteStore(Number(form.get("id")));
   }
 
   return null;
 }
 
+// Name with a pencil that swaps it for an inline rename form
+function RenamableName({ intent, id, name, fw, size }: {
+  intent: string;
+  id: number;
+  name: string;
+  fw?: number;
+  size?: "sm";
+}) {
+  const [editing, setEditing] = useState(false);
+
+  if (!editing) {
+    return (
+      <Group gap={4} wrap="nowrap">
+        <Text fw={fw} size={size}>{name}</Text>
+        <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setEditing(true)} aria-label={`Rename ${name}`}>
+          <IconPencil size={14} />
+        </ActionIcon>
+      </Group>
+    );
+  }
+
+  return (
+    <Form method="post" onSubmit={() => setEditing(false)} style={{ flex: 1 }}>
+      <input type="hidden" name="intent" value={intent} />
+      <input type="hidden" name="id" value={id} />
+      <Group gap={4} wrap="nowrap">
+        <TextInput
+          name="name"
+          defaultValue={name}
+          size="xs"
+          required
+          autoFocus
+          onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
+          style={{ flex: 1 }}
+        />
+        <ActionIcon type="submit" variant="subtle" color="green" size="sm" aria-label="Save name">
+          <IconCheck size={14} />
+        </ActionIcon>
+        <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setEditing(false)} aria-label="Cancel rename">
+          <IconX size={14} />
+        </ActionIcon>
+      </Group>
+    </Form>
+  );
+}
+
+function ShelfMoveButtons({ id, first, last }: { id: number; first: boolean; last: boolean }) {
+  return (
+    <Form method="post" style={{ display: "flex" }}>
+      <input type="hidden" name="intent" value="move-shelf" />
+      <input type="hidden" name="id" value={id} />
+      <Button type="submit" name="direction" value="up" disabled={first}
+        variant="subtle" color="gray" size="xs" px={6} aria-label="Move up">
+        <IconChevronUp size={14} />
+      </Button>
+      <Button type="submit" name="direction" value="down" disabled={last}
+        variant="subtle" color="gray" size="xs" px={6} aria-label="Move down">
+        <IconChevronDown size={14} />
+      </Button>
+    </Form>
+  );
+}
+
 export default function Items({ loaderData }: Route.ComponentProps) {
-  const { allItems, allCategories, allStores } = loaderData;
+  const { allItems, allShelves, allStores } = loaderData;
 
   return (
     <Container size="sm" py="xl">
@@ -86,7 +166,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
           {allItems.map((item) => (
             <Table.Tr key={item.id}>
               <Table.Td>{item.name}</Table.Td>
-              <Table.Td c="dimmed">{item.categoryName ?? "—"}</Table.Td>
+              <Table.Td c="dimmed">{item.shelfName ?? "—"}</Table.Td>
               <Table.Td c="dimmed">{item.storeName ?? "—"}</Table.Td>
               <Table.Td style={{ width: 72 }}>
                 <Group gap={4} wrap="nowrap">
@@ -114,59 +194,63 @@ export default function Items({ loaderData }: Route.ComponentProps) {
 
       <Divider mb="lg" />
 
-      <Stack gap="xl">
-        <div>
-          <Title order={4} mb="sm">Categories</Title>
-          <Stack gap="xs" mb="sm">
-            {allCategories.map((cat) => (
-              <Group key={cat.id} justify="space-between">
-                <Text size="sm">{cat.name}</Text>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="delete-category" />
-                  <input type="hidden" name="id" value={cat.id} />
-                  <ActionIcon type="submit" variant="subtle" color="red" size="sm">
-                    <IconTrash size={14} />
-                  </ActionIcon>
-                </Form>
-              </Group>
-            ))}
-            {allCategories.length === 0 && <Text size="sm" c="dimmed">None yet.</Text>}
-          </Stack>
-          <Form method="post">
-            <input type="hidden" name="intent" value="add-category" />
-            <Group align="flex-end">
-              <TextInput name="name" placeholder="New category…" style={{ flex: 1 }} />
-              <Button type="submit" variant="light" leftSection={<IconPlus size={14} />}>Add</Button>
-            </Group>
-          </Form>
-        </div>
-
-        <div>
-          <Title order={4} mb="sm">Stores</Title>
-          <Stack gap="xs" mb="sm">
-            {allStores.map((store) => (
-              <Group key={store.id} justify="space-between">
-                <Text size="sm">{store.name}</Text>
+      <Title order={4} mb="sm">Stores and shelves</Title>
+      <Text size="sm" c="dimmed" mb="md">
+        Put each store's shelves in the order you walk past them; the shopping list follows it.
+      </Text>
+      <Stack gap="md" mb="md">
+        {allStores.map((store) => {
+          const shelves = allShelves.filter((s) => s.storeId === store.id);
+          return (
+            <Card key={store.id} withBorder radius="md" p="md">
+              <Group justify="space-between" mb="xs">
+                <RenamableName intent="rename-store" id={store.id} name={store.name} fw={600} />
                 <Form method="post">
                   <input type="hidden" name="intent" value="delete-store" />
                   <input type="hidden" name="id" value={store.id} />
-                  <ActionIcon type="submit" variant="subtle" color="red" size="sm">
+                  <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`Delete ${store.name}`}>
                     <IconTrash size={14} />
                   </ActionIcon>
                 </Form>
               </Group>
-            ))}
-            {allStores.length === 0 && <Text size="sm" c="dimmed">None yet.</Text>}
-          </Stack>
-          <Form method="post">
-            <input type="hidden" name="intent" value="add-store" />
-            <Group align="flex-end">
-              <TextInput name="name" placeholder="New store…" style={{ flex: 1 }} />
-              <Button type="submit" variant="light" leftSection={<IconPlus size={14} />}>Add</Button>
-            </Group>
-          </Form>
-        </div>
+              <Stack gap={4} mb="sm">
+                {shelves.map((shelf, i) => (
+                  <Group key={shelf.id} justify="space-between" wrap="nowrap">
+                    <RenamableName intent="rename-shelf" id={shelf.id} name={shelf.name} size="sm" />
+                    <Group gap={0} wrap="nowrap">
+                      <ShelfMoveButtons id={shelf.id} first={i === 0} last={i === shelves.length - 1} />
+                      <Form method="post">
+                        <input type="hidden" name="intent" value="delete-shelf" />
+                        <input type="hidden" name="id" value={shelf.id} />
+                        <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`Delete ${shelf.name}`}>
+                          <IconTrash size={14} />
+                        </ActionIcon>
+                      </Form>
+                    </Group>
+                  </Group>
+                ))}
+                {shelves.length === 0 && <Text size="sm" c="dimmed">No shelves yet.</Text>}
+              </Stack>
+              <Form method="post">
+                <input type="hidden" name="intent" value="add-shelf" />
+                <input type="hidden" name="storeId" value={store.id} />
+                <Group align="flex-end">
+                  <TextInput name="name" placeholder="New shelf…" size="xs" style={{ flex: 1 }} />
+                  <Button type="submit" variant="light" size="xs" leftSection={<IconPlus size={14} />}>Add</Button>
+                </Group>
+              </Form>
+            </Card>
+          );
+        })}
+        {allStores.length === 0 && <Text size="sm" c="dimmed">No stores yet.</Text>}
       </Stack>
+      <Form method="post">
+        <input type="hidden" name="intent" value="add-store" />
+        <Group align="flex-end">
+          <TextInput name="name" placeholder="New store…" style={{ flex: 1 }} />
+          <Button type="submit" variant="light" leftSection={<IconPlus size={14} />}>Add</Button>
+        </Group>
+      </Form>
     </Container>
   );
 }

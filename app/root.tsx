@@ -3,6 +3,7 @@ import "@mantine/core/styles.css";
 import {
   IconCalendarEvent,
   IconChefHat,
+  IconListDetails,
   IconPackage,
   IconShoppingCart,
 } from "@tabler/icons-react";
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
     ? [{ to: "/stock", label: "Stock", icon: IconPackage, end: false }]
     : []),
   { to: "/shopping", label: "Shopping", icon: IconShoppingCart, end: false },
+  { to: "/items", label: "Items", icon: IconListDetails, end: false },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

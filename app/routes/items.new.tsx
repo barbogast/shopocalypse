@@ -1,7 +1,9 @@
-import { Button, Container, Group, Select, Stack, TextInput, Title } from "@mantine/core";
+import { Button, Container, Group, Stack, TextInput, Title } from "@mantine/core";
 import { redirect } from "react-router";
+import { StoreShelfFields } from "~/components/store-shelf-fields";
 import { db } from "~/db/client";
-import { itemCategories, items, stores } from "~/db/schema";
+import { listShelves, parseItemForm } from "~/db/items.server";
+import { items, stores } from "~/db/schema";
 import type { Route } from "./+types/items.new";
 
 export function meta() {
@@ -9,25 +11,21 @@ export function meta() {
 }
 
 export async function loader() {
-  const allCategories = await db.select().from(itemCategories).orderBy(itemCategories.name);
   const allStores = await db.select().from(stores).orderBy(stores.name);
-  return { allCategories, allStores };
+  return { allShelves: listShelves(), allStores };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
-  const name = String(form.get("name")).trim();
-  const categoryId = form.get("categoryId") ? Number(form.get("categoryId")) : null;
-  const storeId = form.get("storeId") ? Number(form.get("storeId")) : null;
+  const parsed = parseItemForm(form);
+  if (parsed.error) return { error: parsed.error };
 
-  if (!name) return { error: "Name is required." };
-
-  await db.insert(items).values({ name, categoryId, storeId });
+  await db.insert(items).values(parsed.values);
   return redirect("/items");
 }
 
 export default function NewItem({ loaderData, actionData }: Route.ComponentProps) {
-  const { allCategories, allStores } = loaderData;
+  const { allShelves, allStores } = loaderData;
 
   return (
     <Container size="sm" py="xl">
@@ -35,20 +33,7 @@ export default function NewItem({ loaderData, actionData }: Route.ComponentProps
       <form method="post">
         <Stack>
           <TextInput name="name" label="Name" required autoFocus />
-          <Select
-            name="categoryId"
-            label="Category"
-            data={allCategories.map((c) => ({ value: String(c.id), label: c.name }))}
-            clearable
-            placeholder="None"
-          />
-          <Select
-            name="storeId"
-            label="Store"
-            data={allStores.map((s) => ({ value: String(s.id), label: s.name }))}
-            clearable
-            placeholder="None"
-          />
+          <StoreShelfFields stores={allStores} shelves={allShelves} />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
             <Button type="submit">Create</Button>

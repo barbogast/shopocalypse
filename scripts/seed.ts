@@ -15,19 +15,19 @@ const [store] = await db
 
 const [produce] = await db
   .insert(schema.itemCategories)
-  .values({ name: "Produce" })
+  .values({ name: "Produce", storeId: store.id, position: 1 })
   .returning();
 const [dairy] = await db
   .insert(schema.itemCategories)
-  .values({ name: "Dairy" })
+  .values({ name: "Dairy", storeId: store.id, position: 2 })
   .returning();
 const [pantry] = await db
   .insert(schema.itemCategories)
-  .values({ name: "Pantry" })
+  .values({ name: "Pantry", storeId: store.id, position: 3 })
   .returning();
 const [meat] = await db
   .insert(schema.itemCategories)
-  .values({ name: "Meat" })
+  .values({ name: "Meat", storeId: store.id, position: 4 })
   .returning();
 
 const [pasta, tomatoes, onion, garlic, mince, chickenBreast, rice, lemon, eggs, cheese] =

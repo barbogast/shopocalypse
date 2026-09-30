@@ -5,9 +5,14 @@ export const stores = sqliteTable("stores", {
   name: text("name").notNull(),
 });
 
+// Shelves: each store has its own, ordered by position (the walking order through the store)
 export const itemCategories = sqliteTable("item_categories", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  storeId: integer("store_id")
+    .notNull()
+    .references(() => stores.id),
+  position: integer("position").notNull().default(0),
 });
 
 export const items = sqliteTable("items", {

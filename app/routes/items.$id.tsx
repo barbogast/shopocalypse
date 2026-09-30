@@ -1,8 +1,10 @@
-import { Button, Container, Group, Select, Stack, TextInput, Title } from "@mantine/core";
+import { Button, Container, Group, Stack, TextInput, Title } from "@mantine/core";
 import { eq } from "drizzle-orm";
 import { redirect } from "react-router";
+import { StoreShelfFields } from "~/components/store-shelf-fields";
 import { db } from "~/db/client";
-import { itemCategories, items, stores } from "~/db/schema";
+import { listShelves, parseItemForm } from "~/db/items.server";
+import { items, stores } from "~/db/schema";
 import type { Route } from "./+types/items.$id";
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -10,28 +12,24 @@ export async function loader({ params }: Route.LoaderArgs) {
   const [item] = await db.select().from(items).where(eq(items.id, id));
   if (!item) throw new Response("Not found", { status: 404 });
 
-  const allCategories = await db.select().from(itemCategories).orderBy(itemCategories.name);
   const allStores = await db.select().from(stores).orderBy(stores.name);
 
-  return { item, allCategories, allStores };
+  return { item, allShelves: listShelves(), allStores };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
   const id = Number(params.id);
   const form = await request.formData();
 
-  const name = String(form.get("name")).trim();
-  const categoryId = form.get("categoryId") ? Number(form.get("categoryId")) : null;
-  const storeId = form.get("storeId") ? Number(form.get("storeId")) : null;
+  const parsed = parseItemForm(form);
+  if (parsed.error) return { error: parsed.error };
 
-  if (!name) return { error: "Name is required." };
-
-  await db.update(items).set({ name, categoryId, storeId }).where(eq(items.id, id));
+  await db.update(items).set(parsed.values).where(eq(items.id, id));
   return redirect("/items");
 }
 
 export default function EditItem({ loaderData, actionData }: Route.ComponentProps) {
-  const { item, allCategories, allStores } = loaderData;
+  const { item, allShelves, allStores } = loaderData;
 
   return (
     <Container size="sm" py="xl">
@@ -39,21 +37,11 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
       <form method="post">
         <Stack>
           <TextInput name="name" label="Name" defaultValue={item.name} required />
-          <Select
-            name="categoryId"
-            label="Category"
-            data={allCategories.map((c) => ({ value: String(c.id), label: c.name }))}
-            defaultValue={item.categoryId ? String(item.categoryId) : null}
-            clearable
-            placeholder="None"
-          />
-          <Select
-            name="storeId"
-            label="Store"
-            data={allStores.map((s) => ({ value: String(s.id), label: s.name }))}
-            defaultValue={item.storeId ? String(item.storeId) : null}
-            clearable
-            placeholder="None"
+          <StoreShelfFields
+            stores={allStores}
+            shelves={allShelves}
+            defaultStoreId={item.storeId}
+            defaultShelfId={item.categoryId}
           />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
