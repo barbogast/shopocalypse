@@ -44,8 +44,8 @@ const [pasta, tomatoes, onion, garlic, mince, chickenBreast, rice, lemon, eggs, 
       { name: "Lemon", categoryId: produce.id, storeId: store.id, defaultUnit: "pcs" },
       { name: "Eggs", categoryId: dairy.id, storeId: store.id, defaultUnit: "pcs" },
       { name: "Cheese", categoryId: dairy.id, storeId: store.id, defaultUnit: "g" },
-      { name: "Salt", categoryId: pantry.id, storeId: store.id },
-      { name: "Pepper", categoryId: pantry.id, storeId: store.id },
+      { name: "Salt", categoryId: pantry.id, storeId: store.id, alwaysAvailable: true },
+      { name: "Pepper", categoryId: pantry.id, storeId: store.id, alwaysAvailable: true },
     ])
     .returning();
 

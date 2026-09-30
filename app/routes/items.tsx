@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Badge,
   Button,
   Card,
   Container,
@@ -31,6 +32,7 @@ export async function loader() {
       id: items.id,
       name: items.name,
       defaultUnit: items.defaultUnit,
+      alwaysAvailable: items.alwaysAvailable,
       shelfName: itemCategories.name,
       storeName: stores.name,
     })
@@ -167,7 +169,12 @@ export default function Items({ loaderData }: Route.ComponentProps) {
         <Table.Tbody>
           {allItems.map((item) => (
             <Table.Tr key={item.id}>
-              <Table.Td>{item.name}</Table.Td>
+              <Table.Td>
+                {item.name}
+                {item.alwaysAvailable && (
+                  <Badge size="xs" variant="outline" color="gray" ml={6}>always available</Badge>
+                )}
+              </Table.Td>
               <Table.Td c="dimmed">{item.defaultUnit ? unitName(item.defaultUnit) : "—"}</Table.Td>
               <Table.Td c="dimmed">{item.shelfName ?? "—"}</Table.Td>
               <Table.Td c="dimmed">{item.storeName ?? "—"}</Table.Td>

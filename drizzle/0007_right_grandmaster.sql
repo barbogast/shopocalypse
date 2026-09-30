@@ -1,0 +1,1 @@
+ALTER TABLE `items` ADD `always_available` integer DEFAULT false NOT NULL;

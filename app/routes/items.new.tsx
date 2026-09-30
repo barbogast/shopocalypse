@@ -1,4 +1,4 @@
-import { Button, Container, Group, Select, Stack, TextInput, Title } from "@mantine/core";
+import { Button, Checkbox, Container, Group, Select, Stack, TextInput, Title } from "@mantine/core";
 import { redirect } from "react-router";
 import { StoreShelfFields } from "~/components/store-shelf-fields";
 import { db } from "~/db/client";
@@ -36,6 +36,11 @@ export default function NewItem({ loaderData, actionData }: Route.ComponentProps
           <TextInput name="name" label="Name" required autoFocus />
           <StoreShelfFields stores={allStores} shelves={allShelves} />
           <Select name="defaultUnit" label="Default unit" data={UNIT_OPTIONS} clearable placeholder="None" />
+          <Checkbox
+            name="alwaysAvailable"
+            label="Always available"
+            description="Assumed to be in stock, so it's left off new shopping lists"
+          />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
             <Button type="submit">Create</Button>

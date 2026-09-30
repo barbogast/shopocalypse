@@ -16,7 +16,7 @@ import {
 } from "@mantine/core";
 import { IconCheck, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
-import { asc, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
 import { Form, Link } from "react-router";
 import { STOCK_TRACKING_ENABLED } from "~/config";
 import { db } from "~/db/client";
@@ -146,6 +146,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "prepare") {
     const positions = form.getAll("position").map(Number);
+    const includeInStock = form.get("includeInStock") === "on";
 
     const scheduled =
       positions.length > 0
@@ -159,10 +160,15 @@ export async function action({ request }: Route.ActionArgs) {
     // Collect ingredient amounts across selected meals, per item
     const mealAmounts = new Map<number, Amount[]>();
     for (const meal of scheduled) {
+      // Always-available items are assumed to be in stock unless asked for
       const ings = await db
-        .select()
+        .select({ itemId: recipeIngredients.itemId, quantity: recipeIngredients.quantity, unit: recipeIngredients.unit })
         .from(recipeIngredients)
-        .where(eq(recipeIngredients.recipeId, meal.recipeId));
+        .innerJoin(items, eq(recipeIngredients.itemId, items.id))
+        .where(and(
+          eq(recipeIngredients.recipeId, meal.recipeId),
+          includeInStock ? undefined : eq(items.alwaysAvailable, false),
+        ));
       for (const ing of ings) {
         mealAmounts.set(ing.itemId, [...(mealAmounts.get(ing.itemId) ?? []), ing]);
       }
@@ -329,6 +335,12 @@ function PrepareList({ scheduled }: { scheduled: { position: number; name: strin
           ) : (
             <Text size="sm" c="dimmed">No meals scheduled.</Text>
           )}
+          <Checkbox
+            name="includeInStock"
+            label="Include items in stock"
+            description="Also add items marked as always available"
+            mt="xs"
+          />
           <Button type="submit" leftSection={<IconShoppingCart size={16} />}>
             {selected.size > 0 ? "Prepare list" : "Start empty list"}
           </Button>

@@ -1,4 +1,4 @@
-import { Button, Container, Group, Select, Stack, TextInput, Title } from "@mantine/core";
+import { Button, Checkbox, Container, Group, Select, Stack, TextInput, Title } from "@mantine/core";
 import { eq } from "drizzle-orm";
 import { redirect } from "react-router";
 import { StoreShelfFields } from "~/components/store-shelf-fields";
@@ -45,6 +45,11 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
             defaultShelfId={item.categoryId}
           />
           <Select name="defaultUnit" label="Default unit" data={UNIT_OPTIONS} defaultValue={item.defaultUnit} clearable placeholder="None" />
+          <Checkbox
+            name="alwaysAvailable"
+            label="Always available"
+            description="Assumed to be in stock, so it's left off new shopping lists" defaultChecked={item.alwaysAvailable}
+          />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
             <Button type="submit">Save</Button>

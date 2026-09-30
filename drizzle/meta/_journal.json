@@ -50,6 +50,13 @@
       "when": 1790768995115,
       "tag": "0006_moaning_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790769765631,
+      "tag": "0007_right_grandmaster",
+      "breakpoints": true
     }
   ]
 }

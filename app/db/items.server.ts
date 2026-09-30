@@ -15,13 +15,14 @@ export function parseItemForm(form: FormData) {
   const categoryId = form.get("categoryId") ? Number(form.get("categoryId")) : null;
   const rawUnit = form.get("defaultUnit");
   const defaultUnit = isUnitKey(rawUnit) ? rawUnit : null;
+  const alwaysAvailable = form.get("alwaysAvailable") === "on";
 
   if (!name) return { error: "Name is required." } as const;
   if (categoryId != null) {
     const shelf = db.select().from(itemCategories).where(eq(itemCategories.id, categoryId)).get();
     if (!shelf || shelf.storeId !== storeId) return { error: "That shelf isn't in the chosen store." } as const;
   }
-  return { values: { name, storeId, categoryId, defaultUnit } } as const;
+  return { values: { name, storeId, categoryId, defaultUnit, alwaysAvailable } } as const;
 }
 
 export function addShelf(storeId: number, name: string) {

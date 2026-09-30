@@ -23,6 +23,8 @@ export const items = sqliteTable("items", {
   storeId: integer("store_id").references(() => stores.id),
   // Unit prefilled when adding the item to a recipe or the shopping list
   defaultUnit: text("default_unit").$type<UnitKey>(),
+  // Assumed to be in stock (salt, oil…): left off prepared shopping lists unless asked for
+  alwaysAvailable: integer("always_available", { mode: "boolean" }).notNull().default(false),
 });
 
 export const recipes = sqliteTable("recipes", {
