@@ -107,7 +107,12 @@ export async function loader() {
 
   const ingredientRows = listRecipeRows.length
     ? await db
-        .select({ recipeId: recipeIngredients.recipeId, name: items.name, quantity: recipeIngredients.quantity })
+        .select({
+          recipeId: recipeIngredients.recipeId,
+          itemId: recipeIngredients.itemId,
+          name: items.name,
+          quantity: recipeIngredients.quantity,
+        })
         .from(recipeIngredients)
         .innerJoin(items, eq(recipeIngredients.itemId, items.id))
         .where(inArray(recipeIngredients.recipeId, listRecipeRows.map((r) => r.id)))
@@ -432,6 +437,15 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
   const allTicked = listItems.length > 0 && listItems.every((i) => i.quantityBought != null);
   const tickedCount = listItems.filter((i) => i.quantityBought != null).length;
 
+  // Which of the list's meals use each item
+  const recipesByItem = new Map<number, string[]>();
+  for (const recipe of listRecipes) {
+    const label = recipe.count > 1 ? `${recipe.name} ×${recipe.count}` : recipe.name;
+    for (const ing of recipe.ingredients) {
+      recipesByItem.set(ing.itemId, [...(recipesByItem.get(ing.itemId) ?? []), label]);
+    }
+  }
+
   return (
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="xs">
@@ -456,6 +470,9 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
                   <Table.Tr key={item.id} opacity={ticked ? 0.5 : 1}>
                     <Table.Td>
                       <Text td={ticked ? "line-through" : undefined}>{item.itemName}</Text>
+                      {recipesByItem.has(item.itemId) && (
+                        <Text size="xs" c="dimmed">{recipesByItem.get(item.itemId)!.join(", ")}</Text>
+                      )}
                       {item.source === "stock_deficit" && (
                         <Badge size="xs" variant="outline" color="gray">stock</Badge>
                       )}
