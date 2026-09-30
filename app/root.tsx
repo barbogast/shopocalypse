@@ -15,12 +15,15 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
+import { STOCK_TRACKING_ENABLED } from "./config";
 import type { Route } from "./+types/root";
 
 const NAV_ITEMS = [
   { to: "/", label: "Schedule", icon: IconCalendarEvent, end: true },
   { to: "/recipes", label: "Recipes", icon: IconChefHat, end: false },
-  { to: "/stock", label: "Stock", icon: IconPackage, end: false },
+  ...(STOCK_TRACKING_ENABLED
+    ? [{ to: "/stock", label: "Stock", icon: IconPackage, end: false }]
+    : []),
   { to: "/shopping", label: "Shopping", icon: IconShoppingCart, end: false },
 ];
 

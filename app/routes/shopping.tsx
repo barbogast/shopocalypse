@@ -14,6 +14,7 @@ import {
 import { IconCheck, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
 import { asc, eq, lt, sql } from "drizzle-orm";
 import { Form } from "react-router";
+import { STOCK_TRACKING_ENABLED } from "~/config";
 import { db } from "~/db/client";
 import {
   itemCategories,
@@ -99,7 +100,7 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     // Subtract stock
-    const stockRows = await db.select().from(stock);
+    const stockRows = STOCK_TRACKING_ENABLED ? await db.select().from(stock) : [];
     const stockMap = new Map(stockRows.map((s) => [s.itemId, s.currentQuantity]));
 
     const toAdd = new Map<number, { quantity: number; source: "meal_plan" | "stock_deficit" }>();
@@ -109,10 +110,12 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     // Add stock deficits not already covered
-    const deficits = await db
-      .select()
-      .from(stock)
-      .where(lt(stock.currentQuantity, stock.desiredQuantity));
+    const deficits = STOCK_TRACKING_ENABLED
+      ? await db
+          .select()
+          .from(stock)
+          .where(lt(stock.currentQuantity, stock.desiredQuantity))
+      : [];
     for (const deficit of deficits) {
       if (!toAdd.has(deficit.itemId)) {
         toAdd.set(deficit.itemId, {
@@ -192,7 +195,7 @@ export async function action({ request }: Route.ActionArgs) {
       .then((rows) => rows.filter((r) => r.quantityBought != null));
 
     await db.transaction(async (tx) => {
-      for (const item of ticked) {
+      for (const item of STOCK_TRACKING_ENABLED ? ticked : []) {
         const bought = item.quantityBought!;
         const [existing] = await tx
           .select()

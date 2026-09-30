@@ -10,7 +10,8 @@ import {
   Title,
 } from "@mantine/core";
 import { eq } from "drizzle-orm";
-import { Form } from "react-router";
+import { Form, redirect } from "react-router";
+import { STOCK_TRACKING_ENABLED } from "~/config";
 import { db } from "~/db/client";
 import { items, stock } from "~/db/schema";
 import type { Route } from "./+types/stock";
@@ -20,6 +21,7 @@ export function meta() {
 }
 
 export async function loader() {
+  if (!STOCK_TRACKING_ENABLED) throw redirect("/shopping");
   const tracked = await db
     .select({
       itemId: stock.itemId,
