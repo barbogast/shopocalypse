@@ -23,6 +23,7 @@ export const recipes = sqliteTable("recipes", {
   servingSize: integer("serving_size").notNull(),
   instructions: text("instructions"),
   comments: text("comments"),
+  archived: integer("archived", { mode: "boolean" }).notNull().default(false),
 });
 
 export const recipeIngredients = sqliteTable("recipe_ingredients", {

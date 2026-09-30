@@ -1,29 +1,40 @@
-import { ActionIcon, Button, Container, Group, Stack, Table, Title } from "@mantine/core";
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { ActionIcon, Badge, Button, Container, Group, Switch, Table, Title, Tooltip } from "@mantine/core";
+import { IconArchive, IconArchiveOff, IconPlus, IconTrash } from "@tabler/icons-react";
 import { eq } from "drizzle-orm";
-import { Form, Link } from "react-router";
+import { Form, Link, useSearchParams } from "react-router";
 import { db } from "~/db/client";
-import { recipes } from "~/db/schema";
+import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
+import { mealHistory, recipes } from "~/db/schema";
 import type { Route } from "./+types/recipes";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Recipes – Shopocalypse" }];
 }
 
-export async function loader() {
-  const all = await db.select().from(recipes).orderBy(recipes.name);
-  return { recipes: all };
+export async function loader({ request }: Route.LoaderArgs) {
+  const showArchived = new URL(request.url).searchParams.has("archived");
+  const all = await db
+    .select()
+    .from(recipes)
+    .where(showArchived ? undefined : eq(recipes.archived, false))
+    .orderBy(recipes.name);
+  const cooked = await db.selectDistinct({ recipeId: mealHistory.recipeId }).from(mealHistory);
+  const cookedIds = new Set(cooked.map((c) => c.recipeId));
+  return { recipes: all.map((r) => ({ ...r, cooked: cookedIds.has(r.id) })) };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const id = Number(form.get("id"));
-  await db.delete(recipes).where(eq(recipes.id, id));
+  if (form.get("intent") === "restore") restoreRecipe(id);
+  else deleteOrArchiveRecipe(id);
   return null;
 }
 
 export default function Recipes({ loaderData }: Route.ComponentProps) {
   const { recipes: all } = loaderData;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showArchived = searchParams.has("archived");
 
   return (
     <Container size="sm" py="xl">
@@ -37,15 +48,25 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
         </Group>
       </Group>
 
+      <Switch
+        mb="md"
+        label="Show archived"
+        checked={showArchived}
+        onChange={(e) => setSearchParams(e.currentTarget.checked ? { archived: "" } : {}, { replace: true })}
+      />
+
       <Table highlightOnHover>
         <Table.Tbody>
           {all.map((recipe) => (
-            <Table.Tr key={recipe.id} style={{ position: "relative" }}>
+            <Table.Tr key={recipe.id} style={{ position: "relative" }} opacity={recipe.archived ? 0.6 : 1}>
               <Table.Td>
                 <Link to={`/recipes/${recipe.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                   {recipe.name}
                   <span aria-hidden="true" style={{ position: "absolute", inset: 0 }} />
                 </Link>
+                {recipe.archived && (
+                  <Badge size="xs" variant="outline" color="gray" ml="xs">archived</Badge>
+                )}
               </Table.Td>
               <Table.Td c="dimmed" style={{ width: 80 }}>
                 serves {recipe.servingSize}
@@ -53,9 +74,26 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
               <Table.Td style={{ width: 40 }}>
                 <Form method="post">
                   <input type="hidden" name="id" value={recipe.id} />
-                  <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="red" type="submit" aria-label={`Delete ${recipe.name}`}>
-                    <IconTrash size={16} />
-                  </ActionIcon>
+                  {recipe.archived ? (
+                    <>
+                      <input type="hidden" name="intent" value="restore" />
+                      <Tooltip label="Restore from archive">
+                        <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="blue" type="submit" aria-label={`Restore ${recipe.name}`}>
+                          <IconArchiveOff size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </>
+                  ) : recipe.cooked ? (
+                    <Tooltip label="Archive">
+                      <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="gray" type="submit" aria-label={`Archive ${recipe.name}`}>
+                        <IconArchive size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  ) : (
+                    <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="red" type="submit" aria-label={`Delete ${recipe.name}`}>
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  )}
                 </Form>
               </Table.Td>
             </Table.Tr>

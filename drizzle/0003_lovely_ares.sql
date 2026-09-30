@@ -1,0 +1,1 @@
+ALTER TABLE `recipes` ADD `archived` integer DEFAULT false NOT NULL;

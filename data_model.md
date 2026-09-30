@@ -26,6 +26,7 @@
 - serving_size (integer — fixed per recipe)
 - instructions (free text, optional)
 - comments (free text, optional)
+- archived (boolean) — recipes that have been cooked are archived instead of deleted, to keep meal history intact
 - ingredients: list of RecipeIngredient
 
 ### RecipeIngredient _(join between Recipe and Ingredient)_

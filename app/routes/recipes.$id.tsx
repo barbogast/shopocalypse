@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Badge,
   Button,
   Container,
   Group,
@@ -11,10 +12,11 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconTrash } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconTrash } from "@tabler/icons-react";
 import { and, asc, eq } from "drizzle-orm";
 import { Form, redirect } from "react-router";
 import { db } from "~/db/client";
+import { deleteOrArchiveRecipe, hasBeenCooked, restoreRecipe } from "~/db/recipes.server";
 import { items, recipeIngredients, recipes } from "~/db/schema";
 import type { Route } from "./+types/recipes.$id";
 
@@ -32,7 +34,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 
   const allItems = await db.select({ id: items.id, name: items.name }).from(items).orderBy(items.name);
 
-  return { recipe, ingredients, allItems };
+  return { recipe, ingredients, allItems, cooked: hasBeenCooked(id) };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -67,15 +69,19 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "delete") {
-    await db.delete(recipes).where(eq(recipes.id, id));
+    deleteOrArchiveRecipe(id);
     return redirect("/recipes");
+  }
+
+  if (intent === "restore") {
+    restoreRecipe(id);
   }
 
   return null;
 }
 
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { recipe, ingredients, allItems } = loaderData;
+  const { recipe, ingredients, allItems, cooked } = loaderData;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   const availableItems = allItems
     .filter((i) => !usedItemIds.has(i.id))
@@ -83,6 +89,11 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
 
   return (
     <Container size="sm" py="xl">
+      {/* Kept outside the save form: forms can't be nested */}
+      <Form method="post" id="recipe-status-form">
+        <input type="hidden" name="intent" value={recipe.archived ? "restore" : "delete"} />
+      </Form>
+      {recipe.archived && <Badge color="gray" mb="md">Archived</Badge>}
       <Form method="post" id="recipe-form">
         <input type="hidden" name="intent" value="save" />
         <Stack mb="xl">
@@ -91,10 +102,22 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
             <Button type="submit">Save</Button>
-            <Form method="post" style={{ marginLeft: "auto" }}>
-              <input type="hidden" name="intent" value="delete" />
-              <Button type="submit" variant="subtle" color="red">Delete recipe</Button>
-            </Form>
+            {recipe.archived ? (
+              <Button type="submit" form="recipe-status-form" variant="subtle" ml="auto"
+                leftSection={<IconArchiveOff size={16} />}>
+                Restore recipe
+              </Button>
+            ) : cooked ? (
+              <Button type="submit" form="recipe-status-form" variant="subtle" color="gray" ml="auto"
+                leftSection={<IconArchive size={16} />}>
+                Archive recipe
+              </Button>
+            ) : (
+              <Button type="submit" form="recipe-status-form" variant="subtle" color="red" ml="auto"
+                leftSection={<IconTrash size={16} />}>
+                Delete recipe
+              </Button>
+            )}
           </Group>
         </Stack>
       </Form>

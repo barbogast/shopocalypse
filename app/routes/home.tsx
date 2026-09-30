@@ -34,6 +34,7 @@ export async function loader() {
   const allRecipes = await db
     .select({ id: recipes.id, name: recipes.name })
     .from(recipes)
+    .where(eq(recipes.archived, false))
     .orderBy(recipes.name);
 
   return { scheduled, allRecipes, scheduledRecipeIds };
@@ -86,6 +87,7 @@ export async function action({ request }: Route.ActionArgs) {
     const candidates = await db
       .select({ id: recipes.id })
       .from(recipes)
+      .where(eq(recipes.archived, false))
       .then((all) =>
         all
           .filter((r) => !inQueueIds.includes(r.id))
