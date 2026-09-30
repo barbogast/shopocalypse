@@ -3,7 +3,9 @@ import {
   Button,
   Checkbox,
   Container,
+  Anchor,
   Divider,
+  Drawer,
   Group,
   NumberInput,
   Select,
@@ -15,7 +17,7 @@ import {
 import { IconCheck, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 import { asc, eq, inArray, lt, sql } from "drizzle-orm";
-import { Form } from "react-router";
+import { Form, Link } from "react-router";
 import { STOCK_TRACKING_ENABLED } from "~/config";
 import { db } from "~/db/client";
 import {
@@ -37,10 +39,14 @@ export function meta() {
 }
 
 // Collapse repeated recipes into one entry with a count, keeping first-seen order
-function countNames(rows: { name: string }[]) {
-  const counts = new Map<string, number>();
-  for (const { name } of rows) counts.set(name, (counts.get(name) ?? 0) + 1);
-  return [...counts].map(([name, count]) => ({ name, count }));
+function countRecipes<T extends { id: number }>(rows: T[]) {
+  const counts = new Map<number, T & { count: number }>();
+  for (const row of rows) {
+    const entry = counts.get(row.id);
+    if (entry) entry.count++;
+    else counts.set(row.id, { ...row, count: 1 });
+  }
+  return [...counts.values()];
 }
 
 export async function loader() {
@@ -86,12 +92,31 @@ export async function loader() {
     .orderBy(items.name)
     .then((all) => all.filter((i) => !listedItemIds.has(i.id)));
 
-  const listRecipes = await db
-    .select({ name: recipes.name })
+  const listRecipeRows = await db
+    .select({
+      id: recipes.id,
+      name: recipes.name,
+      servingSize: recipes.servingSize,
+      instructions: recipes.instructions,
+      comments: recipes.comments,
+    })
     .from(shoppingListRecipes)
     .innerJoin(recipes, eq(shoppingListRecipes.recipeId, recipes.id))
     .where(eq(shoppingListRecipes.shoppingListId, activeList.id))
     .orderBy(asc(shoppingListRecipes.id));
+
+  const ingredientRows = listRecipeRows.length
+    ? await db
+        .select({ recipeId: recipeIngredients.recipeId, name: items.name, quantity: recipeIngredients.quantity })
+        .from(recipeIngredients)
+        .innerJoin(items, eq(recipeIngredients.itemId, items.id))
+        .where(inArray(recipeIngredients.recipeId, listRecipeRows.map((r) => r.id)))
+        .orderBy(asc(items.name))
+    : [];
+  const listRecipes = countRecipes(listRecipeRows).map((r) => ({
+    ...r,
+    ingredients: ingredientRows.filter((i) => i.recipeId === r.id),
+  }));
 
   // Formatted on the server so client and server render the same string
   const createdAt = new Date(activeList.createdAt).toLocaleString("en-GB", {
@@ -99,7 +124,7 @@ export async function loader() {
     timeStyle: "short",
   });
 
-  return { activeList, createdAt, listRecipes: countNames(listRecipes), listItems, scheduled, allItems };
+  return { activeList, createdAt, listRecipes, listItems, scheduled, allItems };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -327,6 +352,78 @@ function PrepareList({ scheduled }: { scheduled: { position: number; name: strin
   );
 }
 
+type ListRecipe = Extract<Awaited<ReturnType<typeof loader>>, { createdAt: string }>["listRecipes"][number];
+
+// "For: …" line; tapping a recipe opens its details without leaving the list
+function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
+  const [openId, setOpenId] = useState<number | null>(null);
+  const open = recipes.find((r) => r.id === openId);
+
+  if (recipes.length === 0) return <Text c="dimmed" size="sm" mb="lg">No meals</Text>;
+
+  return (
+    <>
+      <Text c="dimmed" size="sm" mb="lg">
+        For:{" "}
+        {recipes.map((r, i) => (
+          <span key={r.id}>
+            {i > 0 && ", "}
+            <Anchor component="button" type="button" size="sm" onClick={() => setOpenId(r.id)}>
+              {r.name}
+            </Anchor>
+            {r.count > 1 && ` ×${r.count}`}
+          </span>
+        ))}
+      </Text>
+
+      <Drawer
+        opened={open != null}
+        onClose={() => setOpenId(null)}
+        position="bottom"
+        size="85%"
+        title={open && <Title order={3}>{open.name}</Title>}
+      >
+        {open && (
+          <Stack>
+            <Text size="sm" c="dimmed">
+              serves {open.servingSize}
+              {open.count > 1 && ` · on this list ×${open.count}`}
+            </Text>
+            <Table>
+              <Table.Tbody>
+                {open.ingredients.map((ing) => (
+                  <Table.Tr key={ing.name}>
+                    <Table.Td>{ing.name}</Table.Td>
+                    <Table.Td c="dimmed" style={{ width: 60 }}>{ing.quantity}×</Table.Td>
+                  </Table.Tr>
+                ))}
+                {open.ingredients.length === 0 && (
+                  <Table.Tr>
+                    <Table.Td c="dimmed">No ingredients.</Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
+            </Table>
+            {open.instructions && (
+              <div>
+                <Text fw={500} size="sm">Instructions</Text>
+                <Text style={{ whiteSpace: "pre-wrap" }}>{open.instructions}</Text>
+              </div>
+            )}
+            {open.comments && (
+              <div>
+                <Text fw={500} size="sm">Comments</Text>
+                <Text style={{ whiteSpace: "pre-wrap" }}>{open.comments}</Text>
+              </div>
+            )}
+            <Anchor component={Link} to={`/recipes/${open.id}`} size="sm">Open recipe page</Anchor>
+          </Stack>
+        )}
+      </Drawer>
+    </>
+  );
+}
+
 export default function Shopping({ loaderData }: Route.ComponentProps) {
   if (!loaderData.activeList) return <PrepareList scheduled={loaderData.scheduled} />;
   const { createdAt, listRecipes, listItems, allItems } = loaderData;
@@ -342,11 +439,7 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
         <Text c="dimmed" size="sm">{tickedCount}/{listItems.length}</Text>
       </Group>
       <Text c="dimmed" size="sm">Created {createdAt}</Text>
-      <Text c="dimmed" size="sm" mb="lg">
-        {listRecipes.length > 0
-          ? `For: ${listRecipes.map((r) => (r.count > 1 ? `${r.name} ×${r.count}` : r.name)).join(", ")}`
-          : "No meals"}
-      </Text>
+      <ListMeals recipes={listRecipes} />
 
       {listItems.length === 0 && (
         <Text c="dimmed" mb="lg">No items on the list.</Text>
