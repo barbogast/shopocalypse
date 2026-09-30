@@ -74,8 +74,12 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "auto-fill") {
     const count = Number(form.get("count"));
 
-    const inQueue = await db.select({ recipeId: mealSchedule.recipeId }).from(mealSchedule);
-    const inQueueIds = inQueue.map((r) => r.recipeId);
+    const queue = await db
+      .select({ recipeId: mealSchedule.recipeId })
+      .from(mealSchedule)
+      .orderBy(asc(mealSchedule.position));
+    // Last position in the queue per recipe (later entries overwrite earlier ones)
+    const queuePos = new Map(queue.map((r, i) => [r.recipeId, i]));
 
     // Find the last-cooked date per recipe
     const lastCooked = await db
@@ -84,30 +88,36 @@ export async function action({ request }: Route.ActionArgs) {
       .groupBy(mealHistory.recipeId);
     const lastCookedMap = new Map(lastCooked.map((r) => [r.recipeId, r.lastDate]));
 
-    const candidates = await db
+    // Rotation order: unscheduled recipes by least recently cooked (never cooked
+    // first), then scheduled ones in the order they come up in the queue.
+    const rotation = await db
       .select({ id: recipes.id })
       .from(recipes)
       .where(eq(recipes.archived, false))
       .then((all) =>
-        all
-          .filter((r) => !inQueueIds.includes(r.id))
-          .sort((a, b) => {
-            const aDate = lastCookedMap.get(a.id) ?? "";
-            const bDate = lastCookedMap.get(b.id) ?? "";
-            return aDate < bDate ? -1 : aDate > bDate ? 1 : 0; // never cooked ("") sorts first
-          })
-          .slice(0, count)
+        all.sort((a, b) => {
+          const aPos = queuePos.get(a.id) ?? -1;
+          const bPos = queuePos.get(b.id) ?? -1;
+          if (aPos !== bPos) return aPos - bPos;
+          const aDate = lastCookedMap.get(a.id) ?? "";
+          const bDate = lastCookedMap.get(b.id) ?? "";
+          return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
+        })
       );
 
-    if (candidates.length === 0) return null;
+    if (rotation.length === 0 || count < 1) return null;
 
     const [{ nextPos }] = await db
       .select({ nextPos: max(mealSchedule.position) })
       .from(mealSchedule);
-    let pos = (nextPos ?? 0) + 1;
-    for (const candidate of candidates) {
-      await db.insert(mealSchedule).values({ position: pos++, recipeId: candidate.id });
-    }
+    const start = (nextPos ?? 0) + 1;
+    // Loop through the rotation if more meals are requested than there are recipes
+    await db.insert(mealSchedule).values(
+      Array.from({ length: count }, (_, i) => ({
+        position: start + i,
+        recipeId: rotation[i % rotation.length].id,
+      }))
+    );
   }
 
   return null;
@@ -205,7 +215,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               <NumberInput
                 name="count"
                 label="Auto-fill"
-                description="Adds least recently cooked recipes"
+                description="Appends least recently cooked recipes"
                 min={1}
                 defaultValue={3}
                 style={{ width: 100 }}
