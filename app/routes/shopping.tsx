@@ -236,8 +236,8 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 // Group list items by store
-function groupByStore(listItems: Awaited<ReturnType<typeof loader>>["listItems"]) {
-  const groups = new Map<string, typeof listItems>();
+function groupByStore<T extends { storeName: string | null }>(listItems: T[]) {
+  const groups = new Map<string, T[]>();
   for (const item of listItems) {
     const key = item.storeName ?? "Other";
     if (!groups.has(key)) groups.set(key, []);
