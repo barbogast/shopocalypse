@@ -13,11 +13,13 @@ import {
   Title,
 } from "@mantine/core";
 import { IconArchive, IconArchiveOff, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
+import { useState } from "react";
 import { and, asc, eq } from "drizzle-orm";
 import { Form, Link, redirect } from "react-router";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, hasBeenCooked, restoreRecipe } from "~/db/recipes.server";
 import { items, recipeIngredients, recipes } from "~/db/schema";
+import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/recipes.$id";
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -26,13 +28,16 @@ export async function loader({ params }: Route.LoaderArgs) {
   if (!recipe) throw new Response("Not found", { status: 404 });
 
   const ingredients = await db
-    .select({ itemId: items.id, name: items.name, quantity: recipeIngredients.quantity })
+    .select({ itemId: items.id, name: items.name, quantity: recipeIngredients.quantity, unit: recipeIngredients.unit })
     .from(recipeIngredients)
     .innerJoin(items, eq(recipeIngredients.itemId, items.id))
     .where(eq(recipeIngredients.recipeId, id))
     .orderBy(asc(items.name));
 
-  const allItems = await db.select({ id: items.id, name: items.name }).from(items).orderBy(items.name);
+  const allItems = await db
+    .select({ id: items.id, name: items.name, defaultUnit: items.defaultUnit })
+    .from(items)
+    .orderBy(items.name);
 
   return { recipe, ingredients, allItems, cooked: hasBeenCooked(id) };
 }
@@ -53,12 +58,14 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent === "add-ingredient") {
     const itemId = Number(form.get("itemId"));
-    const quantity = Number(form.get("quantity"));
-    if (!itemId || quantity < 1) return { error: "Select an item and quantity." };
+    if (!itemId) return { error: "Select an item." };
+    const parsed = parseAmount(form);
+    if ("error" in parsed) return { error: parsed.error };
+    const { quantity, unit } = parsed.amount;
     await db
       .insert(recipeIngredients)
-      .values({ recipeId: id, itemId, quantity })
-      .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity } });
+      .values({ recipeId: id, itemId, quantity, unit })
+      .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit } });
   }
 
   if (intent === "remove-ingredient") {
@@ -86,6 +93,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   const availableItems = allItems
     .filter((i) => !usedItemIds.has(i.id))
     .map((i) => ({ value: String(i.id), label: i.name }));
+  const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
 
   return (
     <Container size="sm" py="xl">
@@ -134,7 +142,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           {ingredients.map((ing) => (
             <Table.Tr key={ing.itemId}>
               <Table.Td>{ing.name}</Table.Td>
-              <Table.Td c="dimmed" style={{ width: 60 }}>{ing.quantity}×</Table.Td>
+              <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
               <Table.Td style={{ width: 40 }}>
                 <Form method="post">
                   <input type="hidden" name="intent" value="remove-ingredient" />
@@ -157,15 +165,21 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
       {availableItems.length > 0 && (
         <Form method="post">
           <input type="hidden" name="intent" value="add-ingredient" />
-          <Group align="flex-end">
+          <Group align="flex-end" gap="xs">
             <Select
               name="itemId"
               label="Add ingredient"
               data={availableItems}
               searchable
-              style={{ flex: 1 }}
+              onChange={(value) => {
+                const item = allItems.find((i) => String(i.id) === value);
+                setUnit(item?.defaultUnit ?? DEFAULT_UNIT);
+              }}
+              style={{ flex: 1, minWidth: 140 }}
             />
-            <NumberInput name="quantity" label="Qty" min={1} defaultValue={1} style={{ width: 80 }} />
+            {/* Leave the quantity empty for ingredients without one, like spices */}
+            <NumberInput name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—" style={{ width: 70 }} />
+            <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
             <Button type="submit">Add</Button>
           </Group>
         </Form>

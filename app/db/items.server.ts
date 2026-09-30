@@ -1,24 +1,27 @@
 import { and, asc, desc, eq, gt, lt, max } from "drizzle-orm";
 import { db } from "./client";
 import { itemCategories, items, stores } from "./schema";
+import { isUnitKey } from "~/units";
 
 // Shelves in walking order, grouped by store
 export function listShelves() {
   return db.select().from(itemCategories).orderBy(asc(itemCategories.storeId), asc(itemCategories.position)).all();
 }
 
-// Reads the item form's name/store/shelf fields; a shelf must belong to the chosen store
+// Reads the item form's name/store/shelf/unit fields; a shelf must belong to the chosen store
 export function parseItemForm(form: FormData) {
   const name = String(form.get("name")).trim();
   const storeId = form.get("storeId") ? Number(form.get("storeId")) : null;
   const categoryId = form.get("categoryId") ? Number(form.get("categoryId")) : null;
+  const rawUnit = form.get("defaultUnit");
+  const defaultUnit = isUnitKey(rawUnit) ? rawUnit : null;
 
   if (!name) return { error: "Name is required." } as const;
   if (categoryId != null) {
     const shelf = db.select().from(itemCategories).where(eq(itemCategories.id, categoryId)).get();
     if (!shelf || shelf.storeId !== storeId) return { error: "That shelf isn't in the chosen store." } as const;
   }
-  return { values: { name, storeId, categoryId } } as const;
+  return { values: { name, storeId, categoryId, defaultUnit } } as const;
 }
 
 export function addShelf(storeId: number, name: string) {

@@ -32,6 +32,7 @@ import {
   stock,
   stores,
 } from "~/db/schema";
+import { type Amount, combineAmounts, DEFAULT_UNIT, formatAmount, formatAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/shopping";
 
 export function meta() {
@@ -63,8 +64,7 @@ export async function loader() {
     .orderBy(asc(mealSchedule.position));
 
   if (!activeList) {
-    const allItems = await db.select({ id: items.id, name: items.name }).from(items).orderBy(items.name);
-    return { activeList: null, listItems: [], scheduled, allItems };
+    return { activeList: null, listItems: [], scheduled };
   }
 
   const listItems = await db
@@ -72,8 +72,8 @@ export async function loader() {
       id: shoppingListItems.id,
       itemId: shoppingListItems.itemId,
       itemName: items.name,
-      quantityNeeded: shoppingListItems.quantityNeeded,
-      quantityBought: shoppingListItems.quantityBought,
+      amounts: shoppingListItems.amounts,
+      bought: shoppingListItems.bought,
       source: shoppingListItems.source,
       storeName: stores.name,
       shelfName: itemCategories.name,
@@ -94,7 +94,7 @@ export async function loader() {
 
   const listedItemIds = new Set(listItems.map((i) => i.itemId));
   const allItems = await db
-    .select({ id: items.id, name: items.name })
+    .select({ id: items.id, name: items.name, defaultUnit: items.defaultUnit })
     .from(items)
     .orderBy(items.name)
     .then((all) => all.filter((i) => !listedItemIds.has(i.id)));
@@ -119,6 +119,7 @@ export async function loader() {
           itemId: recipeIngredients.itemId,
           name: items.name,
           quantity: recipeIngredients.quantity,
+          unit: recipeIngredients.unit,
         })
         .from(recipeIngredients)
         .innerJoin(items, eq(recipeIngredients.itemId, items.id))
@@ -155,26 +156,22 @@ export async function action({ request }: Route.ActionArgs) {
             .orderBy(asc(mealSchedule.position))
         : [];
 
-    // Sum ingredients across selected meals
-    const mealTotals = new Map<number, number>();
+    // Collect ingredient amounts across selected meals, per item
+    const mealAmounts = new Map<number, Amount[]>();
     for (const meal of scheduled) {
       const ings = await db
         .select()
         .from(recipeIngredients)
         .where(eq(recipeIngredients.recipeId, meal.recipeId));
       for (const ing of ings) {
-        mealTotals.set(ing.itemId, (mealTotals.get(ing.itemId) ?? 0) + ing.quantity);
+        mealAmounts.set(ing.itemId, [...(mealAmounts.get(ing.itemId) ?? []), ing]);
       }
     }
 
-    // Subtract stock
-    const stockRows = STOCK_TRACKING_ENABLED ? await db.select().from(stock) : [];
-    const stockMap = new Map(stockRows.map((s) => [s.itemId, s.currentQuantity]));
-
-    const toAdd = new Map<number, { quantity: number; source: "meal_plan" | "stock_deficit" }>();
-    for (const [itemId, qty] of mealTotals) {
-      const needed = qty - (stockMap.get(itemId) ?? 0);
-      if (needed > 0) toAdd.set(itemId, { quantity: needed, source: "meal_plan" });
+    // Stock has no units, so it isn't subtracted from meal amounts
+    const toAdd = new Map<number, { amounts: Amount[]; source: "meal_plan" | "stock_deficit" }>();
+    for (const [itemId, amounts] of mealAmounts) {
+      toAdd.set(itemId, { amounts: combineAmounts(amounts), source: "meal_plan" });
     }
 
     // Add stock deficits not already covered
@@ -187,7 +184,7 @@ export async function action({ request }: Route.ActionArgs) {
     for (const deficit of deficits) {
       if (!toAdd.has(deficit.itemId)) {
         toAdd.set(deficit.itemId, {
-          quantity: deficit.desiredQuantity - deficit.currentQuantity,
+          amounts: [{ quantity: deficit.desiredQuantity - deficit.currentQuantity, unit: "pcs" }],
           source: "stock_deficit",
         });
       }
@@ -206,10 +203,10 @@ export async function action({ request }: Route.ActionArgs) {
 
     if (toAdd.size > 0) {
       await db.insert(shoppingListItems).values(
-        [...toAdd.entries()].map(([itemId, { quantity, source }]) => ({
+        [...toAdd.entries()].map(([itemId, { amounts, source }]) => ({
           shoppingListId: list.id,
           itemId,
-          quantityNeeded: quantity,
+          amounts,
           source,
         }))
       );
@@ -225,19 +222,19 @@ export async function action({ request }: Route.ActionArgs) {
     if (!activeList) return null;
 
     const itemId = Number(form.get("itemId"));
-    const quantity = Number(form.get("quantity"));
+    const parsed = parseAmount(form);
+    if (!itemId || "error" in parsed) return null;
     await db
       .insert(shoppingListItems)
-      .values({ shoppingListId: activeList.id, itemId, quantityNeeded: quantity, source: "manual" })
+      .values({ shoppingListId: activeList.id, itemId, amounts: combineAmounts([parsed.amount]), source: "manual" })
       .onConflictDoNothing();
   }
 
   if (intent === "tick") {
     const id = Number(form.get("id"));
-    const quantityBought = Number(form.get("quantityBought"));
     await db
       .update(shoppingListItems)
-      .set({ quantityBought })
+      .set({ bought: true })
       .where(eq(shoppingListItems.id, id));
   }
 
@@ -245,7 +242,7 @@ export async function action({ request }: Route.ActionArgs) {
     const id = Number(form.get("id"));
     await db
       .update(shoppingListItems)
-      .set({ quantityBought: null })
+      .set({ bought: false })
       .where(eq(shoppingListItems.id, id));
   }
 
@@ -262,37 +259,11 @@ export async function action({ request }: Route.ActionArgs) {
       .limit(1);
     if (!activeList) return null;
 
-    const ticked = await db
-      .select()
-      .from(shoppingListItems)
-      .where(eq(shoppingListItems.shoppingListId, activeList.id))
-      .then((rows) => rows.filter((r) => r.quantityBought != null));
-
-    await db.transaction(async (tx) => {
-      for (const item of STOCK_TRACKING_ENABLED ? ticked : []) {
-        const bought = item.quantityBought!;
-        const [existing] = await tx
-          .select()
-          .from(stock)
-          .where(eq(stock.itemId, item.itemId));
-        if (existing) {
-          await tx
-            .update(stock)
-            .set({ currentQuantity: existing.currentQuantity + bought })
-            .where(eq(stock.itemId, item.itemId));
-        } else {
-          await tx.insert(stock).values({
-            itemId: item.itemId,
-            currentQuantity: bought,
-            desiredQuantity: 0,
-          });
-        }
-      }
-      await tx
-        .update(shoppingLists)
-        .set({ status: "completed" })
-        .where(eq(shoppingLists.id, activeList.id));
-    });
+    // Stock has no units, so finishing doesn't add bought items to it
+    await db
+      .update(shoppingLists)
+      .set({ status: "completed" })
+      .where(eq(shoppingLists.id, activeList.id));
   }
 
   if (intent === "discard") {
@@ -409,7 +380,7 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
                 {open.ingredients.map((ing) => (
                   <Table.Tr key={ing.name}>
                     <Table.Td>{ing.name}</Table.Td>
-                    <Table.Td c="dimmed" style={{ width: 60 }}>{ing.quantity}×</Table.Td>
+                    <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
                   </Table.Tr>
                 ))}
                 {open.ingredients.length === 0 && (
@@ -439,13 +410,37 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
   );
 }
 
+// Manually add an item; the unit starts on the item's default unit
+function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit: string | null }[] }) {
+  const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
+
+  return (
+    <Form method="post">
+      <input type="hidden" name="intent" value="add-manual" />
+      <Group align="flex-end" gap="xs">
+        <Select
+          name="itemId"
+          label="Add item"
+          data={items.map((i) => ({ value: String(i.id), label: i.name }))}
+          searchable
+          placeholder="Select item…"
+          onChange={(value) => setUnit(items.find((i) => String(i.id) === value)?.defaultUnit ?? DEFAULT_UNIT)}
+          style={{ flex: 1, minWidth: 140 }}
+        />
+        <NumberInput name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—" style={{ width: 70 }} />
+        <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
+        <Button type="submit" leftSection={<IconPlus size={16} />}>Add</Button>
+      </Group>
+    </Form>
+  );
+}
+
 export default function Shopping({ loaderData }: Route.ComponentProps) {
   if (!loaderData.activeList) return <PrepareList scheduled={loaderData.scheduled} />;
   const { createdAt, listRecipes, listItems, allItems } = loaderData;
 
   const groups = groupByStoreAndShelf(listItems);
-  const allTicked = listItems.length > 0 && listItems.every((i) => i.quantityBought != null);
-  const tickedCount = listItems.filter((i) => i.quantityBought != null).length;
+  const tickedCount = listItems.filter((i) => i.bought).length;
 
   // Which of the list's meals use each item
   const recipesByItem = new Map<number, string[]>();
@@ -486,7 +481,7 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
                     ]
                   : []),
                 ...shelfItems.map((item) => {
-                  const ticked = item.quantityBought != null;
+                  const ticked = item.bought;
                   return (
                     <Table.Tr key={item.id} opacity={ticked ? 0.5 : 1}>
                       <Table.Td>
@@ -501,21 +496,14 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
                           <Badge size="xs" variant="outline" color="gray">manual</Badge>
                         )}
                       </Table.Td>
-                      <Table.Td style={{ width: 40 }} c="dimmed">
-                        {ticked ? item.quantityBought : item.quantityNeeded}×
+                      <Table.Td style={{ width: 110 }} c="dimmed">
+                        {formatAmounts(item.amounts)}
                       </Table.Td>
-                      <Table.Td style={{ width: 120 }}>
+                      <Table.Td style={{ width: 60 }}>
                         {!ticked ? (
-                          <Form method="post" style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                          <Form method="post">
                             <input type="hidden" name="intent" value="tick" />
                             <input type="hidden" name="id" value={item.id} />
-                            <NumberInput
-                              name="quantityBought"
-                              defaultValue={item.quantityNeeded}
-                              min={0}
-                              style={{ width: 70 }}
-                              size="xs"
-                            />
                             <Button type="submit" size="xs" color="green" px={6}>
                               <IconCheck size={14} />
                             </Button>
@@ -549,21 +537,7 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
       {allItems.length > 0 && (
         <>
           <Divider my="md" />
-          <Form method="post">
-            <input type="hidden" name="intent" value="add-manual" />
-            <Group align="flex-end">
-              <Select
-                name="itemId"
-                label="Add item"
-                data={allItems.map((i) => ({ value: String(i.id), label: i.name }))}
-                searchable
-                placeholder="Select item…"
-                style={{ flex: 1 }}
-              />
-              <NumberInput name="quantity" label="Qty" min={1} defaultValue={1} style={{ width: 80 }} />
-              <Button type="submit" leftSection={<IconPlus size={16} />}>Add</Button>
-            </Group>
-          </Form>
+          <AddItemForm items={allItems} />
         </>
       )}
 

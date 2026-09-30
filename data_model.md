@@ -20,6 +20,7 @@
 - name
 - store_id
 - category_id — the shelf; must be one of the item's store's shelves
+- default_unit (optional) — prefilled when adding the item to a recipe or the shopping list
 
 ### Recipe
 
@@ -35,7 +36,8 @@
 
 - recipe_id
 - item_id
-- quantity (integer)
+- quantity (decimal, optional)
+- unit (optional) — both are empty when the recipe gives no quantity (e.g. spices)
 
 ### Stock _(one entry per ingredient)_
 
@@ -76,8 +78,8 @@ A recipe appears once per scheduled meal, so it can be listed more than once.
 - id
 - shopping_list_id
 - item_id
-- quantity_needed (integer)
-- quantity_bought (integer — set when ticking off; may be less than quantity_needed)
+- amounts (JSON list of `{ quantity, unit }`) — what's needed, one entry per unit kind (e.g. `10 g + 2 tbsp`); empty when no quantity is given
+- bought (boolean) — set when ticking off
 - source: meal_plan | stock_deficit | manual
 
 ## Key relationships
@@ -93,7 +95,8 @@ A recipe appears once per scheduled meal, so it can be listed more than once.
 ## Notes and assumptions
 
 - Single shared instance — no user accounts or authentication
-- All quantities are plain integers (no units)
+- Units are a fixed list in code (`app/units.ts`). g/kg and ml/l are added up with each other; every other unit (pcs, tbsp, can, bottle, …) only with itself — there's no conversion between kinds
+- Stock quantities are still plain integers without units; stock tracking is switched off and needs its own unit design before it comes back
 - Only one ShoppingList can be active at a time; completing it archives the old one
 - The shopping list is grouped by store, then by shelf in the store's shelf order
 - "Cook meal" is the sole mechanism that advances the schedule and writes CookHistory

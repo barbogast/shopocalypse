@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { Form, Link, redirect, useNavigate } from "react-router";
 import { db } from "~/db/client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes } from "~/db/schema";
+import { formatAmount } from "~/units";
 import type { Route } from "./+types/cook.$id";
 
 export function meta({ data }: Route.MetaArgs) {
@@ -29,7 +30,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!recipe) throw new Response("Not found", { status: 404 });
 
   const ingredients = await db
-    .select({ itemId: items.id, name: items.name, quantity: recipeIngredients.quantity })
+    .select({ itemId: items.id, name: items.name, quantity: recipeIngredients.quantity, unit: recipeIngredients.unit })
     .from(recipeIngredients)
     .innerJoin(items, eq(recipeIngredients.itemId, items.id))
     .where(eq(recipeIngredients.recipeId, id))
@@ -96,7 +97,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
           {ingredients.map((ing) => (
             <Table.Tr key={ing.itemId}>
               <Table.Td>{ing.name}</Table.Td>
-              <Table.Td c="dimmed" style={{ width: 60 }}>{ing.quantity}×</Table.Td>
+              <Table.Td c="dimmed" style={{ width: 100 }}>{formatAmount(ing)}</Table.Td>
             </Table.Tr>
           ))}
           {ingredients.length === 0 && (

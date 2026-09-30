@@ -1,9 +1,10 @@
-import { Button, Container, Group, Stack, TextInput, Title } from "@mantine/core";
+import { Button, Container, Group, Select, Stack, TextInput, Title } from "@mantine/core";
 import { redirect } from "react-router";
 import { StoreShelfFields } from "~/components/store-shelf-fields";
 import { db } from "~/db/client";
 import { listShelves, parseItemForm } from "~/db/items.server";
 import { items, stores } from "~/db/schema";
+import { UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/items.new";
 
 export function meta() {
@@ -34,6 +35,7 @@ export default function NewItem({ loaderData, actionData }: Route.ComponentProps
         <Stack>
           <TextInput name="name" label="Name" required autoFocus />
           <StoreShelfFields stores={allStores} shelves={allShelves} />
+          <Select name="defaultUnit" label="Default unit" data={UNIT_OPTIONS} clearable placeholder="None" />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
             <Button type="submit">Create</Button>

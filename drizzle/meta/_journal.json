@@ -43,6 +43,13 @@
       "when": 1790757669349,
       "tag": "0005_fresh_mandrill",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790768995115,
+      "tag": "0006_moaning_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }

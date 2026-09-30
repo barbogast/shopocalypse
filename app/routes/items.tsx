@@ -18,6 +18,7 @@ import { Form, Link } from "react-router";
 import { db } from "~/db/client";
 import { addShelf, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
 import { itemCategories, items, stores } from "~/db/schema";
+import { unitName } from "~/units";
 import type { Route } from "./+types/items";
 
 export function meta() {
@@ -29,6 +30,7 @@ export async function loader() {
     .select({
       id: items.id,
       name: items.name,
+      defaultUnit: items.defaultUnit,
       shelfName: itemCategories.name,
       storeName: stores.name,
     })
@@ -166,6 +168,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
           {allItems.map((item) => (
             <Table.Tr key={item.id}>
               <Table.Td>{item.name}</Table.Td>
+              <Table.Td c="dimmed">{item.defaultUnit ? unitName(item.defaultUnit) : "—"}</Table.Td>
               <Table.Td c="dimmed">{item.shelfName ?? "—"}</Table.Td>
               <Table.Td c="dimmed">{item.storeName ?? "—"}</Table.Td>
               <Table.Td style={{ width: 72 }}>

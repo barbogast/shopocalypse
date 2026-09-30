@@ -30,20 +30,22 @@ const [meat] = await db
   .values({ name: "Meat", storeId: store.id, position: 4 })
   .returning();
 
-const [pasta, tomatoes, onion, garlic, mince, chickenBreast, rice, lemon, eggs, cheese] =
+const [pasta, tomatoes, onion, garlic, mince, chickenBreast, rice, lemon, eggs, cheese, salt, pepper] =
   await db
     .insert(schema.items)
     .values([
-      { name: "Pasta", categoryId: pantry.id, storeId: store.id },
-      { name: "Tomatoes", categoryId: produce.id, storeId: store.id },
-      { name: "Onion", categoryId: produce.id, storeId: store.id },
+      { name: "Pasta", categoryId: pantry.id, storeId: store.id, defaultUnit: "g" },
+      { name: "Tomatoes", categoryId: produce.id, storeId: store.id, defaultUnit: "can" },
+      { name: "Onion", categoryId: produce.id, storeId: store.id, defaultUnit: "pcs" },
       { name: "Garlic", categoryId: produce.id, storeId: store.id },
-      { name: "Minced beef", categoryId: meat.id, storeId: store.id },
-      { name: "Chicken breast", categoryId: meat.id, storeId: store.id },
-      { name: "Rice", categoryId: pantry.id, storeId: store.id },
-      { name: "Lemon", categoryId: produce.id, storeId: store.id },
-      { name: "Eggs", categoryId: dairy.id, storeId: store.id },
-      { name: "Cheese", categoryId: dairy.id, storeId: store.id },
+      { name: "Minced beef", categoryId: meat.id, storeId: store.id, defaultUnit: "g" },
+      { name: "Chicken breast", categoryId: meat.id, storeId: store.id, defaultUnit: "g" },
+      { name: "Rice", categoryId: pantry.id, storeId: store.id, defaultUnit: "g" },
+      { name: "Lemon", categoryId: produce.id, storeId: store.id, defaultUnit: "pcs" },
+      { name: "Eggs", categoryId: dairy.id, storeId: store.id, defaultUnit: "pcs" },
+      { name: "Cheese", categoryId: dairy.id, storeId: store.id, defaultUnit: "g" },
+      { name: "Salt", categoryId: pantry.id, storeId: store.id },
+      { name: "Pepper", categoryId: pantry.id, storeId: store.id },
     ])
     .returning();
 
@@ -57,19 +59,23 @@ const [bolognese, lemonChicken, friedRice] = await db
   .returning();
 
 await db.insert(schema.recipeIngredients).values([
-  { recipeId: bolognese.id, itemId: pasta.id, quantity: 2 },
-  { recipeId: bolognese.id, itemId: tomatoes.id, quantity: 3 },
-  { recipeId: bolognese.id, itemId: onion.id, quantity: 1 },
-  { recipeId: bolognese.id, itemId: garlic.id, quantity: 2 },
-  { recipeId: bolognese.id, itemId: mince.id, quantity: 1 },
+  { recipeId: bolognese.id, itemId: pasta.id, quantity: 500, unit: "g" },
+  { recipeId: bolognese.id, itemId: tomatoes.id, quantity: 1, unit: "can" },
+  { recipeId: bolognese.id, itemId: onion.id, quantity: 1, unit: "pcs" },
+  { recipeId: bolognese.id, itemId: garlic.id, quantity: 2, unit: "pcs" },
+  { recipeId: bolognese.id, itemId: mince.id, quantity: 500, unit: "g" },
+  { recipeId: bolognese.id, itemId: cheese.id, quantity: 50, unit: "g" },
+  { recipeId: bolognese.id, itemId: salt.id, quantity: 10, unit: "g" },
 
-  { recipeId: lemonChicken.id, itemId: chickenBreast.id, quantity: 2 },
-  { recipeId: lemonChicken.id, itemId: lemon.id, quantity: 1 },
-  { recipeId: lemonChicken.id, itemId: garlic.id, quantity: 2 },
+  { recipeId: lemonChicken.id, itemId: chickenBreast.id, quantity: 400, unit: "g" },
+  { recipeId: lemonChicken.id, itemId: lemon.id, quantity: 1, unit: "pcs" },
+  { recipeId: lemonChicken.id, itemId: garlic.id, quantity: 2, unit: "pcs" },
+  { recipeId: lemonChicken.id, itemId: salt.id, quantity: 1, unit: "tsp" },
+  { recipeId: lemonChicken.id, itemId: pepper.id, quantity: null, unit: null },
 
-  { recipeId: friedRice.id, itemId: rice.id, quantity: 1 },
-  { recipeId: friedRice.id, itemId: eggs.id, quantity: 3 },
-  { recipeId: friedRice.id, itemId: onion.id, quantity: 1 },
+  { recipeId: friedRice.id, itemId: rice.id, quantity: 250, unit: "g" },
+  { recipeId: friedRice.id, itemId: eggs.id, quantity: 3, unit: "pcs" },
+  { recipeId: friedRice.id, itemId: onion.id, quantity: 1, unit: "pcs" },
 ]);
 
 const maxPosition = 100;

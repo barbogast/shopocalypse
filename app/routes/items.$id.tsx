@@ -1,10 +1,11 @@
-import { Button, Container, Group, Stack, TextInput, Title } from "@mantine/core";
+import { Button, Container, Group, Select, Stack, TextInput, Title } from "@mantine/core";
 import { eq } from "drizzle-orm";
 import { redirect } from "react-router";
 import { StoreShelfFields } from "~/components/store-shelf-fields";
 import { db } from "~/db/client";
 import { listShelves, parseItemForm } from "~/db/items.server";
 import { items, stores } from "~/db/schema";
+import { UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/items.$id";
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -43,6 +44,7 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
             defaultStoreId={item.storeId}
             defaultShelfId={item.categoryId}
           />
+          <Select name="defaultUnit" label="Default unit" data={UNIT_OPTIONS} defaultValue={item.defaultUnit} clearable placeholder="None" />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
             <Button type="submit">Save</Button>

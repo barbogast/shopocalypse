@@ -1,4 +1,5 @@
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import type { Amount, UnitKey } from "../units";
 
 export const stores = sqliteTable("stores", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -20,6 +21,8 @@ export const items = sqliteTable("items", {
   name: text("name").notNull(),
   categoryId: integer("category_id").references(() => itemCategories.id),
   storeId: integer("store_id").references(() => stores.id),
+  // Unit prefilled when adding the item to a recipe or the shopping list
+  defaultUnit: text("default_unit").$type<UnitKey>(),
 });
 
 export const recipes = sqliteTable("recipes", {
@@ -38,7 +41,9 @@ export const recipeIngredients = sqliteTable("recipe_ingredients", {
   itemId: integer("item_id")
     .notNull()
     .references(() => items.id),
-  quantity: integer("quantity").notNull(),
+  // Both null when the recipe gives no quantity (e.g. spices)
+  quantity: real("quantity"),
+  unit: text("unit").$type<UnitKey>(),
 }, (t) => [primaryKey({ columns: [t.recipeId, t.itemId] })]);
 
 export const stock = sqliteTable("stock", {
@@ -89,7 +94,8 @@ export const shoppingListItems = sqliteTable("shopping_list_items", {
   itemId: integer("item_id")
     .notNull()
     .references(() => items.id),
-  quantityNeeded: integer("quantity_needed").notNull(),
-  quantityBought: integer("quantity_bought"),
+  // Combined amounts needed, one per unit kind; empty when no quantity is given
+  amounts: text("amounts", { mode: "json" }).$type<Amount[]>().notNull(),
+  bought: integer("bought", { mode: "boolean" }).notNull().default(false),
   source: text("source", { enum: ["meal_plan", "stock_deficit", "manual"] }).notNull(),
 });
