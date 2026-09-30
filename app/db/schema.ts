@@ -65,6 +65,17 @@ export const shoppingLists = sqliteTable("shopping_lists", {
   status: text("status", { enum: ["active", "completed"] }).notNull().default("active"),
 });
 
+// Meals a shopping list was prepared for (a recipe may appear more than once)
+export const shoppingListRecipes = sqliteTable("shopping_list_recipes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  shoppingListId: integer("shopping_list_id")
+    .notNull()
+    .references(() => shoppingLists.id),
+  recipeId: integer("recipe_id")
+    .notNull()
+    .references(() => recipes.id),
+});
+
 export const shoppingListItems = sqliteTable("shopping_list_items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   shoppingListId: integer("shopping_list_id")

@@ -25,6 +25,7 @@ import {
   recipeIngredients,
   recipes,
   shoppingListItems,
+  shoppingListRecipes,
   shoppingLists,
   stock,
   stores,
@@ -33,6 +34,13 @@ import type { Route } from "./+types/shopping";
 
 export function meta() {
   return [{ title: "Shopping – Shopocalypse" }];
+}
+
+// Collapse repeated recipes into one entry with a count, keeping first-seen order
+function countNames(rows: { name: string }[]) {
+  const counts = new Map<string, number>();
+  for (const { name } of rows) counts.set(name, (counts.get(name) ?? 0) + 1);
+  return [...counts].map(([name, count]) => ({ name, count }));
 }
 
 export async function loader() {
@@ -78,7 +86,20 @@ export async function loader() {
     .orderBy(items.name)
     .then((all) => all.filter((i) => !listedItemIds.has(i.id)));
 
-  return { activeList, listItems, scheduled, allItems };
+  const listRecipes = await db
+    .select({ name: recipes.name })
+    .from(shoppingListRecipes)
+    .innerJoin(recipes, eq(shoppingListRecipes.recipeId, recipes.id))
+    .where(eq(shoppingListRecipes.shoppingListId, activeList.id))
+    .orderBy(asc(shoppingListRecipes.id));
+
+  // Formatted on the server so client and server render the same string
+  const createdAt = new Date(activeList.createdAt).toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
+  return { activeList, createdAt, listRecipes: countNames(listRecipes), listItems, scheduled, allItems };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -90,7 +111,11 @@ export async function action({ request }: Route.ActionArgs) {
 
     const scheduled =
       positions.length > 0
-        ? await db.select().from(mealSchedule).where(inArray(mealSchedule.position, positions))
+        ? await db
+            .select()
+            .from(mealSchedule)
+            .where(inArray(mealSchedule.position, positions))
+            .orderBy(asc(mealSchedule.position))
         : [];
 
     // Sum ingredients across selected meals
@@ -135,6 +160,12 @@ export async function action({ request }: Route.ActionArgs) {
       .insert(shoppingLists)
       .values({ createdAt: new Date().toISOString(), status: "active" })
       .returning();
+
+    if (scheduled.length > 0) {
+      await db
+        .insert(shoppingListRecipes)
+        .values(scheduled.map((meal) => ({ shoppingListId: list.id, recipeId: meal.recipeId })));
+    }
 
     if (toAdd.size > 0) {
       await db.insert(shoppingListItems).values(
@@ -235,6 +266,7 @@ export async function action({ request }: Route.ActionArgs) {
       .limit(1);
     if (!activeList) return null;
     await db.delete(shoppingListItems).where(eq(shoppingListItems.shoppingListId, activeList.id));
+    await db.delete(shoppingListRecipes).where(eq(shoppingListRecipes.shoppingListId, activeList.id));
     await db.delete(shoppingLists).where(eq(shoppingLists.id, activeList.id));
   }
 
@@ -296,9 +328,8 @@ function PrepareList({ scheduled }: { scheduled: { position: number; name: strin
 }
 
 export default function Shopping({ loaderData }: Route.ComponentProps) {
-  const { activeList, listItems, scheduled, allItems } = loaderData;
-
-  if (!activeList) return <PrepareList scheduled={scheduled} />;
+  if (!loaderData.activeList) return <PrepareList scheduled={loaderData.scheduled} />;
+  const { createdAt, listRecipes, listItems, allItems } = loaderData;
 
   const groups = groupByStore(listItems);
   const allTicked = listItems.length > 0 && listItems.every((i) => i.quantityBought != null);
@@ -306,10 +337,16 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
 
   return (
     <Container size="sm" py="xl">
-      <Group justify="space-between" mb="lg">
+      <Group justify="space-between" mb="xs">
         <Title>Shopping</Title>
         <Text c="dimmed" size="sm">{tickedCount}/{listItems.length}</Text>
       </Group>
+      <Text c="dimmed" size="sm">Created {createdAt}</Text>
+      <Text c="dimmed" size="sm" mb="lg">
+        {listRecipes.length > 0
+          ? `For: ${listRecipes.map((r) => (r.count > 1 ? `${r.name} ×${r.count}` : r.name)).join(", ")}`
+          : "No meals"}
+      </Text>
 
       {listItems.length === 0 && (
         <Text c="dimmed" mb="lg">No items on the list.</Text>

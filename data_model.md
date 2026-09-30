@@ -61,6 +61,14 @@ Used to determine "least recently cooked" when auto-filling the schedule.
 - created_at
 - status: active | completed
 
+### ShoppingListRecipe _(meals a list was prepared for)_
+
+- id
+- shopping_list_id
+- recipe_id
+
+A recipe appears once per scheduled meal, so it can be listed more than once.
+
 ### ShoppingListItem
 
 - id
@@ -76,6 +84,7 @@ Used to determine "least recently cooked" when auto-filling the schedule.
 - Stock → Item: one-to-one
 - MealSchedule → Recipe: many-to-one
 - MealHistory → Recipe: many-to-one
+- ShoppingListRecipe → ShoppingList, Recipe: many-to-one
 - ShoppingListItem → Item: many-to-one (nullable)
 
 ## Notes and assumptions
