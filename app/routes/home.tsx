@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Anchor,
   Badge,
   Button,
@@ -9,10 +10,11 @@ import {
   NumberInput,
   Select,
   Stack,
+  Table,
   Text,
   Title,
 } from "@mantine/core";
-import { IconChevronDown, IconChevronUp, IconMinus, IconPlayerPlay, IconPlus, IconRefresh, IconUsers, IconX } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconMinus, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
 import { asc, desc, eq, gt, inArray, lt, max, notInArray, sql } from "drizzle-orm";
 import { useState } from "react";
 import { Form, Link } from "react-router";
@@ -48,7 +50,21 @@ export async function loader() {
     .where(eq(recipes.archived, false))
     .orderBy(recipes.name);
 
-  return { scheduled, allRecipes };
+  const recentlyCooked = await db
+    .select({ id: mealHistory.id, recipeId: recipes.id, name: recipes.name, cookedAt: mealHistory.cookedAt })
+    .from(mealHistory)
+    .innerJoin(recipes, eq(mealHistory.recipeId, recipes.id))
+    .orderBy(desc(mealHistory.cookedAt), desc(mealHistory.id))
+    .limit(10)
+    // Dates are stored as YYYY-MM-DD; formatted on the server so client and server render the same string
+    .then((rows) => rows.map((r) => ({
+      ...r,
+      cookedAt: new Date(`${r.cookedAt}T00:00:00Z`).toLocaleDateString("en-GB", {
+        weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+      }),
+    })));
+
+  return { scheduled, allRecipes, recentlyCooked };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -93,6 +109,11 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "remove") {
     const position = Number(form.get("position"));
     await db.delete(mealSchedule).where(eq(mealSchedule.position, position));
+  }
+
+  // Also changes the auto-fill rotation, which goes by last-cooked date
+  if (intent === "remove-history") {
+    await db.delete(mealHistory).where(eq(mealHistory.id, Number(form.get("id"))));
   }
 
   if (intent === "add") {
@@ -195,7 +216,7 @@ function ServingsControl({ position, servings }: { position: number; servings: n
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { scheduled, allRecipes } = loaderData;
+  const { scheduled, allRecipes, recentlyCooked } = loaderData;
   const [next, ...upcoming] = scheduled;
 
   const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
@@ -344,6 +365,35 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </Form>
         )}
       </Stack>
+
+      <Divider my="lg" />
+
+      <Title order={4} mb="sm">Recently cooked</Title>
+      {recentlyCooked.length === 0 ? (
+        <Text size="sm" c="dimmed">Nothing cooked yet.</Text>
+      ) : (
+        <Table>
+          <Table.Tbody>
+            {recentlyCooked.map((entry) => (
+              <Table.Tr key={entry.id}>
+                <Table.Td c="dimmed" style={{ width: 130, whiteSpace: "nowrap" }}>{entry.cookedAt}</Table.Td>
+                <Table.Td>
+                  <Anchor component={Link} to={`/recipes/${entry.recipeId}`} c="inherit">{entry.name}</Anchor>
+                </Table.Td>
+                <Table.Td style={{ width: 40 }}>
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="remove-history" />
+                    <input type="hidden" name="id" value={entry.id} />
+                    <ActionIcon type="submit" variant="subtle" color="gray" aria-label={`Remove ${entry.name} on ${entry.cookedAt} from history`}>
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Form>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      )}
     </Container>
   );
 }
