@@ -17,13 +17,13 @@ import {
 import { IconArchive, IconArchiveOff, IconCheck, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useRef, useState } from "react";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { ItemFields } from "~/components/item-fields";
 import { db } from "~/db/client";
 import { listShelves, parseItemForm } from "~/db/items.server";
-import { deleteOrArchiveRecipe, hasBeenCooked, restoreRecipe } from "~/db/recipes.server";
-import { items, recipeIngredients, recipes, stores } from "~/db/schema";
+import { deleteOrArchiveRecipe, formatCookedAt, restoreRecipe } from "~/db/recipes.server";
+import { items, mealHistory, recipeIngredients, recipes, stores } from "~/db/schema";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/recipes.$id";
 
@@ -46,7 +46,14 @@ export async function loader({ params }: Route.LoaderArgs) {
 
   const allStores = await db.select().from(stores).orderBy(stores.name);
 
-  return { recipe, ingredients, allItems, allStores, allShelves: listShelves(), cooked: hasBeenCooked(id) };
+  const cookedDates = await db
+    .select({ id: mealHistory.id, cookedAt: mealHistory.cookedAt })
+    .from(mealHistory)
+    .where(eq(mealHistory.recipeId, id))
+    .orderBy(desc(mealHistory.cookedAt), desc(mealHistory.id))
+    .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
+
+  return { recipe, ingredients, allItems, allStores, allShelves: listShelves(), cookedDates };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -125,7 +132,8 @@ function SaveButton({ saved }: { saved: boolean }) {
 }
 
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { recipe, ingredients, allItems, allStores, allShelves, cooked } = loaderData;
+  const { recipe, ingredients, allItems, allStores, allShelves, cookedDates } = loaderData;
+  const cooked = cookedDates.length > 0;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   const availableItems = allItems
     .filter((i) => !usedItemIds.has(i.id))
@@ -308,6 +316,16 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         />
         <SaveButton saved={saved} />
       </Stack>
+
+      <Title order={3} mt="xl" mb="sm">Cooked</Title>
+      {cooked ? (
+        <Stack gap={2}>
+          <Text size="sm" c="dimmed" mb={4}>{cookedDates.length === 1 ? "Once" : `${cookedDates.length} times`}</Text>
+          {cookedDates.map((d) => <Text key={d.id} size="sm">{d.cookedAt}</Text>)}
+        </Stack>
+      ) : (
+        <Text size="sm" c="dimmed">Not cooked yet.</Text>
+      )}
     </Container>
   );
 }

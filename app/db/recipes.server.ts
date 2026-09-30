@@ -3,6 +3,13 @@ import { scaleAmount } from "~/units";
 import { db } from "./client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes } from "./schema";
 
+// Cook dates are stored as YYYY-MM-DD; format on the server so client and server render the same string
+export function formatCookedAt(cookedAt: string) {
+  return new Date(`${cookedAt}T00:00:00Z`).toLocaleDateString("en-GB", {
+    weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+  });
+}
+
 export function hasBeenCooked(recipeId: number) {
   return !!db.select().from(mealHistory).where(eq(mealHistory.recipeId, recipeId)).limit(1).get();
 }

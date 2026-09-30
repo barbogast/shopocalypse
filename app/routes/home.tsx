@@ -20,7 +20,7 @@ import { useState } from "react";
 import { Form, Link } from "react-router";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { db } from "~/db/client";
-import { withIngredients } from "~/db/recipes.server";
+import { formatCookedAt, withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
 import type { Route } from "./+types/home";
 
@@ -56,13 +56,7 @@ export async function loader() {
     .innerJoin(recipes, eq(mealHistory.recipeId, recipes.id))
     .orderBy(desc(mealHistory.cookedAt), desc(mealHistory.id))
     .limit(10)
-    // Dates are stored as YYYY-MM-DD; formatted on the server so client and server render the same string
-    .then((rows) => rows.map((r) => ({
-      ...r,
-      cookedAt: new Date(`${r.cookedAt}T00:00:00Z`).toLocaleDateString("en-GB", {
-        weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
-      }),
-    })));
+    .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
 
   return { scheduled, allRecipes, recentlyCooked };
 }
