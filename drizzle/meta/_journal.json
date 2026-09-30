@@ -8,6 +8,13 @@
       "when": 1779355541612,
       "tag": "0000_cold_romulus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790753450532,
+      "tag": "0001_wild_oracle",
+      "breakpoints": true
     }
   ]
 }

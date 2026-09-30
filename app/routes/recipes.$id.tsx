@@ -7,6 +7,7 @@ import {
   Select,
   Stack,
   Table,
+  Textarea,
   TextInput,
   Title,
 } from "@mantine/core";
@@ -42,8 +43,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "save") {
     const name = String(form.get("name")).trim();
     const servingSize = Number(form.get("servingSize"));
+    const instructions = String(form.get("instructions") ?? "").trim() || null;
+    const comments = String(form.get("comments") ?? "").trim() || null;
     if (!name || servingSize < 1) return { error: "Name and serving size are required." };
-    await db.update(recipes).set({ name, servingSize }).where(eq(recipes.id, id));
+    await db.update(recipes).set({ name, servingSize, instructions, comments }).where(eq(recipes.id, id));
   }
 
   if (intent === "add-ingredient") {
@@ -80,7 +83,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
 
   return (
     <Container size="sm" py="xl">
-      <Form method="post">
+      <Form method="post" id="recipe-form">
         <input type="hidden" name="intent" value="save" />
         <Stack mb="xl">
           <TextInput name="name" label="Name" defaultValue={recipe.name} required />
@@ -139,6 +142,29 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           </Group>
         </Form>
       )}
+
+      {/* Part of the save form above via the `form` attribute */}
+      <Stack mt="xl">
+        <Textarea
+          form="recipe-form"
+          name="instructions"
+          label="Cooking instructions"
+          defaultValue={recipe.instructions ?? ""}
+          autosize
+          minRows={4}
+        />
+        <Textarea
+          form="recipe-form"
+          name="comments"
+          label="Comments"
+          defaultValue={recipe.comments ?? ""}
+          autosize
+          minRows={2}
+        />
+        <Group>
+          <Button type="submit" form="recipe-form">Save</Button>
+        </Group>
+      </Stack>
     </Container>
   );
 }

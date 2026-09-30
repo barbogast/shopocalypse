@@ -24,6 +24,8 @@
 - id
 - name
 - serving_size (integer — fixed per recipe)
+- instructions (free text, optional)
+- comments (free text, optional)
 - ingredients: list of RecipeIngredient
 
 ### RecipeIngredient _(join between Recipe and Ingredient)_
