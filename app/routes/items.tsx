@@ -1,24 +1,26 @@
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Button,
   Card,
   Container,
   Divider,
   Group,
+  Popover,
   Stack,
   Table,
   Text,
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconCheck, IconChevronDown, IconChevronUp, IconPencil, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
+import { IconCheck, IconChevronDown, IconChevronUp, IconPencil, IconPlus, IconToolsKitchen2, IconTrash, IconX } from "@tabler/icons-react";
 import { useState } from "react";
 import { eq } from "drizzle-orm";
 import { Form, Link } from "react-router";
 import { db } from "~/db/client";
 import { addShelf, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
-import { itemCategories, items, stores } from "~/db/schema";
+import { itemCategories, items, recipeIngredients, recipes, stores } from "~/db/schema";
 import { unitName } from "~/units";
 import type { Route } from "./+types/items";
 
@@ -44,7 +46,16 @@ export async function loader() {
   const allShelves = listShelves();
   const allStores = await db.select().from(stores).orderBy(stores.name);
 
-  return { allItems, allShelves, allStores };
+  // Recipes each item is used in
+  const usage = await db
+    .selectDistinct({ itemId: recipeIngredients.itemId, id: recipes.id, name: recipes.name, archived: recipes.archived })
+    .from(recipeIngredients)
+    .innerJoin(recipes, eq(recipeIngredients.recipeId, recipes.id))
+    .orderBy(recipes.name);
+  const recipesByItem: Record<number, typeof usage> = {};
+  for (const row of usage) (recipesByItem[row.itemId] ??= []).push(row);
+
+  return { allItems, allShelves, allStores, recipesByItem };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -136,6 +147,38 @@ function RenamableName({ intent, id, name, fw, size }: {
   );
 }
 
+// Button listing the recipes an item is used in
+function UsedInRecipes({ name, recipes }: { name: string; recipes: { id: number; name: string; archived: boolean }[] }) {
+  if (recipes.length === 0) {
+    return (
+      <ActionIcon variant="subtle" color="gray" disabled aria-label={`${name} isn't used in any recipe`}>
+        <IconToolsKitchen2 size={16} />
+      </ActionIcon>
+    );
+  }
+
+  return (
+    <Popover position="bottom-end" shadow="md" withArrow>
+      <Popover.Target>
+        <ActionIcon variant="subtle" color="gray" aria-label={`Recipes using ${name}`}>
+          <IconToolsKitchen2 size={16} />
+        </ActionIcon>
+      </Popover.Target>
+      <Popover.Dropdown>
+        <Text size="xs" fw={600} c="dimmed" mb={4}>Used in</Text>
+        <Stack gap={4}>
+          {recipes.map((r) => (
+            <Group key={r.id} gap={6} wrap="nowrap">
+              <Anchor component={Link} to={`/recipes/${r.id}`} size="sm">{r.name}</Anchor>
+              {r.archived && <Badge size="xs" variant="outline" color="gray">archived</Badge>}
+            </Group>
+          ))}
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
+  );
+}
+
 function ShelfMoveButtons({ id, first, last }: { id: number; first: boolean; last: boolean }) {
   return (
     <Form method="post" style={{ display: "flex" }}>
@@ -154,7 +197,7 @@ function ShelfMoveButtons({ id, first, last }: { id: number; first: boolean; las
 }
 
 export default function Items({ loaderData }: Route.ComponentProps) {
-  const { allItems, allShelves, allStores } = loaderData;
+  const { allItems, allShelves, allStores, recipesByItem } = loaderData;
 
   return (
     <Container size="sm" py="xl">
@@ -178,8 +221,9 @@ export default function Items({ loaderData }: Route.ComponentProps) {
               <Table.Td c="dimmed">{item.defaultUnit ? unitName(item.defaultUnit) : "—"}</Table.Td>
               <Table.Td c="dimmed">{item.shelfName ?? "—"}</Table.Td>
               <Table.Td c="dimmed">{item.storeName ?? "—"}</Table.Td>
-              <Table.Td style={{ width: 72 }}>
+              <Table.Td style={{ width: 104 }}>
                 <Group gap={4} wrap="nowrap">
+                  <UsedInRecipes name={item.name} recipes={recipesByItem[item.id] ?? []} />
                   <ActionIcon component={Link} to={`/items/${item.id}`} variant="subtle">
                     <IconPencil size={16} />
                   </ActionIcon>
