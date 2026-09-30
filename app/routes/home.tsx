@@ -29,15 +29,13 @@ export async function loader() {
     .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
     .orderBy(asc(mealSchedule.position));
 
-  const scheduledRecipeIds = scheduled.map((s) => s.recipeId);
-
   const allRecipes = await db
     .select({ id: recipes.id, name: recipes.name })
     .from(recipes)
     .where(eq(recipes.archived, false))
     .orderBy(recipes.name);
 
-  return { scheduled, allRecipes, scheduledRecipeIds };
+  return { scheduled, allRecipes };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -124,12 +122,10 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { scheduled, allRecipes, scheduledRecipeIds } = loaderData;
+  const { scheduled, allRecipes } = loaderData;
   const [next, ...upcoming] = scheduled;
 
-  const availableRecipes = allRecipes
-    .filter((r) => !scheduledRecipeIds.includes(r.id))
-    .map((r) => ({ value: String(r.id), label: r.name }));
+  const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
 
   return (
     <Container size="sm" py="xl">
