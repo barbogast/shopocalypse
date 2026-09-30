@@ -6,15 +6,15 @@ import { Form, Link, redirect, useNavigate } from "react-router";
 import { Markdown } from "~/components/markdown";
 import { db } from "~/db/client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes } from "~/db/schema";
-import { formatAmount } from "~/units";
+import { formatAmount, scaleAmount } from "~/units";
 import type { Route } from "./+types/cook.$id";
 
 export function meta({ data }: Route.MetaArgs) {
   return [{ title: `Cooking ${data?.recipe.name ?? ""} – Shopocalypse` }];
 }
 
-// Returns the schedule position from ?position=, if it refers to an entry for this recipe
-function scheduledPosition(request: Request, recipeId: number) {
+// Returns the schedule entry from ?position=, if it refers to an entry for this recipe
+function scheduledMeal(request: Request, recipeId: number) {
   const param = new URL(request.url).searchParams.get("position");
   if (param == null) return null;
   const entry = db
@@ -22,7 +22,7 @@ function scheduledPosition(request: Request, recipeId: number) {
     .from(mealSchedule)
     .where(and(eq(mealSchedule.position, Number(param)), eq(mealSchedule.recipeId, recipeId)))
     .get();
-  return entry?.position ?? null;
+  return entry ?? null;
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -37,14 +37,21 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     .where(eq(recipeIngredients.recipeId, id))
     .orderBy(asc(items.name));
 
-  return { recipe, ingredients, scheduled: scheduledPosition(request, id) != null };
+  const meal = scheduledMeal(request, id);
+  const servings = meal?.servings ?? recipe.servingSize;
+  return {
+    recipe,
+    servings,
+    ingredients: ingredients.map((i) => ({ ...i, ...scaleAmount(i, servings, recipe.servingSize) })),
+    scheduled: meal != null,
+  };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
   const id = Number(params.id);
   const form = await request.formData();
   const comments = String(form.get("comments") ?? "").trim() || null;
-  const position = scheduledPosition(request, id);
+  const position = scheduledMeal(request, id)?.position ?? null;
 
   db.transaction((tx) => {
     tx.update(recipes).set({ comments }).where(eq(recipes.id, id)).run();
@@ -75,7 +82,7 @@ function useWakeLock() {
 }
 
 export default function Cook({ loaderData }: Route.ComponentProps) {
-  const { recipe, ingredients, scheduled } = loaderData;
+  const { recipe, servings, ingredients, scheduled } = loaderData;
   const navigate = useNavigate();
   useWakeLock();
 
@@ -84,7 +91,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
       <Group justify="space-between" align="baseline" mb="lg">
         <Title>{recipe.name}</Title>
         <Group gap="xs">
-          <Badge variant="light" color="gray">serves {recipe.servingSize}</Badge>
+          <Badge variant="light" color={servings === recipe.servingSize ? "gray" : "blue"}>serves {servings}</Badge>
           <Button component={Link} to={`/recipes/${recipe.id}`} variant="subtle" size="xs"
             leftSection={<IconPencil size={14} />}>
             Edit

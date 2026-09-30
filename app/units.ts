@@ -64,6 +64,22 @@ export function combineAmounts(amounts: Amount[]): Amount[] {
   });
 }
 
+// Scales a recipe amount from the recipe's serving size to the servings being cooked
+export function scaleAmount(amount: Amount, servings: number, servingSize: number): Amount {
+  if (amount.quantity == null || servings === servingSize) return amount;
+  return { ...amount, quantity: (amount.quantity * servings) / servingSize };
+}
+
+// Units bought whole (half a can isn't for sale); mass, volume, spoons and pinches aren't
+const BOUGHT_WHOLE = new Set<string>(["pcs", "can", "jar", "pack", "bottle", "crate", "bunch"]);
+
+// Rounds amounts up to what can be bought, e.g. 1.5 cans → 2 cans
+export function roundUpToBuy(amounts: Amount[]): Amount[] {
+  return amounts.map((a) =>
+    a.quantity != null && a.unit != null && BOUGHT_WHOLE.has(a.unit) ? { ...a, quantity: Math.ceil(a.quantity - 1e-9) } : a
+  );
+}
+
 const numberFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 });
 
 export function formatAmount({ quantity, unit }: Amount) {

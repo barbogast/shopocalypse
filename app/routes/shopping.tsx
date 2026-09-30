@@ -14,7 +14,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { IconCheck, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
+import { IconCheck, IconPlus, IconShoppingCart, IconTrash, IconUsers } from "@tabler/icons-react";
 import { useState } from "react";
 import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
 import { Form, Link } from "react-router";
@@ -33,20 +33,46 @@ import {
   stock,
   stores,
 } from "~/db/schema";
-import { type Amount, combineAmounts, DEFAULT_UNIT, formatAmount, formatAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
+import {
+  type Amount,
+  combineAmounts,
+  DEFAULT_UNIT,
+  formatAmount,
+  formatAmounts,
+  parseAmount,
+  roundUpToBuy,
+  scaleAmount,
+  UNIT_OPTIONS,
+} from "~/units";
 import type { Route } from "./+types/shopping";
 
 export function meta() {
   return [{ title: "Shopping – Shopocalypse" }];
 }
 
-// Collapse repeated recipes into one entry with a count, keeping first-seen order
-function countRecipes<T extends { id: number }>(rows: T[]) {
-  const counts = new Map<number, T & { count: number }>();
+// Servings of a scheduled or listed meal, falling back to the recipe's serving size
+function mealServings(servings: typeof mealSchedule.servings | typeof shoppingListRecipes.servings) {
+  return sql<number>`coalesce(${servings}, ${recipes.servingSize})`;
+}
+
+// Compact servings marker, e.g. "👥 6"
+function Servings({ servings }: { servings: number }) {
+  return (
+    <span style={{ whiteSpace: "nowrap" }} aria-label={`${servings} servings`}>
+      {" "}
+      <IconUsers size="1em" style={{ verticalAlign: "-0.125em" }} /> {servings}
+    </span>
+  );
+}
+
+// Collapse repeated meals (same recipe and servings) into one entry with a count, keeping first-seen order
+function countRecipes<T extends { id: number; servings: number }>(rows: T[]) {
+  const counts = new Map<string, T & { key: string; count: number }>();
   for (const row of rows) {
-    const entry = counts.get(row.id);
+    const key = `${row.id}-${row.servings}`;
+    const entry = counts.get(key);
     if (entry) entry.count++;
-    else counts.set(row.id, { ...row, count: 1 });
+    else counts.set(key, { ...row, key, count: 1 });
   }
   return [...counts.values()];
 }
@@ -59,7 +85,12 @@ export async function loader() {
     .limit(1);
 
   const scheduled = await db
-    .select({ position: mealSchedule.position, name: recipes.name })
+    .select({
+      position: mealSchedule.position,
+      name: recipes.name,
+      servings: mealServings(mealSchedule.servings),
+      servingSize: recipes.servingSize,
+    })
     .from(mealSchedule)
     .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
     .orderBy(asc(mealSchedule.position));
@@ -105,6 +136,7 @@ export async function loader() {
       id: recipes.id,
       name: recipes.name,
       servingSize: recipes.servingSize,
+      servings: mealServings(shoppingListRecipes.servings),
       instructions: recipes.instructions,
       comments: recipes.comments,
     })
@@ -129,7 +161,9 @@ export async function loader() {
     : [];
   const listRecipes = countRecipes(listRecipeRows).map((r) => ({
     ...r,
-    ingredients: ingredientRows.filter((i) => i.recipeId === r.id),
+    ingredients: ingredientRows
+      .filter((i) => i.recipeId === r.id)
+      .map((i) => ({ ...i, ...scaleAmount(i, r.servings, r.servingSize) })),
   }));
 
   // Formatted on the server so client and server render the same string
@@ -152,8 +186,13 @@ export async function action({ request }: Route.ActionArgs) {
     const scheduled =
       positions.length > 0
         ? await db
-            .select()
+            .select({
+              recipeId: mealSchedule.recipeId,
+              servings: mealServings(mealSchedule.servings),
+              servingSize: recipes.servingSize,
+            })
             .from(mealSchedule)
+            .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
             .where(inArray(mealSchedule.position, positions))
             .orderBy(asc(mealSchedule.position))
         : [];
@@ -171,14 +210,15 @@ export async function action({ request }: Route.ActionArgs) {
           includeInStock ? undefined : eq(items.alwaysAvailable, false),
         ));
       for (const ing of ings) {
-        mealAmounts.set(ing.itemId, [...(mealAmounts.get(ing.itemId) ?? []), ing]);
+        const amount = scaleAmount(ing, meal.servings, meal.servingSize);
+        mealAmounts.set(ing.itemId, [...(mealAmounts.get(ing.itemId) ?? []), amount]);
       }
     }
 
     // Stock has no units, so it isn't subtracted from meal amounts
     const toAdd = new Map<number, { amounts: Amount[]; source: "meal_plan" | "stock_deficit" }>();
     for (const [itemId, amounts] of mealAmounts) {
-      toAdd.set(itemId, { amounts: combineAmounts(amounts), source: "meal_plan" });
+      toAdd.set(itemId, { amounts: roundUpToBuy(combineAmounts(amounts)), source: "meal_plan" });
     }
 
     // Add stock deficits not already covered
@@ -205,7 +245,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (scheduled.length > 0) {
       await db
         .insert(shoppingListRecipes)
-        .values(scheduled.map((meal) => ({ shoppingListId: list.id, recipeId: meal.recipeId })));
+        .values(scheduled.map((meal) => ({ shoppingListId: list.id, recipeId: meal.recipeId, servings: meal.servings })));
     }
 
     if (toAdd.size > 0) {
@@ -302,7 +342,7 @@ function groupByStoreAndShelf<T extends { storeName: string | null; shelfName: s
   return groups;
 }
 
-function PrepareList({ scheduled }: { scheduled: { position: number; name: string }[] }) {
+function PrepareList({ scheduled }: { scheduled: { position: number; name: string; servings: number; servingSize: number }[] }) {
   const [selected, setSelected] = useState(() => new Set(scheduled.map((m) => m.position)));
   const toggle = (position: number, checked: boolean) =>
     setSelected((prev) => {
@@ -327,7 +367,7 @@ function PrepareList({ scheduled }: { scheduled: { position: number; name: strin
                   key={meal.position}
                   name="position"
                   value={meal.position}
-                  label={meal.name}
+                  label={<>{meal.name}{meal.servings !== meal.servingSize && <Servings servings={meal.servings} />}</>}
                   checked={selected.has(meal.position)}
                   onChange={(e) => toggle(meal.position, e.currentTarget.checked)}
                 />
@@ -355,8 +395,8 @@ type ListRecipe = Extract<Awaited<ReturnType<typeof loader>>, { createdAt: strin
 
 // "For: …" line; tapping a recipe opens its details without leaving the list
 function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
-  const [openId, setOpenId] = useState<number | null>(null);
-  const open = recipes.find((r) => r.id === openId);
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const open = recipes.find((r) => r.key === openKey);
 
   if (recipes.length === 0) return <Text c="dimmed" size="sm" mb="lg">No meals</Text>;
 
@@ -365,11 +405,12 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
       <Text c="dimmed" size="sm" mb="lg">
         For:{" "}
         {recipes.map((r, i) => (
-          <span key={r.id}>
+          <span key={r.key}>
             {i > 0 && ", "}
-            <Anchor component="button" type="button" size="sm" onClick={() => setOpenId(r.id)}>
+            <Anchor component="button" type="button" size="sm" onClick={() => setOpenKey(r.key)}>
               {r.name}
             </Anchor>
+            {r.servings !== r.servingSize && <Servings servings={r.servings} />}
             {r.count > 1 && ` ×${r.count}`}
           </span>
         ))}
@@ -377,7 +418,7 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
 
       <Drawer
         opened={open != null}
-        onClose={() => setOpenId(null)}
+        onClose={() => setOpenKey(null)}
         position="bottom"
         size="85%"
         title={open && <Title order={3}>{open.name}</Title>}
@@ -385,7 +426,9 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
         {open && (
           <Stack>
             <Text size="sm" c="dimmed">
-              serves {open.servingSize}
+              {open.servings === open.servingSize
+                ? `serves ${open.servingSize}`
+                : `scaled to ${open.servings} servings (recipe serves ${open.servingSize})`}
               {open.count > 1 && ` · on this list ×${open.count}`}
             </Text>
             <Table>

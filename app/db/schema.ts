@@ -61,6 +61,8 @@ export const mealSchedule = sqliteTable("meal_schedule", {
   recipeId: integer("recipe_id")
     .notNull()
     .references(() => recipes.id),
+  // Servings to cook; null means the recipe's own serving size
+  servings: integer("servings"),
 });
 
 export const mealHistory = sqliteTable("meal_history", {
@@ -86,6 +88,8 @@ export const shoppingListRecipes = sqliteTable("shopping_list_recipes", {
   recipeId: integer("recipe_id")
     .notNull()
     .references(() => recipes.id),
+  // Servings the meal was shopped for; null means the recipe's own serving size
+  servings: integer("servings"),
 });
 
 export const shoppingListItems = sqliteTable("shopping_list_items", {

@@ -27,7 +27,7 @@
 
 - id
 - name
-- serving_size (integer — fixed per recipe)
+- serving_size (integer) — the servings the ingredient quantities are for
 - instructions (free text, optional)
 - comments (free text, optional)
 - archived (boolean) — recipes that have been cooked are archived instead of deleted, to keep meal history intact
@@ -50,6 +50,7 @@
 
 - position (determines order)
 - recipe_id
+- servings (optional) — servings to cook; empty means the recipe's serving size
 
 The "next meal" pointer is implicit: it's always the entry at the lowest position. Cooking a meal removes the head entry and appends a CookHistory record.
 
@@ -71,6 +72,7 @@ Used to determine "least recently cooked" when auto-filling the schedule.
 - id
 - shopping_list_id
 - recipe_id
+- servings (optional) — servings shopped for; empty means the recipe's serving size
 
 A recipe appears once per scheduled meal, so it can be listed more than once.
 
@@ -99,5 +101,6 @@ A recipe appears once per scheduled meal, so it can be listed more than once.
 - Units are a fixed list in code (`app/units.ts`). g/kg and ml/l are added up with each other; every other unit (pcs, tbsp, can, bottle, …) only with itself — there's no conversion between kinds
 - Stock quantities are still plain integers without units; stock tracking is switched off and needs its own unit design before it comes back
 - Only one ShoppingList can be active at a time; completing it archives the old one
+- Ingredient quantities are scaled by servings / serving_size when preparing a shopping list and when cooking a scheduled meal. Summed list amounts in units bought whole (pcs, can, jar, pack, bottle, crate, bunch) are rounded up
 - The shopping list is grouped by store, then by shelf in the store's shelf order
 - "Cook meal" is the sole mechanism that advances the schedule and writes CookHistory

@@ -11,8 +11,9 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { IconChevronDown, IconChevronUp, IconPlayerPlay, IconPlus, IconRefresh, IconX } from "@tabler/icons-react";
-import { asc, desc, eq, gt, inArray, lt, max, notInArray } from "drizzle-orm";
+import { IconChevronDown, IconChevronUp, IconMinus, IconPlayerPlay, IconPlus, IconRefresh, IconUsers, IconX } from "@tabler/icons-react";
+import { asc, desc, eq, gt, inArray, lt, max, notInArray, sql } from "drizzle-orm";
+import { useState } from "react";
 import { Form, Link } from "react-router";
 import { db } from "~/db/client";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
@@ -24,7 +25,12 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader() {
   const scheduled = await db
-    .select({ position: mealSchedule.position, recipeId: mealSchedule.recipeId, name: recipes.name })
+    .select({
+      position: mealSchedule.position,
+      recipeId: mealSchedule.recipeId,
+      name: recipes.name,
+      servings: sql<number>`coalesce(${mealSchedule.servings}, ${recipes.servingSize})`,
+    })
     .from(mealSchedule)
     .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
     .orderBy(asc(mealSchedule.position));
@@ -41,11 +47,14 @@ export async function loader() {
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
+  // Servings for newly added meals; empty means each recipe's serving size
+  const newServings = Number(form.get("servings")) || null;
+  if (newServings != null && (!Number.isInteger(newServings) || newServings < 1)) return null;
 
   if (intent === "move") {
     const position = Number(form.get("position"));
     const up = form.get("direction") === "up";
-    // Swap recipes with the neighbouring entry (positions may have gaps)
+    // Swap meals with the neighbouring entry (positions may have gaps)
     db.transaction((tx) => {
       const current = tx.select().from(mealSchedule).where(eq(mealSchedule.position, position)).get();
       const neighbour = tx
@@ -56,9 +65,22 @@ export async function action({ request }: Route.ActionArgs) {
         .limit(1)
         .get();
       if (!current || !neighbour) return;
-      tx.update(mealSchedule).set({ recipeId: neighbour.recipeId }).where(eq(mealSchedule.position, current.position)).run();
-      tx.update(mealSchedule).set({ recipeId: current.recipeId }).where(eq(mealSchedule.position, neighbour.position)).run();
+      tx.update(mealSchedule)
+        .set({ recipeId: neighbour.recipeId, servings: neighbour.servings })
+        .where(eq(mealSchedule.position, current.position))
+        .run();
+      tx.update(mealSchedule)
+        .set({ recipeId: current.recipeId, servings: current.servings })
+        .where(eq(mealSchedule.position, neighbour.position))
+        .run();
     });
+  }
+
+  if (intent === "servings") {
+    const position = Number(form.get("position"));
+    const servings = Number(form.get("servings"));
+    if (!Number.isInteger(servings) || servings < 1) return null;
+    await db.update(mealSchedule).set({ servings }).where(eq(mealSchedule.position, position));
   }
 
   if (intent === "remove") {
@@ -71,7 +93,7 @@ export async function action({ request }: Route.ActionArgs) {
     const [{ nextPos }] = await db
       .select({ nextPos: max(mealSchedule.position) })
       .from(mealSchedule);
-    await db.insert(mealSchedule).values({ position: (nextPos ?? 0) + 1, recipeId });
+    await db.insert(mealSchedule).values({ position: (nextPos ?? 0) + 1, recipeId, servings: newServings });
   }
 
   if (intent === "auto-fill") {
@@ -119,6 +141,7 @@ export async function action({ request }: Route.ActionArgs) {
       Array.from({ length: count }, (_, i) => ({
         position: start + i,
         recipeId: rotation[i % rotation.length].id,
+        servings: newServings,
       }))
     );
   }
@@ -143,11 +166,34 @@ function MoveButtons({ position, first, last }: { position: number; first: boole
   );
 }
 
+function ServingsControl({ position, servings }: { position: number; servings: number }) {
+  return (
+    <Form method="post" style={{ display: "flex", alignItems: "center" }}>
+      <input type="hidden" name="intent" value="servings" />
+      <input type="hidden" name="position" value={position} />
+      <Button type="submit" name="servings" value={servings - 1} disabled={servings <= 1}
+        variant="subtle" color="gray" size="xs" px={6} aria-label="Fewer servings">
+        <IconMinus size={14} />
+      </Button>
+      <Group gap={4} wrap="nowrap" c="dimmed" aria-label={`${servings} servings`}>
+        <IconUsers size={14} />
+        <Text size="sm">{servings}</Text>
+      </Group>
+      <Button type="submit" name="servings" value={servings + 1}
+        variant="subtle" color="gray" size="xs" px={6} aria-label="More servings">
+        <IconPlus size={14} />
+      </Button>
+    </Form>
+  );
+}
+
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { scheduled, allRecipes } = loaderData;
   const [next, ...upcoming] = scheduled;
 
   const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
+  // Shared by the add and auto-fill forms
+  const [newServings, setNewServings] = useState<string | number>("");
 
   return (
     <Container size="sm" py="xl">
@@ -162,6 +208,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               <Stack gap={4}>
                 <Badge color="green" variant="light">Next up</Badge>
                 <Title order={2}>{next.name}</Title>
+                <ServingsControl position={next.position} servings={next.servings} />
               </Stack>
               <Group gap="xs">
                 <MoveButtons position={next.position} first last={upcoming.length === 0} />
@@ -190,7 +237,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               {upcoming.map((meal, i) => (
                 <Card key={meal.position} withBorder radius="md" p="md">
                   <Group justify="space-between">
-                    <Text>{meal.name}</Text>
+                    <Stack gap={0}>
+                      <Text>{meal.name}</Text>
+                      <ServingsControl position={meal.position} servings={meal.servings} />
+                    </Stack>
                     <Group gap="xs">
                       <Badge variant="outline" color="gray">#{i + 2}</Badge>
                       <MoveButtons position={meal.position} first={false} last={i === upcoming.length - 1} />
@@ -224,9 +274,24 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <Divider mb="lg" />
 
       <Stack gap="md">
+        {allRecipes.length > 0 && (
+          <NumberInput
+            label="Servings"
+            description="For meals added below; empty uses each recipe's own"
+            placeholder="Recipe's"
+            min={1}
+            allowDecimal={false}
+            value={newServings}
+            onChange={setNewServings}
+            leftSection={<IconUsers size={16} />}
+            maw={260}
+          />
+        )}
+
         {availableRecipes.length > 0 && (
           <Form method="post">
             <input type="hidden" name="intent" value="add" />
+            <input type="hidden" name="servings" value={newServings} />
             <Group align="flex-end">
               <Select
                 name="recipeId"
@@ -244,6 +309,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {allRecipes.length > 0 && (
           <Form method="post">
             <input type="hidden" name="intent" value="auto-fill" />
+            <input type="hidden" name="servings" value={newServings} />
             <Group align="flex-end">
               <NumberInput
                 name="count"

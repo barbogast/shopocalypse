@@ -27,7 +27,7 @@ A personal tool that helps our family to know which meal to cook and which groce
 # Other
 
 - Quantities have units (g, l, pieces, spoons, cans, bottles, …); the same item can use different units in different recipes, and some ingredients have no quantity (spices). Stock does not have units yet
-- For now serving size is fixed within the recipe
+- Each recipe has a serving size; the servings of a scheduled meal can be changed, and the shopping list and cooking view scale ingredient quantities accordingly
 - Ticking off shopping items needs to work offline
 - Single user system
 
