@@ -1,11 +1,10 @@
-import { Button, Checkbox, Container, Group, Select, Stack, TextInput, Title } from "@mantine/core";
+import { Button, Container, Group, Stack, Title } from "@mantine/core";
 import { eq } from "drizzle-orm";
 import { redirect } from "react-router";
-import { StoreShelfFields } from "~/components/store-shelf-fields";
+import { ItemFields } from "~/components/item-fields";
 import { db } from "~/db/client";
 import { listShelves, parseItemForm } from "~/db/items.server";
 import { items, stores } from "~/db/schema";
-import { UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/items.$id";
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -37,19 +36,7 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
       <Title mb="lg">Edit item</Title>
       <form method="post">
         <Stack>
-          <TextInput name="name" label="Name" defaultValue={item.name} required />
-          <StoreShelfFields
-            stores={allStores}
-            shelves={allShelves}
-            defaultStoreId={item.storeId}
-            defaultShelfId={item.categoryId}
-          />
-          <Select name="defaultUnit" label="Default unit" data={UNIT_OPTIONS} defaultValue={item.defaultUnit} clearable placeholder="None" />
-          <Checkbox
-            name="alwaysAvailable"
-            label="Always available"
-            description="Assumed to be in stock, so it's left off new shopping lists" defaultChecked={item.alwaysAvailable}
-          />
+          <ItemFields stores={allStores} shelves={allShelves} defaults={item} />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
             <Button type="submit">Save</Button>

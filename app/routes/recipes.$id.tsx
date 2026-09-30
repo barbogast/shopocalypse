@@ -4,6 +4,7 @@ import {
   Button,
   Container,
   Group,
+  Modal,
   NumberInput,
   Select,
   Stack,
@@ -13,12 +14,15 @@ import {
   Title,
 } from "@mantine/core";
 import { IconArchive, IconArchiveOff, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
-import { useState } from "react";
+import { useDisclosure } from "@mantine/hooks";
+import { useEffect, useRef, useState } from "react";
 import { and, asc, eq } from "drizzle-orm";
 import { Form, Link, redirect } from "react-router";
+import { ItemFields } from "~/components/item-fields";
 import { db } from "~/db/client";
+import { listShelves, parseItemForm } from "~/db/items.server";
 import { deleteOrArchiveRecipe, hasBeenCooked, restoreRecipe } from "~/db/recipes.server";
-import { items, recipeIngredients, recipes } from "~/db/schema";
+import { items, recipeIngredients, recipes, stores } from "~/db/schema";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/recipes.$id";
 
@@ -39,7 +43,9 @@ export async function loader({ params }: Route.LoaderArgs) {
     .from(items)
     .orderBy(items.name);
 
-  return { recipe, ingredients, allItems, cooked: hasBeenCooked(id) };
+  const allStores = await db.select().from(stores).orderBy(stores.name);
+
+  return { recipe, ingredients, allItems, allStores, allShelves: listShelves(), cooked: hasBeenCooked(id) };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -68,6 +74,17 @@ export async function action({ request, params }: Route.ActionArgs) {
       .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit } });
   }
 
+  // New item from the ingredient picker; it's then preselected for adding
+  if (intent === "create-item") {
+    const parsed = parseItemForm(form);
+    if (parsed.error) return { createError: parsed.error };
+    const [item] = await db
+      .insert(items)
+      .values(parsed.values)
+      .returning({ id: items.id, name: items.name, defaultUnit: items.defaultUnit });
+    return { createdItem: item };
+  }
+
   if (intent === "remove-ingredient") {
     const itemId = Number(form.get("itemId"));
     await db
@@ -88,12 +105,46 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { recipe, ingredients, allItems, cooked } = loaderData;
+  const { recipe, ingredients, allItems, allStores, allShelves, cooked } = loaderData;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   const availableItems = allItems
     .filter((i) => !usedItemIds.has(i.id))
     .map((i) => ({ value: String(i.id), label: i.name }));
+  const [itemId, setItemId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
+  const [createOpened, createModal] = useDisclosure(false);
+  const [createName, setCreateName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
+
+  // Offer to create the searched-for item when no item has that name yet
+  const searchName = search.trim();
+  const canCreate = searchName !== "" && !allItems.some((i) => i.name.toLowerCase() === searchName.toLowerCase());
+  const itemOptions = canCreate
+    ? [...availableItems, { value: "__create__", label: `+ Create "${searchName}"` }]
+    : availableItems;
+
+  const selectItem = (item: (typeof allItems)[number] | undefined) => {
+    setItemId(item ? String(item.id) : null);
+    setSearch(item?.name ?? "");
+    setUnit(item?.defaultUnit ?? DEFAULT_UNIT);
+  };
+
+  // Clear the picker once its item has been added to the recipe
+  useEffect(() => {
+    if (itemId && usedItemIds.has(Number(itemId))) selectItem(undefined);
+  }, [ingredients]);
+
+  useEffect(() => {
+    if (actionData && "createError" in actionData) setCreateError(actionData.createError ?? null);
+    // Arrives before the loader reruns, so the new item isn't in allItems yet
+    if (actionData && "createdItem" in actionData) {
+      createModal.close();
+      selectItem(actionData.createdItem);
+      quantityRef.current?.focus();
+    }
+  }, [actionData]);
 
   return (
     <Container size="sm" py="xl">
@@ -162,28 +213,54 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         </Table.Tbody>
       </Table>
 
-      {availableItems.length > 0 && (
+      <Form method="post">
+        <input type="hidden" name="intent" value="add-ingredient" />
+        <Group align="flex-end" gap="xs">
+          <Select
+            name="itemId"
+            label="Add ingredient"
+            placeholder="Search or create…"
+            data={itemOptions}
+            value={itemId}
+            searchable
+            searchValue={search}
+            onSearchChange={setSearch}
+            onChange={(value) => {
+              if (value === "__create__") {
+                setCreateName(searchName);
+                setCreateError(null);
+                createModal.open();
+              } else {
+                selectItem(allItems.find((i) => String(i.id) === value));
+              }
+            }}
+            style={{ flex: 1, minWidth: 140 }}
+          />
+          {/* Leave the quantity empty for ingredients without one, like spices */}
+          <NumberInput ref={quantityRef} name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—" style={{ width: 70 }} />
+          <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
+          <Button type="submit">Add</Button>
+        </Group>
+      </Form>
+
+      <Modal opened={createOpened} onClose={createModal.close} title="New item">
         <Form method="post">
-          <input type="hidden" name="intent" value="add-ingredient" />
-          <Group align="flex-end" gap="xs">
-            <Select
-              name="itemId"
-              label="Add ingredient"
-              data={availableItems}
-              searchable
-              onChange={(value) => {
-                const item = allItems.find((i) => String(i.id) === value);
-                setUnit(item?.defaultUnit ?? DEFAULT_UNIT);
-              }}
-              style={{ flex: 1, minWidth: 140 }}
+          <input type="hidden" name="intent" value="create-item" />
+          <Stack>
+            <ItemFields
+              stores={allStores}
+              shelves={allShelves}
+              defaults={{ name: createName, defaultUnit: unit }}
+              autoFocus
             />
-            {/* Leave the quantity empty for ingredients without one, like spices */}
-            <NumberInput name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—" style={{ width: 70 }} />
-            <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
-            <Button type="submit">Add</Button>
-          </Group>
+            {createError && <p style={{ color: "red" }}>{createError}</p>}
+            <Group justify="flex-end">
+              <Button variant="subtle" onClick={createModal.close}>Cancel</Button>
+              <Button type="submit">Create</Button>
+            </Group>
+          </Stack>
         </Form>
-      )}
+      </Modal>
 
       {/* Part of the save form above via the `form` attribute */}
       <Stack mt="xl">
