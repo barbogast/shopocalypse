@@ -11,8 +11,8 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { IconPlayerPlay, IconPlus, IconRefresh, IconX } from "@tabler/icons-react";
-import { asc, desc, eq, inArray, max, notInArray } from "drizzle-orm";
+import { IconChevronDown, IconChevronUp, IconPlayerPlay, IconPlus, IconRefresh, IconX } from "@tabler/icons-react";
+import { asc, desc, eq, gt, inArray, lt, max, notInArray } from "drizzle-orm";
 import { Form, Link } from "react-router";
 import { db } from "~/db/client";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
@@ -41,6 +41,25 @@ export async function loader() {
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
+
+  if (intent === "move") {
+    const position = Number(form.get("position"));
+    const up = form.get("direction") === "up";
+    // Swap recipes with the neighbouring entry (positions may have gaps)
+    db.transaction((tx) => {
+      const current = tx.select().from(mealSchedule).where(eq(mealSchedule.position, position)).get();
+      const neighbour = tx
+        .select()
+        .from(mealSchedule)
+        .where(up ? lt(mealSchedule.position, position) : gt(mealSchedule.position, position))
+        .orderBy(up ? desc(mealSchedule.position) : asc(mealSchedule.position))
+        .limit(1)
+        .get();
+      if (!current || !neighbour) return;
+      tx.update(mealSchedule).set({ recipeId: neighbour.recipeId }).where(eq(mealSchedule.position, current.position)).run();
+      tx.update(mealSchedule).set({ recipeId: current.recipeId }).where(eq(mealSchedule.position, neighbour.position)).run();
+    });
+  }
 
   if (intent === "remove") {
     const position = Number(form.get("position"));
@@ -107,6 +126,23 @@ export async function action({ request }: Route.ActionArgs) {
   return null;
 }
 
+function MoveButtons({ position, first, last }: { position: number; first: boolean; last: boolean }) {
+  return (
+    <Form method="post" style={{ display: "flex" }}>
+      <input type="hidden" name="intent" value="move" />
+      <input type="hidden" name="position" value={position} />
+      <Button type="submit" name="direction" value="up" disabled={first}
+        variant="subtle" color="gray" size="xs" px={6} aria-label="Move up">
+        <IconChevronUp size={14} />
+      </Button>
+      <Button type="submit" name="direction" value="down" disabled={last}
+        variant="subtle" color="gray" size="xs" px={6} aria-label="Move down">
+        <IconChevronDown size={14} />
+      </Button>
+    </Form>
+  );
+}
+
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { scheduled, allRecipes } = loaderData;
   const [next, ...upcoming] = scheduled;
@@ -128,6 +164,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 <Title order={2}>{next.name}</Title>
               </Stack>
               <Group gap="xs">
+                <MoveButtons position={next.position} first last={upcoming.length === 0} />
                 <Form method="post">
                   <input type="hidden" name="intent" value="remove" />
                   <input type="hidden" name="position" value={next.position} />
@@ -156,6 +193,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     <Text>{meal.name}</Text>
                     <Group gap="xs">
                       <Badge variant="outline" color="gray">#{i + 2}</Badge>
+                      <MoveButtons position={meal.position} first={false} last={i === upcoming.length - 1} />
                       <Button
                         component={Link}
                         to={`/cook/${meal.recipeId}?position=${meal.position}`}
