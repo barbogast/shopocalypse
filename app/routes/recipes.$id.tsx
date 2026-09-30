@@ -12,9 +12,9 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconTrash } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { and, asc, eq } from "drizzle-orm";
-import { Form, redirect } from "react-router";
+import { Form, Link, redirect } from "react-router";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, hasBeenCooked, restoreRecipe } from "~/db/recipes.server";
 import { items, recipeIngredients, recipes } from "~/db/schema";
@@ -93,7 +93,12 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
       <Form method="post" id="recipe-status-form">
         <input type="hidden" name="intent" value={recipe.archived ? "restore" : "delete"} />
       </Form>
-      {recipe.archived && <Badge color="gray" mb="md">Archived</Badge>}
+      <Group justify="space-between" mb="md">
+        {recipe.archived ? <Badge color="gray">Archived</Badge> : <span />}
+        <Button component={Link} to={`/cook/${recipe.id}`} color="green" leftSection={<IconPlayerPlay size={16} />}>
+          Cook now
+        </Button>
+      </Group>
       <Form method="post" id="recipe-form">
         <input type="hidden" name="intent" value="save" />
         <Stack mb="xl">

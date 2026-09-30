@@ -5,6 +5,7 @@ export default [
   route("recipes", "routes/recipes.tsx"),
   route("recipes/new", "routes/recipes.new.tsx"),
   route("recipes/:id", "routes/recipes.$id.tsx"),
+  route("cook/:id", "routes/cook.$id.tsx"),
   route("items", "routes/items.tsx"),
   route("items/new", "routes/items.new.tsx"),
   route("items/:id", "routes/items.$id.tsx"),

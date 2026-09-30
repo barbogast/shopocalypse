@@ -13,7 +13,7 @@ import {
 } from "@mantine/core";
 import { IconPlayerPlay, IconPlus, IconRefresh, IconX } from "@tabler/icons-react";
 import { asc, desc, eq, inArray, max, notInArray } from "drizzle-orm";
-import { Form } from "react-router";
+import { Form, Link } from "react-router";
 import { db } from "~/db/client";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
 import type { Route } from "./+types/home";
@@ -41,20 +41,6 @@ export async function loader() {
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
-
-  if (intent === "cook") {
-    const [head] = await db
-      .select()
-      .from(mealSchedule)
-      .orderBy(asc(mealSchedule.position))
-      .limit(1);
-    if (!head) return null;
-    await db.delete(mealSchedule).where(eq(mealSchedule.position, head.position));
-    await db.insert(mealHistory).values({
-      recipeId: head.recipeId,
-      cookedAt: new Date().toISOString().slice(0, 10),
-    });
-  }
 
   if (intent === "remove") {
     const position = Number(form.get("position"));
@@ -149,12 +135,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     <IconX size={14} />
                   </Button>
                 </Form>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="cook" />
-                  <Button type="submit" color="green" leftSection={<IconPlayerPlay size={16} />}>
-                    Cook
-                  </Button>
-                </Form>
+                <Button
+                  component={Link}
+                  to={`/cook/${next.recipeId}?position=${next.position}`}
+                  color="green"
+                  leftSection={<IconPlayerPlay size={16} />}
+                >
+                  Cook
+                </Button>
               </Group>
             </Group>
           </Card>
@@ -168,6 +156,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     <Text>{meal.name}</Text>
                     <Group gap="xs">
                       <Badge variant="outline" color="gray">#{i + 2}</Badge>
+                      <Button
+                        component={Link}
+                        to={`/cook/${meal.recipeId}?position=${meal.position}`}
+                        variant="subtle"
+                        color="green"
+                        size="xs"
+                        px={6}
+                        aria-label={`Cook ${meal.name}`}
+                      >
+                        <IconPlayerPlay size={14} />
+                      </Button>
                       <Form method="post">
                         <input type="hidden" name="intent" value="remove" />
                         <input type="hidden" name="position" value={meal.position} />

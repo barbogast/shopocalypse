@@ -1,5 +1,5 @@
 import { ActionIcon, Badge, Button, Container, Group, Switch, Table, Title, Tooltip } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconPlayerPlay, IconPlus, IconTrash } from "@tabler/icons-react";
 import { eq } from "drizzle-orm";
 import { Form, Link, useSearchParams } from "react-router";
 import { db } from "~/db/client";
@@ -70,6 +70,13 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
               </Table.Td>
               <Table.Td c="dimmed" style={{ width: 80 }}>
                 serves {recipe.servingSize}
+              </Table.Td>
+              <Table.Td style={{ width: 40 }}>
+                <Tooltip label="Cook now">
+                  <ActionIcon component={Link} to={`/cook/${recipe.id}`} style={{ position: "relative", zIndex: 1 }} variant="subtle" color="green" aria-label={`Cook ${recipe.name}`}>
+                    <IconPlayerPlay size={16} />
+                  </ActionIcon>
+                </Tooltip>
               </Table.Td>
               <Table.Td style={{ width: 40 }}>
                 <Form method="post">
