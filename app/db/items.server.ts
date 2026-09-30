@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, lt, max } from "drizzle-orm";
 import { db } from "./client";
-import { itemCategories, items, stores } from "./schema";
+import { itemCategories, items, recipeIngredients, shoppingListItems, stock, stores } from "./schema";
 import { isUnitKey } from "~/units";
 
 // Shelves in walking order, grouped by store
@@ -69,5 +69,15 @@ export function deleteStore(id: number) {
     tx.update(items).set({ storeId: null, categoryId: null }).where(eq(items.storeId, id)).run();
     tx.delete(itemCategories).where(eq(itemCategories.storeId, id)).run();
     tx.delete(stores).where(eq(stores.id, id)).run();
+  });
+}
+
+// Items used in recipes can't be deleted; their stock and shopping list entries go with them
+export function deleteItem(id: number) {
+  db.transaction((tx) => {
+    if (tx.select().from(recipeIngredients).where(eq(recipeIngredients.itemId, id)).limit(1).get()) return;
+    tx.delete(stock).where(eq(stock.itemId, id)).run();
+    tx.delete(shoppingListItems).where(eq(shoppingListItems.itemId, id)).run();
+    tx.delete(items).where(eq(items.id, id)).run();
   });
 }

@@ -13,13 +13,14 @@ import {
   Text,
   TextInput,
   Title,
+  Tooltip,
 } from "@mantine/core";
 import { IconCheck, IconChevronDown, IconChevronUp, IconPencil, IconPlus, IconToolsKitchen2, IconTrash, IconX } from "@tabler/icons-react";
 import { useState } from "react";
 import { eq } from "drizzle-orm";
 import { Form, Link } from "react-router";
 import { db } from "~/db/client";
-import { addShelf, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
+import { addShelf, deleteItem, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
 import { itemCategories, items, recipeIngredients, recipes, stores } from "~/db/schema";
 import { unitName } from "~/units";
 import type { Route } from "./+types/items";
@@ -63,7 +64,7 @@ export async function action({ request }: Route.ActionArgs) {
   const intent = form.get("intent");
 
   if (intent === "delete-item") {
-    await db.delete(items).where(eq(items.id, Number(form.get("id"))));
+    deleteItem(Number(form.get("id")));
   }
 
   if (intent === "add-shelf") {
@@ -227,13 +228,24 @@ export default function Items({ loaderData }: Route.ComponentProps) {
                   <ActionIcon component={Link} to={`/items/${item.id}`} variant="subtle">
                     <IconPencil size={16} />
                   </ActionIcon>
-                  <Form method="post">
-                    <input type="hidden" name="intent" value="delete-item" />
-                    <input type="hidden" name="id" value={item.id} />
-                    <ActionIcon type="submit" variant="subtle" color="red">
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Form>
+                  {recipesByItem[item.id] ? (
+                    // Disabled buttons don't fire hover events, so the tooltip sits on a wrapper
+                    <Tooltip label="Used in recipes; remove it from them first">
+                      <span>
+                        <ActionIcon variant="subtle" color="red" disabled aria-label={`Can't delete ${item.name}: used in recipes`}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <Form method="post">
+                      <input type="hidden" name="intent" value="delete-item" />
+                      <input type="hidden" name="id" value={item.id} />
+                      <ActionIcon type="submit" variant="subtle" color="red" aria-label={`Delete ${item.name}`}>
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Form>
+                  )}
                 </Group>
               </Table.Td>
             </Table.Tr>
