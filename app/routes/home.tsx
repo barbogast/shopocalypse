@@ -1,4 +1,5 @@
 import {
+  Anchor,
   Badge,
   Button,
   Card,
@@ -15,7 +16,9 @@ import { IconChevronDown, IconChevronUp, IconMinus, IconPlayerPlay, IconPlus, Ic
 import { asc, desc, eq, gt, inArray, lt, max, notInArray, sql } from "drizzle-orm";
 import { useState } from "react";
 import { Form, Link } from "react-router";
+import { RecipeDrawer } from "~/components/recipe-drawer";
 import { db } from "~/db/client";
+import { withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
 import type { Route } from "./+types/home";
 
@@ -27,13 +30,17 @@ export async function loader() {
   const scheduled = await db
     .select({
       position: mealSchedule.position,
-      recipeId: mealSchedule.recipeId,
+      id: recipes.id,
       name: recipes.name,
       servings: sql<number>`coalesce(${mealSchedule.servings}, ${recipes.servingSize})`,
+      servingSize: recipes.servingSize,
+      instructions: recipes.instructions,
+      comments: recipes.comments,
     })
     .from(mealSchedule)
     .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
-    .orderBy(asc(mealSchedule.position));
+    .orderBy(asc(mealSchedule.position))
+    .then(withIngredients);
 
   const allRecipes = await db
     .select({ id: recipes.id, name: recipes.name })
@@ -194,6 +201,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
   // Shared by the add and auto-fill forms
   const [newServings, setNewServings] = useState<string | number>("");
+  // Tapping a meal's name opens its recipe details
+  const [openPosition, setOpenPosition] = useState<number | null>(null);
+  const open = scheduled.find((m) => m.position === openPosition);
 
   return (
     <Container size="sm" py="xl">
@@ -207,7 +217,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <Group justify="space-between" align="center">
               <Stack gap={4}>
                 <Badge color="green" variant="light">Next up</Badge>
-                <Title order={2}>{next.name}</Title>
+                <Title order={2}>
+                  <Anchor component="button" type="button" inherit c="inherit" ta="left" onClick={() => setOpenPosition(next.position)}>
+                    {next.name}
+                  </Anchor>
+                </Title>
                 <ServingsControl position={next.position} servings={next.servings} />
               </Stack>
               <Group gap="xs">
@@ -221,7 +235,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 </Form>
                 <Button
                   component={Link}
-                  to={`/cook/${next.recipeId}?position=${next.position}`}
+                  to={`/cook/${next.id}?position=${next.position}`}
                   color="green"
                   leftSection={<IconPlayerPlay size={16} />}
                 >
@@ -238,7 +252,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 <Card key={meal.position} withBorder radius="md" p="md">
                   <Group justify="space-between">
                     <Stack gap={0}>
-                      <Text>{meal.name}</Text>
+                      <Anchor component="button" type="button" c="inherit" ta="left" onClick={() => setOpenPosition(meal.position)}>
+                        {meal.name}
+                      </Anchor>
                       <ServingsControl position={meal.position} servings={meal.servings} />
                     </Stack>
                     <Group gap="xs">
@@ -246,7 +262,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                       <MoveButtons position={meal.position} first={false} last={i === upcoming.length - 1} />
                       <Button
                         component={Link}
-                        to={`/cook/${meal.recipeId}?position=${meal.position}`}
+                        to={`/cook/${meal.id}?position=${meal.position}`}
                         variant="subtle"
                         color="green"
                         size="xs"
@@ -270,6 +286,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           )}
         </Stack>
       )}
+
+      <RecipeDrawer recipe={open} onClose={() => setOpenPosition(null)} />
 
       <Divider mb="lg" />
 

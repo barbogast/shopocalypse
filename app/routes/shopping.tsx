@@ -5,7 +5,6 @@ import {
   Container,
   Anchor,
   Divider,
-  Drawer,
   Group,
   NumberInput,
   Select,
@@ -17,10 +16,11 @@ import {
 import { IconCheck, IconPlus, IconShoppingCart, IconTrash, IconUsers } from "@tabler/icons-react";
 import { useState } from "react";
 import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
-import { Form, Link } from "react-router";
+import { Form } from "react-router";
 import { STOCK_TRACKING_ENABLED } from "~/config";
-import { Markdown } from "~/components/markdown";
+import { RecipeDrawer } from "~/components/recipe-drawer";
 import { db } from "~/db/client";
+import { withIngredients } from "~/db/recipes.server";
 import {
   itemCategories,
   items,
@@ -37,7 +37,6 @@ import {
   type Amount,
   combineAmounts,
   DEFAULT_UNIT,
-  formatAmount,
   formatAmounts,
   parseAmount,
   roundUpToBuy,
@@ -145,26 +144,7 @@ export async function loader() {
     .where(eq(shoppingListRecipes.shoppingListId, activeList.id))
     .orderBy(asc(shoppingListRecipes.id));
 
-  const ingredientRows = listRecipeRows.length
-    ? await db
-        .select({
-          recipeId: recipeIngredients.recipeId,
-          itemId: recipeIngredients.itemId,
-          name: items.name,
-          quantity: recipeIngredients.quantity,
-          unit: recipeIngredients.unit,
-        })
-        .from(recipeIngredients)
-        .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-        .where(inArray(recipeIngredients.recipeId, listRecipeRows.map((r) => r.id)))
-        .orderBy(asc(items.name))
-    : [];
-  const listRecipes = countRecipes(listRecipeRows).map((r) => ({
-    ...r,
-    ingredients: ingredientRows
-      .filter((i) => i.recipeId === r.id)
-      .map((i) => ({ ...i, ...scaleAmount(i, r.servings, r.servingSize) })),
-  }));
+  const listRecipes = countRecipes(await withIngredients(listRecipeRows));
 
   // Formatted on the server so client and server render the same string
   const createdAt = new Date(activeList.createdAt).toLocaleString("en-GB", {
@@ -416,52 +396,11 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
         ))}
       </Text>
 
-      <Drawer
-        opened={open != null}
+      <RecipeDrawer
+        recipe={open}
+        note={open && open.count > 1 ? `on this list ×${open.count}` : undefined}
         onClose={() => setOpenKey(null)}
-        position="bottom"
-        size="85%"
-        title={open && <Title order={3}>{open.name}</Title>}
-      >
-        {open && (
-          <Stack>
-            <Text size="sm" c="dimmed">
-              {open.servings === open.servingSize
-                ? `serves ${open.servingSize}`
-                : `scaled to ${open.servings} servings (recipe serves ${open.servingSize})`}
-              {open.count > 1 && ` · on this list ×${open.count}`}
-            </Text>
-            <Table>
-              <Table.Tbody>
-                {open.ingredients.map((ing) => (
-                  <Table.Tr key={ing.name}>
-                    <Table.Td>{ing.name}</Table.Td>
-                    <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
-                  </Table.Tr>
-                ))}
-                {open.ingredients.length === 0 && (
-                  <Table.Tr>
-                    <Table.Td c="dimmed">No ingredients.</Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-            {open.instructions && (
-              <div>
-                <Text fw={500} size="sm">Instructions</Text>
-                <Markdown>{open.instructions}</Markdown>
-              </div>
-            )}
-            {open.comments && (
-              <div>
-                <Text fw={500} size="sm">Comments</Text>
-                <Text style={{ whiteSpace: "pre-wrap" }}>{open.comments}</Text>
-              </div>
-            )}
-            <Anchor component={Link} to={`/recipes/${open.id}`} size="sm">Open recipe page</Anchor>
-          </Stack>
-        )}
-      </Drawer>
+      />
     </>
   );
 }

@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
+import { scaleAmount } from "~/units";
 import { db } from "./client";
-import { mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes } from "./schema";
+import { items, mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes } from "./schema";
 
 export function hasBeenCooked(recipeId: number) {
   return !!db.select().from(mealHistory).where(eq(mealHistory.recipeId, recipeId)).limit(1).get();
@@ -24,4 +25,28 @@ export function deleteOrArchiveRecipe(recipeId: number) {
 
 export function restoreRecipe(recipeId: number) {
   db.update(recipes).set({ archived: false }).where(eq(recipes.id, recipeId)).run();
+}
+
+// Attach each meal's ingredients, scaled to its servings
+export async function withIngredients<T extends { id: number; servings: number; servingSize: number }>(meals: T[]) {
+  const rows = meals.length
+    ? await db
+        .select({
+          recipeId: recipeIngredients.recipeId,
+          itemId: recipeIngredients.itemId,
+          name: items.name,
+          quantity: recipeIngredients.quantity,
+          unit: recipeIngredients.unit,
+        })
+        .from(recipeIngredients)
+        .innerJoin(items, eq(recipeIngredients.itemId, items.id))
+        .where(inArray(recipeIngredients.recipeId, meals.map((m) => m.id)))
+        .orderBy(asc(items.name))
+    : [];
+  return meals.map((m) => ({
+    ...m,
+    ingredients: rows
+      .filter((i) => i.recipeId === m.id)
+      .map((i) => ({ ...i, ...scaleAmount(i, m.servings, m.servingSize) })),
+  }));
 }
