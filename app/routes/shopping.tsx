@@ -1,6 +1,7 @@
 import {
   Badge,
   Button,
+  Checkbox,
   Container,
   Divider,
   Group,
@@ -12,7 +13,8 @@ import {
   Title,
 } from "@mantine/core";
 import { IconCheck, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
-import { asc, eq, lt, sql } from "drizzle-orm";
+import { useState } from "react";
+import { asc, eq, inArray, lt, sql } from "drizzle-orm";
 import { Form } from "react-router";
 import { STOCK_TRACKING_ENABLED } from "~/config";
 import { db } from "~/db/client";
@@ -21,6 +23,7 @@ import {
   items,
   mealSchedule,
   recipeIngredients,
+  recipes,
   shoppingListItems,
   shoppingLists,
   stock,
@@ -39,11 +42,15 @@ export async function loader() {
     .where(eq(shoppingLists.status, "active"))
     .limit(1);
 
-  const scheduledCount = (await db.select().from(mealSchedule)).length;
+  const scheduled = await db
+    .select({ position: mealSchedule.position, name: recipes.name })
+    .from(mealSchedule)
+    .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
+    .orderBy(asc(mealSchedule.position));
 
   if (!activeList) {
     const allItems = await db.select({ id: items.id, name: items.name }).from(items).orderBy(items.name);
-    return { activeList: null, listItems: [], scheduledCount, allItems };
+    return { activeList: null, listItems: [], scheduled, allItems };
   }
 
   const listItems = await db
@@ -71,7 +78,7 @@ export async function loader() {
     .orderBy(items.name)
     .then((all) => all.filter((i) => !listedItemIds.has(i.id)));
 
-  return { activeList, listItems, scheduledCount, allItems };
+  return { activeList, listItems, scheduled, allItems };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -79,13 +86,12 @@ export async function action({ request }: Route.ActionArgs) {
   const intent = form.get("intent");
 
   if (intent === "prepare") {
-    const numMeals = Number(form.get("numMeals"));
+    const positions = form.getAll("position").map(Number);
 
-    const scheduled = await db
-      .select()
-      .from(mealSchedule)
-      .orderBy(asc(mealSchedule.position))
-      .limit(numMeals);
+    const scheduled =
+      positions.length > 0
+        ? await db.select().from(mealSchedule).where(inArray(mealSchedule.position, positions))
+        : [];
 
     // Sum ingredients across selected meals
     const mealTotals = new Map<number, number>();
@@ -246,32 +252,53 @@ function groupByStore<T extends { storeName: string | null }>(listItems: T[]) {
   return groups;
 }
 
-export default function Shopping({ loaderData }: Route.ComponentProps) {
-  const { activeList, listItems, scheduledCount, allItems } = loaderData;
+function PrepareList({ scheduled }: { scheduled: { position: number; name: string }[] }) {
+  const [selected, setSelected] = useState(() => new Set(scheduled.map((m) => m.position)));
+  const toggle = (position: number, checked: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(position);
+      else next.delete(position);
+      return next;
+    });
 
-  if (!activeList) {
-    return (
-      <Container size="sm" py="xl">
-        <Title mb="lg">Shopping</Title>
-        <Text c="dimmed" mb="xl">No active shopping list.</Text>
-        <Form method="post">
-          <input type="hidden" name="intent" value="prepare" />
-          <Stack maw={300}>
-            <NumberInput
-              name="numMeals"
-              label="Meals to include"
-              description="How many upcoming meals to shop for"
-              min={0}
-              defaultValue={scheduledCount}
-            />
-            <Button type="submit" leftSection={<IconShoppingCart size={16} />}>
-              Prepare list
-            </Button>
-          </Stack>
-        </Form>
-      </Container>
-    );
-  }
+  return (
+    <Container size="sm" py="xl">
+      <Title mb="lg">Shopping</Title>
+      <Text c="dimmed" mb="xl">No active shopping list.</Text>
+      <Form method="post">
+        <input type="hidden" name="intent" value="prepare" />
+        <Stack maw={300}>
+          <Text size="sm" fw={500}>Meals to shop for</Text>
+          {scheduled.length > 0 ? (
+            <Stack gap="xs">
+              {scheduled.map((meal) => (
+                <Checkbox
+                  key={meal.position}
+                  name="position"
+                  value={meal.position}
+                  label={meal.name}
+                  checked={selected.has(meal.position)}
+                  onChange={(e) => toggle(meal.position, e.currentTarget.checked)}
+                />
+              ))}
+            </Stack>
+          ) : (
+            <Text size="sm" c="dimmed">No meals scheduled.</Text>
+          )}
+          <Button type="submit" leftSection={<IconShoppingCart size={16} />}>
+            {selected.size > 0 ? "Prepare list" : "Start empty list"}
+          </Button>
+        </Stack>
+      </Form>
+    </Container>
+  );
+}
+
+export default function Shopping({ loaderData }: Route.ComponentProps) {
+  const { activeList, listItems, scheduled, allItems } = loaderData;
+
+  if (!activeList) return <PrepareList scheduled={scheduled} />;
 
   const groups = groupByStore(listItems);
   const allTicked = listItems.length > 0 && listItems.every((i) => i.quantityBought != null);
