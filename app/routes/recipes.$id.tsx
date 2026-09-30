@@ -9,15 +9,16 @@ import {
   Select,
   Stack,
   Table,
+  Text,
   Textarea,
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconCheck, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useRef, useState } from "react";
 import { and, asc, eq } from "drizzle-orm";
-import { Form, Link, redirect } from "react-router";
+import { Form, Link, redirect, useNavigation } from "react-router";
 import { ItemFields } from "~/components/item-fields";
 import { db } from "~/db/client";
 import { listShelves, parseItemForm } from "~/db/items.server";
@@ -60,6 +61,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const comments = String(form.get("comments") ?? "").trim() || null;
     if (!name || servingSize < 1) return { error: "Name and serving size are required." };
     await db.update(recipes).set({ name, servingSize, instructions, comments }).where(eq(recipes.id, id));
+    return { saved: true };
   }
 
   if (intent === "add-ingredient") {
@@ -104,6 +106,24 @@ export async function action({ request, params }: Route.ActionArgs) {
   return null;
 }
 
+// Save button for the recipe form: spins while saving, then confirms until the next edit
+function SaveButton({ saved }: { saved: boolean }) {
+  const navigation = useNavigation();
+  const saving = navigation.state === "submitting" && navigation.formData?.get("intent") === "save";
+
+  return (
+    <Group gap="xs">
+      <Button type="submit" form="recipe-form" loading={saving}>Save</Button>
+      {saved && !saving && (
+        <Group gap={4} c="green">
+          <IconCheck size={16} />
+          <Text size="sm">Saved</Text>
+        </Group>
+      )}
+    </Group>
+  );
+}
+
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
   const { recipe, ingredients, allItems, allStores, allShelves, cooked } = loaderData;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
@@ -117,6 +137,8 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   const [createName, setCreateName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
+  const [saved, setSaved] = useState(false);
+  const markUnsaved = () => setSaved(false);
 
   // Offer to create the searched-for item when no item has that name yet
   const searchName = search.trim();
@@ -137,6 +159,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   }, [ingredients]);
 
   useEffect(() => {
+    if (actionData && "saved" in actionData) setSaved(true);
     if (actionData && "createError" in actionData) setCreateError(actionData.createError ?? null);
     // Arrives before the loader reruns, so the new item isn't in allItems yet
     if (actionData && "createdItem" in actionData) {
@@ -158,14 +181,14 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           Cook now
         </Button>
       </Group>
-      <Form method="post" id="recipe-form">
+      <Form method="post" id="recipe-form" onChange={markUnsaved}>
         <input type="hidden" name="intent" value="save" />
         <Stack mb="xl">
           <TextInput name="name" label="Name" defaultValue={recipe.name} required />
           <NumberInput name="servingSize" label="Serving size" defaultValue={recipe.servingSize} min={1} required />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
-            <Button type="submit">Save</Button>
+            <SaveButton saved={saved} />
             {recipe.archived ? (
               <Button type="submit" form="recipe-status-form" variant="subtle" ml="auto"
                 leftSection={<IconArchiveOff size={16} />}>
@@ -262,11 +285,12 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         </Form>
       </Modal>
 
-      {/* Part of the save form above via the `form` attribute */}
+      {/* Part of the save form above via the `form` attribute; their change events don't reach its onChange */}
       <Stack mt="xl">
         <Textarea
           form="recipe-form"
           name="instructions"
+          onChange={markUnsaved}
           label="Cooking instructions"
           description="Supports markdown"
           defaultValue={recipe.instructions ?? ""}
@@ -276,14 +300,13 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <Textarea
           form="recipe-form"
           name="comments"
+          onChange={markUnsaved}
           label="Comments"
           defaultValue={recipe.comments ?? ""}
           autosize
           minRows={2}
         />
-        <Group>
-          <Button type="submit" form="recipe-form">Save</Button>
-        </Group>
+        <SaveButton saved={saved} />
       </Stack>
     </Container>
   );
