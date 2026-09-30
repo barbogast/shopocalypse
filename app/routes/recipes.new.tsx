@@ -29,7 +29,7 @@ export default function NewRecipe({ actionData }: Route.ComponentProps) {
         <Stack>
           <TextInput name="name" label="Name" required autoFocus />
           <NumberInput name="servingSize" label="Serving size" min={1} defaultValue={4} required />
-          <Textarea name="instructions" label="Cooking instructions" autosize minRows={4} />
+          <Textarea name="instructions" label="Cooking instructions" description="Supports markdown" autosize minRows={4} />
           <Textarea name="comments" label="Comments" autosize minRows={2} />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Button type="submit">Create</Button>

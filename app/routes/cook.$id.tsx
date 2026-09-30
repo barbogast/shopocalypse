@@ -1,8 +1,9 @@
-import { Badge, Button, Container, Group, Stack, Table, Text, Textarea, Title } from "@mantine/core";
+import { Badge, Box, Button, Container, Group, Stack, Table, Text, Textarea, Title } from "@mantine/core";
 import { IconCheck, IconPencil } from "@tabler/icons-react";
 import { and, asc, eq } from "drizzle-orm";
 import { useEffect } from "react";
 import { Form, Link, redirect, useNavigate } from "react-router";
+import { Markdown } from "~/components/markdown";
 import { db } from "~/db/client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes } from "~/db/schema";
 import { formatAmount } from "~/units";
@@ -109,9 +110,13 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
       </Table>
 
       <Title order={3} mb="sm">Instructions</Title>
-      <Text size="lg" mb="xl" style={{ whiteSpace: "pre-wrap" }} c={recipe.instructions ? undefined : "dimmed"}>
-        {recipe.instructions ?? "No instructions."}
-      </Text>
+      {recipe.instructions ? (
+        <Box fz="lg" mb="xl">
+          <Markdown>{recipe.instructions}</Markdown>
+        </Box>
+      ) : (
+        <Text size="lg" mb="xl" c="dimmed">No instructions.</Text>
+      )}
 
       <Form method="post">
         <Stack>

@@ -22,7 +22,9 @@
     "isbot": "^5",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router": "7.15.1"
+    "react-markdown": "^10.1.0",
+    "react-router": "7.15.1",
+    "remark-breaks": "^4.0.0"
   },
   "devDependencies": {
     "@react-router/dev": "7.15.1",

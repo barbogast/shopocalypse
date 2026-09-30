@@ -19,6 +19,7 @@ import { useState } from "react";
 import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
 import { Form, Link } from "react-router";
 import { STOCK_TRACKING_ENABLED } from "~/config";
+import { Markdown } from "~/components/markdown";
 import { db } from "~/db/client";
 import {
   itemCategories,
@@ -405,7 +406,7 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
             {open.instructions && (
               <div>
                 <Text fw={500} size="sm">Instructions</Text>
-                <Text style={{ whiteSpace: "pre-wrap" }}>{open.instructions}</Text>
+                <Markdown>{open.instructions}</Markdown>
               </div>
             )}
             {open.comments && (

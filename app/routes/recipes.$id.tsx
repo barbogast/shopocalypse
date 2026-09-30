@@ -191,6 +191,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           form="recipe-form"
           name="instructions"
           label="Cooking instructions"
+          description="Supports markdown"
           defaultValue={recipe.instructions ?? ""}
           autosize
           minRows={4}
