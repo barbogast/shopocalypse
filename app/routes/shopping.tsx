@@ -17,6 +17,7 @@ import { IconCheck, IconPlus, IconShoppingCart, IconTrash, IconUsers } from "@ta
 import { useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { Form } from "react-router";
+import { LocalDateTime } from "~/components/local-date-time";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
@@ -145,13 +146,7 @@ export async function loader() {
 
   const listRecipes = countRecipes(await withIngredients(listRecipeRows));
 
-  // Formatted on the server so client and server render the same string
-  const createdAt = new Date(activeList.createdAt).toLocaleString("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-
-  return { activeList, createdAt, listRecipes, listItems, scheduled, allItems };
+  return { activeList, listRecipes, listItems, scheduled, allItems };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -362,7 +357,7 @@ function PrepareList({ scheduled }: { scheduled: { position: number; name: strin
   );
 }
 
-type ListRecipe = Extract<Awaited<ReturnType<typeof loader>>, { createdAt: string }>["listRecipes"][number];
+type ListRecipe = Extract<Awaited<ReturnType<typeof loader>>, { activeList: object }>["listRecipes"][number];
 
 // "For: …" line; tapping a recipe opens its details without leaving the list
 function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
@@ -423,7 +418,7 @@ function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit
 
 export default function Shopping({ loaderData }: Route.ComponentProps) {
   if (!loaderData.activeList) return <PrepareList scheduled={loaderData.scheduled} />;
-  const { createdAt, listRecipes, listItems, allItems } = loaderData;
+  const { activeList, listRecipes, listItems, allItems } = loaderData;
 
   const groups = groupByStoreAndShelf(listItems);
   const tickedCount = listItems.filter((i) => i.bought).length;
@@ -443,7 +438,7 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
         <Title>Shopping</Title>
         <Text c="dimmed" size="sm">{tickedCount}/{listItems.length}</Text>
       </Group>
-      <Text c="dimmed" size="sm">Created {createdAt}</Text>
+      <Text c="dimmed" size="sm">Created <LocalDateTime iso={activeList.createdAt} /></Text>
       <ListMeals recipes={listRecipes} />
 
       {listItems.length === 0 && (

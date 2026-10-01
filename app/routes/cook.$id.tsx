@@ -1,10 +1,11 @@
 import { Badge, Box, Button, Container, Group, Stack, Table, Text, Textarea, Title } from "@mantine/core";
 import { IconCheck, IconPencil } from "@tabler/icons-react";
 import { and, asc, eq } from "drizzle-orm";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Form, Link, redirect, useNavigate } from "react-router";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
+import { isDateString, localDate } from "~/dates";
 import { db } from "~/db/client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes } from "~/db/schema";
 import { formatAmount, scaleAmount } from "~/units";
@@ -54,6 +55,9 @@ export async function action({ params, request }: Route.ActionArgs) {
   const id = Number(params.id);
   const form = await request.formData();
   const comments = String(form.get("comments") ?? "").trim() || null;
+  // The browser sends its local date; the server's time zone may differ
+  const cookedOn = form.get("cookedOn");
+  const cookedAt = isDateString(cookedOn) ? cookedOn : localDate();
   const position = scheduledMeal(request, id)?.position ?? null;
   // The loader drops stale positions, so a missing one means this is a repeated
   // submit after the meal was already recorded
@@ -62,7 +66,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   db.transaction((tx) => {
     tx.update(recipes).set({ comments }).where(eq(recipes.id, id)).run();
     if (position != null) tx.delete(mealSchedule).where(eq(mealSchedule.position, position)).run();
-    tx.insert(mealHistory).values({ recipeId: id, cookedAt: new Date().toISOString().slice(0, 10) }).run();
+    tx.insert(mealHistory).values({ recipeId: id, cookedAt }).run();
   });
 
   return redirect(position != null ? "/" : `/recipes/${id}`);
@@ -90,6 +94,7 @@ function useWakeLock() {
 export default function Cook({ loaderData }: Route.ComponentProps) {
   const { recipe, servings, ingredients, scheduled } = loaderData;
   const navigate = useNavigate();
+  const cookedOnRef = useRef<HTMLInputElement>(null);
   useWakeLock();
 
   return (
@@ -131,7 +136,9 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
         <Text size="lg" mb="xl" c="dimmed">No instructions.</Text>
       )}
 
-      <Form method="post">
+      {/* Read at submit time: the page may stay open past midnight */}
+      <Form method="post" onSubmit={() => cookedOnRef.current && (cookedOnRef.current.value = localDate())}>
+        <input type="hidden" name="cookedOn" ref={cookedOnRef} />
         <Stack>
           <Textarea
             name="comments"
