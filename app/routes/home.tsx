@@ -76,105 +76,118 @@ export async function action({ request }: Route.ActionArgs) {
   if (text(form, "servings") && !newServings) return null;
   const position = int(form, "position");
 
-  if (intent === "move" && position) {
-    const up = form.get("direction") === "up";
-    // Swap meals with the neighbouring entry (positions may have gaps)
-    db.transaction((tx) => {
-      const current = tx.select().from(mealSchedule).where(eq(mealSchedule.position, position)).get();
-      const neighbour = tx
-        .select()
+  switch (intent) {
+    case "move": {
+      if (!position) break;
+      const up = form.get("direction") === "up";
+      // Swap meals with the neighbouring entry (positions may have gaps)
+      db.transaction((tx) => {
+        const current = tx.select().from(mealSchedule).where(eq(mealSchedule.position, position)).get();
+        const neighbour = tx
+          .select()
+          .from(mealSchedule)
+          .where(up ? lt(mealSchedule.position, position) : gt(mealSchedule.position, position))
+          .orderBy(up ? desc(mealSchedule.position) : asc(mealSchedule.position))
+          .limit(1)
+          .get();
+        if (!current || !neighbour) return;
+        tx.update(mealSchedule)
+          .set({ recipeId: neighbour.recipeId, servings: neighbour.servings })
+          .where(eq(mealSchedule.position, current.position))
+          .run();
+        tx.update(mealSchedule)
+          .set({ recipeId: current.recipeId, servings: current.servings })
+          .where(eq(mealSchedule.position, neighbour.position))
+          .run();
+      });
+      break;
+    }
+
+    case "servings": {
+      if (!(position && newServings)) break;
+      await db.update(mealSchedule).set({ servings: newServings }).where(eq(mealSchedule.position, position));
+      break;
+    }
+
+    case "remove": {
+      if (!position) break;
+      await db.delete(mealSchedule).where(eq(mealSchedule.position, position));
+      break;
+    }
+
+    // Also changes the auto-fill rotation, which goes by last-cooked date
+    case "remove-history": {
+      const historyId = int(form, "id");
+      if (historyId) await db.delete(mealHistory).where(eq(mealHistory.id, historyId));
+      break;
+    }
+
+    case "add": {
+      const recipeId = int(form, "recipeId");
+      // Nothing picked, or a recipe that's gone or archived since the page loaded
+      if (!recipeId) return null;
+      const recipe = db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
+      if (!recipe || recipe.archived) return null;
+      const [{ nextPos }] = await db
+        .select({ nextPos: max(mealSchedule.position) })
+        .from(mealSchedule);
+      await db.insert(mealSchedule).values({ position: (nextPos ?? 0) + 1, recipeId, servings: newServings });
+      break;
+    }
+
+    case "auto-fill": {
+      const count = int(form, "count");
+      if (!count || count > MAX_AUTO_FILL) return null;
+
+      const queue = await db
+        .select({ recipeId: mealSchedule.recipeId })
         .from(mealSchedule)
-        .where(up ? lt(mealSchedule.position, position) : gt(mealSchedule.position, position))
-        .orderBy(up ? desc(mealSchedule.position) : asc(mealSchedule.position))
-        .limit(1)
-        .get();
-      if (!current || !neighbour) return;
-      tx.update(mealSchedule)
-        .set({ recipeId: neighbour.recipeId, servings: neighbour.servings })
-        .where(eq(mealSchedule.position, current.position))
-        .run();
-      tx.update(mealSchedule)
-        .set({ recipeId: current.recipeId, servings: current.servings })
-        .where(eq(mealSchedule.position, neighbour.position))
-        .run();
-    });
-  }
+        .orderBy(asc(mealSchedule.position));
+      // Last position in the queue per recipe (later entries overwrite earlier ones)
+      const queuePos = new Map(queue.map((r, i) => [r.recipeId, i]));
 
-  if (intent === "servings" && position && newServings) {
-    await db.update(mealSchedule).set({ servings: newServings }).where(eq(mealSchedule.position, position));
-  }
+      // Find the last-cooked date per recipe
+      const lastCooked = await db
+        .select({ recipeId: mealHistory.recipeId, lastDate: max(mealHistory.cookedAt) })
+        .from(mealHistory)
+        .groupBy(mealHistory.recipeId);
+      const lastCookedMap = new Map(lastCooked.map((r) => [r.recipeId, r.lastDate]));
 
-  if (intent === "remove" && position) {
-    await db.delete(mealSchedule).where(eq(mealSchedule.position, position));
-  }
+      // Rotation order: unscheduled recipes by least recently cooked (never cooked
+      // first), then scheduled ones in the order they come up in the queue.
+      const rotation = await db
+        .select({ id: recipes.id })
+        .from(recipes)
+        .where(eq(recipes.archived, false))
+        .then((all) =>
+          all.sort((a, b) => {
+            const aPos = queuePos.get(a.id) ?? -1;
+            const bPos = queuePos.get(b.id) ?? -1;
+            if (aPos !== bPos) return aPos - bPos;
+            const aDate = lastCookedMap.get(a.id) ?? "";
+            const bDate = lastCookedMap.get(b.id) ?? "";
+            return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
+          })
+        );
 
-  // Also changes the auto-fill rotation, which goes by last-cooked date
-  if (intent === "remove-history") {
-    const historyId = int(form, "id");
-    if (historyId) await db.delete(mealHistory).where(eq(mealHistory.id, historyId));
-  }
+      if (rotation.length === 0) return null;
 
-  if (intent === "add") {
-    const recipeId = int(form, "recipeId");
-    // Nothing picked, or a recipe that's gone or archived since the page loaded
-    if (!recipeId) return null;
-    const recipe = db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
-    if (!recipe || recipe.archived) return null;
-    const [{ nextPos }] = await db
-      .select({ nextPos: max(mealSchedule.position) })
-      .from(mealSchedule);
-    await db.insert(mealSchedule).values({ position: (nextPos ?? 0) + 1, recipeId, servings: newServings });
-  }
-
-  if (intent === "auto-fill") {
-    const count = int(form, "count");
-    if (!count || count > MAX_AUTO_FILL) return null;
-
-    const queue = await db
-      .select({ recipeId: mealSchedule.recipeId })
-      .from(mealSchedule)
-      .orderBy(asc(mealSchedule.position));
-    // Last position in the queue per recipe (later entries overwrite earlier ones)
-    const queuePos = new Map(queue.map((r, i) => [r.recipeId, i]));
-
-    // Find the last-cooked date per recipe
-    const lastCooked = await db
-      .select({ recipeId: mealHistory.recipeId, lastDate: max(mealHistory.cookedAt) })
-      .from(mealHistory)
-      .groupBy(mealHistory.recipeId);
-    const lastCookedMap = new Map(lastCooked.map((r) => [r.recipeId, r.lastDate]));
-
-    // Rotation order: unscheduled recipes by least recently cooked (never cooked
-    // first), then scheduled ones in the order they come up in the queue.
-    const rotation = await db
-      .select({ id: recipes.id })
-      .from(recipes)
-      .where(eq(recipes.archived, false))
-      .then((all) =>
-        all.sort((a, b) => {
-          const aPos = queuePos.get(a.id) ?? -1;
-          const bPos = queuePos.get(b.id) ?? -1;
-          if (aPos !== bPos) return aPos - bPos;
-          const aDate = lastCookedMap.get(a.id) ?? "";
-          const bDate = lastCookedMap.get(b.id) ?? "";
-          return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
-        })
+      const [{ nextPos }] = await db
+        .select({ nextPos: max(mealSchedule.position) })
+        .from(mealSchedule);
+      const start = (nextPos ?? 0) + 1;
+      // Loop through the rotation if more meals are requested than there are recipes
+      await db.insert(mealSchedule).values(
+        Array.from({ length: count }, (_, i) => ({
+          position: start + i,
+          recipeId: rotation[i % rotation.length].id,
+          servings: newServings,
+        }))
       );
-
-    if (rotation.length === 0) return null;
-
-    const [{ nextPos }] = await db
-      .select({ nextPos: max(mealSchedule.position) })
-      .from(mealSchedule);
-    const start = (nextPos ?? 0) + 1;
-    // Loop through the rotation if more meals are requested than there are recipes
-    await db.insert(mealSchedule).values(
-      Array.from({ length: count }, (_, i) => ({
-        position: start + i,
-        recipeId: rotation[i % rotation.length].id,
-        servings: newServings,
-      }))
-    );
+      break;
+    }
+    default:
+      throw new Response("Unknown intent", { status: 400 });
   }
 
   return null;

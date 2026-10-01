@@ -67,37 +67,49 @@ export async function action({ request }: Route.ActionArgs) {
   const id = int(form, "id");
   const name = text(form, "name");
 
-  if (intent === "delete-item") {
-    if (id) deleteItem(id);
-  }
+  switch (intent) {
+    case "delete-item": {
+      if (id) deleteItem(id);
+      break;
+    }
 
-  if (intent === "add-shelf") {
-    const storeId = int(form, "storeId");
-    if (storeId && name) addShelf(storeId, name);
-  }
+    case "add-shelf": {
+      const storeId = int(form, "storeId");
+      if (storeId && name) addShelf(storeId, name);
+      break;
+    }
 
-  if (intent === "rename-shelf") {
-    if (id && name) await db.update(itemCategories).set({ name }).where(eq(itemCategories.id, id));
-  }
+    case "rename-shelf": {
+      if (id && name) await db.update(itemCategories).set({ name }).where(eq(itemCategories.id, id));
+      break;
+    }
 
-  if (intent === "move-shelf") {
-    if (id) moveShelf(id, form.get("direction") === "up");
-  }
+    case "move-shelf": {
+      if (id) moveShelf(id, form.get("direction") === "up");
+      break;
+    }
 
-  if (intent === "delete-shelf") {
-    if (id) deleteShelf(id);
-  }
+    case "delete-shelf": {
+      if (id) deleteShelf(id);
+      break;
+    }
 
-  if (intent === "add-store") {
-    if (name) await db.insert(stores).values({ name });
-  }
+    case "add-store": {
+      if (name) await db.insert(stores).values({ name });
+      break;
+    }
 
-  if (intent === "rename-store") {
-    if (id && name) await db.update(stores).set({ name }).where(eq(stores.id, id));
-  }
+    case "rename-store": {
+      if (id && name) await db.update(stores).set({ name }).where(eq(stores.id, id));
+      break;
+    }
 
-  if (intent === "delete-store") {
-    if (id) deleteStore(id);
+    case "delete-store": {
+      if (id) deleteStore(id);
+      break;
+    }
+    default:
+      throw new Response("Unknown intent", { status: 400 });
   }
 
   return null;

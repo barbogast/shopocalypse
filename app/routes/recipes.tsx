@@ -28,9 +28,16 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const id = int(form, "id");
   if (!id) return null;
-  const intent = form.get("intent");
-  if (intent === "restore") restoreRecipe(id);
-  if (intent === "delete") deleteOrArchiveRecipe(id);
+  switch (form.get("intent")) {
+    case "restore":
+      restoreRecipe(id);
+      break;
+    case "delete":
+      deleteOrArchiveRecipe(id);
+      break;
+    default:
+      throw new Response("Unknown intent", { status: 400 });
+  }
   return null;
 }
 

@@ -62,54 +62,61 @@ export async function action({ request, params }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
 
-  if (intent === "save") {
-    const name = text(form, "name");
-    const servingSize = int(form, "servingSize");
-    const instructions = optionalText(form, "instructions");
-    const comments = optionalText(form, "comments");
-    if (!name || !servingSize) return { error: "Name and a whole-number serving size are required." };
-    await db.update(recipes).set({ name, servingSize, instructions, comments }).where(eq(recipes.id, id));
-    return { saved: true };
-  }
+  switch (intent) {
+    case "save": {
+      const name = text(form, "name");
+      const servingSize = int(form, "servingSize");
+      const instructions = optionalText(form, "instructions");
+      const comments = optionalText(form, "comments");
+      if (!name || !servingSize) return { error: "Name and a whole-number serving size are required." };
+      await db.update(recipes).set({ name, servingSize, instructions, comments }).where(eq(recipes.id, id));
+      return { saved: true };
+    }
 
-  if (intent === "add-ingredient") {
-    const itemId = int(form, "itemId");
-    if (!itemId) return { error: "Select an item." };
-    const parsed = parseAmount(form);
-    if ("error" in parsed) return { error: parsed.error };
-    const { quantity, unit } = parsed.amount;
-    await db
-      .insert(recipeIngredients)
-      .values({ recipeId: id, itemId, quantity, unit })
-      .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit } });
-  }
+    case "add-ingredient": {
+      const itemId = int(form, "itemId");
+      if (!itemId) return { error: "Select an item." };
+      const parsed = parseAmount(form);
+      if ("error" in parsed) return { error: parsed.error };
+      const { quantity, unit } = parsed.amount;
+      await db
+        .insert(recipeIngredients)
+        .values({ recipeId: id, itemId, quantity, unit })
+        .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit } });
+      break;
+    }
 
-  // New item from the ingredient picker; it's then preselected for adding
-  if (intent === "create-item") {
-    const parsed = parseItemForm(form);
-    if (parsed.error) return { createError: parsed.error };
-    const [item] = await db
-      .insert(items)
-      .values(parsed.values)
-      .returning({ id: items.id, name: items.name, defaultUnit: items.defaultUnit });
-    return { createdItem: item };
-  }
+    // New item from the ingredient picker; it's then preselected for adding
+    case "create-item": {
+      const parsed = parseItemForm(form);
+      if (parsed.error) return { createError: parsed.error };
+      const [item] = await db
+        .insert(items)
+        .values(parsed.values)
+        .returning({ id: items.id, name: items.name, defaultUnit: items.defaultUnit });
+      return { createdItem: item };
+    }
 
-  if (intent === "remove-ingredient") {
-    const itemId = int(form, "itemId");
-    if (!itemId) return null;
-    await db
-      .delete(recipeIngredients)
-      .where(and(eq(recipeIngredients.recipeId, id), eq(recipeIngredients.itemId, itemId)));
-  }
+    case "remove-ingredient": {
+      const itemId = int(form, "itemId");
+      if (!itemId) return null;
+      await db
+        .delete(recipeIngredients)
+        .where(and(eq(recipeIngredients.recipeId, id), eq(recipeIngredients.itemId, itemId)));
+      break;
+    }
 
-  if (intent === "delete") {
-    deleteOrArchiveRecipe(id);
-    return redirect("/recipes");
-  }
+    case "delete": {
+      deleteOrArchiveRecipe(id);
+      return redirect("/recipes");
+    }
 
-  if (intent === "restore") {
-    restoreRecipe(id);
+    case "restore": {
+      restoreRecipe(id);
+      break;
+    }
+    default:
+      throw new Response("Unknown intent", { status: 400 });
   }
 
   return null;

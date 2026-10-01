@@ -139,141 +139,152 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
 
-  if (intent === "prepare") {
-    const positions = form.getAll("position").map(Number).filter(Number.isInteger);
-    const includeInStock = form.get("includeInStock") === "on";
+  switch (intent) {
+    case "prepare": {
+      const positions = form.getAll("position").map(Number).filter(Number.isInteger);
+      const includeInStock = form.get("includeInStock") === "on";
 
-    // One transaction, so a double submit can't create a second active list
-    db.transaction((tx) => {
-      if (getActiveList(tx)) return;
+      // One transaction, so a double submit can't create a second active list
+      db.transaction((tx) => {
+        if (getActiveList(tx)) return;
 
-      const scheduled =
-        positions.length > 0
-          ? tx
-              .select({
-                recipeId: mealSchedule.recipeId,
-                servings: mealServings(mealSchedule.servings),
-                servingSize: recipes.servingSize,
-              })
-              .from(mealSchedule)
-              .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
-              .where(inArray(mealSchedule.position, positions))
-              .orderBy(asc(mealSchedule.position))
-              .all()
-          : [];
+        const scheduled =
+          positions.length > 0
+            ? tx
+                .select({
+                  recipeId: mealSchedule.recipeId,
+                  servings: mealServings(mealSchedule.servings),
+                  servingSize: recipes.servingSize,
+                })
+                .from(mealSchedule)
+                .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
+                .where(inArray(mealSchedule.position, positions))
+                .orderBy(asc(mealSchedule.position))
+                .all()
+            : [];
 
-      const ingredients = tx
-        .select({
-          recipeId: recipeIngredients.recipeId,
-          itemId: recipeIngredients.itemId,
-          quantity: recipeIngredients.quantity,
-          unit: recipeIngredients.unit,
-          alwaysAvailable: items.alwaysAvailable,
-        })
-        .from(recipeIngredients)
-        .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-        .where(inArray(recipeIngredients.recipeId, scheduled.map((m) => m.recipeId)))
-        .all();
-      // Stock tracking is deferred (no units yet), so nothing is subtracted
-      const toAdd = listAmounts(scheduled, ingredients, includeInStock);
+        const ingredients = tx
+          .select({
+            recipeId: recipeIngredients.recipeId,
+            itemId: recipeIngredients.itemId,
+            quantity: recipeIngredients.quantity,
+            unit: recipeIngredients.unit,
+            alwaysAvailable: items.alwaysAvailable,
+          })
+          .from(recipeIngredients)
+          .innerJoin(items, eq(recipeIngredients.itemId, items.id))
+          .where(inArray(recipeIngredients.recipeId, scheduled.map((m) => m.recipeId)))
+          .all();
+        // Stock tracking is deferred (no units yet), so nothing is subtracted
+        const toAdd = listAmounts(scheduled, ingredients, includeInStock);
 
-      const list = tx
-        .insert(shoppingLists)
-        .values({ createdAt: new Date().toISOString(), status: "active" })
-        .returning()
-        .get();
+        const list = tx
+          .insert(shoppingLists)
+          .values({ createdAt: new Date().toISOString(), status: "active" })
+          .returning()
+          .get();
 
-      if (scheduled.length > 0) {
-        tx.insert(shoppingListRecipes)
-          .values(scheduled.map((meal) => ({ shoppingListId: list.id, recipeId: meal.recipeId, servings: meal.servings })))
-          .run();
-      }
+        if (scheduled.length > 0) {
+          tx.insert(shoppingListRecipes)
+            .values(scheduled.map((meal) => ({ shoppingListId: list.id, recipeId: meal.recipeId, servings: meal.servings })))
+            .run();
+        }
 
-      if (toAdd.size > 0) {
-        tx.insert(shoppingListItems)
-          .values(
-            [...toAdd.entries()].map(([itemId, amounts]) => ({
-              shoppingListId: list.id,
-              itemId,
-              amounts,
-              source: "meal_plan" as const,
-            }))
-          )
-          .run();
-      }
-    });
-  }
+        if (toAdd.size > 0) {
+          tx.insert(shoppingListItems)
+            .values(
+              [...toAdd.entries()].map(([itemId, amounts]) => ({
+                shoppingListId: list.id,
+                itemId,
+                amounts,
+                source: "meal_plan" as const,
+              }))
+            )
+            .run();
+        }
+      });
+      break;
+    }
 
-  if (intent === "add-manual") {
-    const activeList = getActiveList();
-    if (!activeList) return null;
+    case "add-manual": {
+      const activeList = getActiveList();
+      if (!activeList) return null;
 
-    const itemId = int(form, "itemId");
-    const parsed = parseAmount(form);
-    if (!itemId || "error" in parsed) return null;
-    // An item already on the list gets the amounts added up, and needs buying again
-    db.transaction((tx) => {
-      const listed = tx
-        .select()
-        .from(shoppingListItems)
-        .where(and(eq(shoppingListItems.shoppingListId, activeList.id), eq(shoppingListItems.itemId, itemId)))
-        .get();
-      if (listed) {
-        tx.update(shoppingListItems)
-          .set({ amounts: combineAmounts([...listed.amounts, parsed.amount]), bought: false })
-          .where(eq(shoppingListItems.id, listed.id))
-          .run();
-      } else {
-        tx.insert(shoppingListItems)
-          .values({ shoppingListId: activeList.id, itemId, amounts: combineAmounts([parsed.amount]), source: "manual" })
-          .run();
-      }
-    });
-  }
+      const itemId = int(form, "itemId");
+      const parsed = parseAmount(form);
+      if (!itemId || "error" in parsed) return null;
+      // An item already on the list gets the amounts added up, and needs buying again
+      db.transaction((tx) => {
+        const listed = tx
+          .select()
+          .from(shoppingListItems)
+          .where(and(eq(shoppingListItems.shoppingListId, activeList.id), eq(shoppingListItems.itemId, itemId)))
+          .get();
+        if (listed) {
+          tx.update(shoppingListItems)
+            .set({ amounts: combineAmounts([...listed.amounts, parsed.amount]), bought: false })
+            .where(eq(shoppingListItems.id, listed.id))
+            .run();
+        } else {
+          tx.insert(shoppingListItems)
+            .values({ shoppingListId: activeList.id, itemId, amounts: combineAmounts([parsed.amount]), source: "manual" })
+            .run();
+        }
+      });
+      break;
+    }
 
-  if (intent === "tick") {
-    const id = int(form, "id");
-    if (!id) return null;
-    await db
-      .update(shoppingListItems)
-      .set({ bought: true })
-      .where(eq(shoppingListItems.id, id));
-  }
+    case "tick": {
+      const id = int(form, "id");
+      if (!id) return null;
+      await db
+        .update(shoppingListItems)
+        .set({ bought: true })
+        .where(eq(shoppingListItems.id, id));
+      break;
+    }
 
-  if (intent === "untick") {
-    const id = int(form, "id");
-    if (!id) return null;
-    await db
-      .update(shoppingListItems)
-      .set({ bought: false })
-      .where(eq(shoppingListItems.id, id));
-  }
+    case "untick": {
+      const id = int(form, "id");
+      if (!id) return null;
+      await db
+        .update(shoppingListItems)
+        .set({ bought: false })
+        .where(eq(shoppingListItems.id, id));
+      break;
+    }
 
-  if (intent === "remove-item") {
-    const id = int(form, "id");
-    if (!id) return null;
-    await db.delete(shoppingListItems).where(eq(shoppingListItems.id, id));
-  }
+    case "remove-item": {
+      const id = int(form, "id");
+      if (!id) return null;
+      await db.delete(shoppingListItems).where(eq(shoppingListItems.id, id));
+      break;
+    }
 
-  if (intent === "finish") {
-    const activeList = getActiveList();
-    if (!activeList) return null;
+    case "finish": {
+      const activeList = getActiveList();
+      if (!activeList) return null;
 
-    // Stock tracking is deferred, so finishing doesn't add bought items to it
-    await db
-      .update(shoppingLists)
-      .set({ status: "completed" })
-      .where(eq(shoppingLists.id, activeList.id));
-  }
+      // Stock tracking is deferred, so finishing doesn't add bought items to it
+      await db
+        .update(shoppingLists)
+        .set({ status: "completed" })
+        .where(eq(shoppingLists.id, activeList.id));
+      break;
+    }
 
-  if (intent === "discard") {
-    const activeList = getActiveList();
-    if (!activeList) return null;
-    db.transaction((tx) => {
-      tx.delete(shoppingListItems).where(eq(shoppingListItems.shoppingListId, activeList.id)).run();
-      tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.shoppingListId, activeList.id)).run();
-      tx.delete(shoppingLists).where(eq(shoppingLists.id, activeList.id)).run();
-    });
+    case "discard": {
+      const activeList = getActiveList();
+      if (!activeList) return null;
+      db.transaction((tx) => {
+        tx.delete(shoppingListItems).where(eq(shoppingListItems.shoppingListId, activeList.id)).run();
+        tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.shoppingListId, activeList.id)).run();
+        tx.delete(shoppingLists).where(eq(shoppingLists.id, activeList.id)).run();
+      });
+      break;
+    }
+    default:
+      throw new Response("Unknown intent", { status: 400 });
   }
 
   return null;
