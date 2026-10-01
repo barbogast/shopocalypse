@@ -99,7 +99,7 @@ A recipe appears once per scheduled meal, so it can be listed more than once.
 
 - Single shared instance — no user accounts or authentication
 - Units are a fixed list in code (`app/units.ts`). g/kg and ml/l are added up with each other; every other unit (pcs, tbsp, can, bottle, …) only with itself — there's no conversion between kinds
-- Stock quantities are still plain integers without units; stock tracking is switched off and needs its own unit design before it comes back
+- Stock quantities are still plain integers without units; stock tracking was removed from the app (the table is kept) and needs its own unit design before it comes back
 - Only one ShoppingList can be active at a time; completing it archives the old one
 - Ingredient quantities are scaled by servings / serving_size when preparing a shopping list and when cooking a scheduled meal. Summed list amounts in units bought whole (pcs, can, jar, pack, bottle, crate, bunch) are rounded up
 - The shopping list is grouped by store, then by shelf in the store's shelf order

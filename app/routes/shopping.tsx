@@ -15,9 +15,8 @@ import {
 } from "@mantine/core";
 import { IconCheck, IconPlus, IconShoppingCart, IconTrash, IconUsers } from "@tabler/icons-react";
 import { useState } from "react";
-import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { Form } from "react-router";
-import { STOCK_TRACKING_ENABLED } from "~/config";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { db } from "~/db/client";
 import { withIngredients } from "~/db/recipes.server";
@@ -30,7 +29,6 @@ import {
   shoppingListItems,
   shoppingListRecipes,
   shoppingLists,
-  stock,
   stores,
 } from "~/db/schema";
 import {
@@ -195,27 +193,9 @@ export async function action({ request }: Route.ActionArgs) {
       }
     }
 
-    // Stock has no units, so it isn't subtracted from meal amounts
-    const toAdd = new Map<number, { amounts: Amount[]; source: "meal_plan" | "stock_deficit" }>();
-    for (const [itemId, amounts] of mealAmounts) {
-      toAdd.set(itemId, { amounts: roundUpToBuy(combineAmounts(amounts)), source: "meal_plan" });
-    }
-
-    // Add stock deficits not already covered
-    const deficits = STOCK_TRACKING_ENABLED
-      ? await db
-          .select()
-          .from(stock)
-          .where(lt(stock.currentQuantity, stock.desiredQuantity))
-      : [];
-    for (const deficit of deficits) {
-      if (!toAdd.has(deficit.itemId)) {
-        toAdd.set(deficit.itemId, {
-          amounts: [{ quantity: deficit.desiredQuantity - deficit.currentQuantity, unit: "pcs" }],
-          source: "stock_deficit",
-        });
-      }
-    }
+    // Stock tracking is deferred (no units yet), so nothing is subtracted
+    const toAdd = new Map<number, Amount[]>();
+    for (const [itemId, amounts] of mealAmounts) toAdd.set(itemId, roundUpToBuy(combineAmounts(amounts)));
 
     const [list] = await db
       .insert(shoppingLists)
@@ -230,11 +210,11 @@ export async function action({ request }: Route.ActionArgs) {
 
     if (toAdd.size > 0) {
       await db.insert(shoppingListItems).values(
-        [...toAdd.entries()].map(([itemId, { amounts, source }]) => ({
+        [...toAdd.entries()].map(([itemId, amounts]) => ({
           shoppingListId: list.id,
           itemId,
           amounts,
-          source,
+          source: "meal_plan" as const,
         }))
       );
     }
@@ -286,7 +266,7 @@ export async function action({ request }: Route.ActionArgs) {
       .limit(1);
     if (!activeList) return null;
 
-    // Stock has no units, so finishing doesn't add bought items to it
+    // Stock tracking is deferred, so finishing doesn't add bought items to it
     await db
       .update(shoppingLists)
       .set({ status: "completed" })
@@ -483,9 +463,6 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
                         <Text td={ticked ? "line-through" : undefined}>{item.itemName}</Text>
                         {recipesByItem.has(item.itemId) && (
                           <Text size="xs" c="dimmed">{recipesByItem.get(item.itemId)!.join(", ")}</Text>
-                        )}
-                        {item.source === "stock_deficit" && (
-                          <Badge size="xs" variant="outline" color="gray">stock</Badge>
                         )}
                         {item.source === "manual" && (
                           <Badge size="xs" variant="outline" color="gray">manual</Badge>

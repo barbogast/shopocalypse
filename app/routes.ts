@@ -9,6 +9,5 @@ export default [
   route("items", "routes/items.tsx"),
   route("items/new", "routes/items.new.tsx"),
   route("items/:id", "routes/items.$id.tsx"),
-  route("stock", "routes/stock.tsx"),
   route("shopping", "routes/shopping.tsx"),
 ] satisfies RouteConfig;
