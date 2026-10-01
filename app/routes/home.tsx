@@ -62,6 +62,9 @@ export async function loader() {
   return { scheduled, allRecipes, recentlyCooked };
 }
 
+// Guards against a typo like 300 filling the schedule for a year
+const MAX_AUTO_FILL = 30;
+
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
@@ -124,7 +127,8 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "auto-fill") {
-    const count = Number(form.get("count"));
+    const count = int(form, "count");
+    if (!count || count > MAX_AUTO_FILL) return null;
 
     const queue = await db
       .select({ recipeId: mealSchedule.recipeId })
@@ -157,7 +161,7 @@ export async function action({ request }: Route.ActionArgs) {
         })
       );
 
-    if (rotation.length === 0 || count < 1) return null;
+    if (rotation.length === 0) return null;
 
     const [{ nextPos }] = await db
       .select({ nextPos: max(mealSchedule.position) })
@@ -354,6 +358,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 label="Auto-fill"
                 description="Appends least recently cooked recipes"
                 min={1}
+                max={MAX_AUTO_FILL}
+                allowDecimal={false}
                 defaultValue={3}
                 style={{ width: 100 }}
               />
