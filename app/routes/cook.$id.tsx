@@ -4,6 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { useEffect } from "react";
 import { Form, Link, redirect, useNavigate } from "react-router";
 import { Markdown } from "~/components/markdown";
+import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes } from "~/db/schema";
 import { formatAmount, scaleAmount } from "~/units";
@@ -136,9 +137,9 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
             minRows={2}
           />
           <Group>
-            <Button type="submit" color="green" leftSection={<IconCheck size={16} />}>
+            <SubmitButton color="green" leftSection={<IconCheck size={16} />}>
               Done cooking
-            </Button>
+            </SubmitButton>
             <Button variant="subtle" color="gray" onClick={() => navigate(-1)}>
               Cancel
             </Button>

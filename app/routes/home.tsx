@@ -19,6 +19,7 @@ import { asc, desc, eq, gt, inArray, lt, max, notInArray, sql } from "drizzle-or
 import { useState } from "react";
 import { Form, Link } from "react-router";
 import { RecipeDrawer } from "~/components/recipe-drawer";
+import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { formatCookedAt, withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
@@ -343,7 +344,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 placeholder="Pick a recipe…"
                 style={{ flex: 1 }}
               />
-              <Button type="submit" leftSection={<IconPlus size={16} />}>Add</Button>
+              <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
             </Group>
           </Form>
         )}
@@ -363,9 +364,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 defaultValue={3}
                 style={{ width: 100 }}
               />
-              <Button type="submit" variant="light" leftSection={<IconRefresh size={16} />}>
+              <SubmitButton variant="light" leftSection={<IconRefresh size={16} />}>
                 Auto-fill
-              </Button>
+              </SubmitButton>
             </Group>
           </Form>
         )}

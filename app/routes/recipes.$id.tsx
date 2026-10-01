@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { ItemFields } from "~/components/item-fields";
+import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { listShelves, parseItemForm } from "~/db/items.server";
 import { deleteOrArchiveRecipe, formatCookedAt, restoreRecipe } from "~/db/recipes.server";
@@ -271,7 +272,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           {/* Leave the quantity empty for ingredients without one, like spices */}
           <NumberInput ref={quantityRef} name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—" style={{ width: 70 }} />
           <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
-          <Button type="submit">Add</Button>
+          <SubmitButton>Add</SubmitButton>
         </Group>
       </Form>
 
@@ -288,7 +289,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
             {createError && <p style={{ color: "red" }}>{createError}</p>}
             <Group justify="flex-end">
               <Button variant="subtle" onClick={createModal.close}>Cancel</Button>
-              <Button type="submit">Create</Button>
+              <SubmitButton>Create</SubmitButton>
             </Group>
           </Stack>
         </Form>

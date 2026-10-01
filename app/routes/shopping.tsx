@@ -18,6 +18,7 @@ import { useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { Form } from "react-router";
 import { RecipeDrawer } from "~/components/recipe-drawer";
+import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { withIngredients } from "~/db/recipes.server";
 import {
@@ -342,9 +343,9 @@ function PrepareList({ scheduled }: { scheduled: { position: number; name: strin
             description="Also add items marked as always available"
             mt="xs"
           />
-          <Button type="submit" leftSection={<IconShoppingCart size={16} />}>
+          <SubmitButton leftSection={<IconShoppingCart size={16} />}>
             {selected.size > 0 ? "Prepare list" : "Start empty list"}
-          </Button>
+          </SubmitButton>
         </Stack>
       </Form>
     </Container>
@@ -404,7 +405,7 @@ function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit
         />
         <NumberInput name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—" style={{ width: 70 }} />
         <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
-        <Button type="submit" leftSection={<IconPlus size={16} />}>Add</Button>
+        <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
       </Group>
     </Form>
   );
@@ -517,13 +518,13 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
       <Group>
         <Form method="post">
           <input type="hidden" name="intent" value="finish" />
-          <Button type="submit" color="green" disabled={tickedCount === 0}>
+          <SubmitButton color="green" disabled={tickedCount === 0}>
             Finish shopping
-          </Button>
+          </SubmitButton>
         </Form>
         <Form method="post">
           <input type="hidden" name="intent" value="discard" />
-          <Button type="submit" variant="subtle" color="red">Discard list</Button>
+          <SubmitButton variant="subtle" color="red">Discard list</SubmitButton>
         </Form>
       </Group>
     </Container>
