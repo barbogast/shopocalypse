@@ -15,10 +15,11 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
-import { IconCheck, IconChevronDown, IconChevronUp, IconPencil, IconPlus, IconToolsKitchen2, IconTrash, IconX } from "@tabler/icons-react";
+import { IconCheck, IconPencil, IconPlus, IconToolsKitchen2, IconTrash, IconX } from "@tabler/icons-react";
 import { useState } from "react";
 import { eq } from "drizzle-orm";
 import { Form, Link } from "react-router";
+import { MoveButtons } from "~/components/move-buttons";
 import { db } from "~/db/client";
 import { addShelf, deleteItem, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
 import { itemCategories, items, recipeIngredients, recipes, stores } from "~/db/schema";
@@ -180,23 +181,6 @@ function UsedInRecipes({ name, recipes }: { name: string; recipes: { id: number;
   );
 }
 
-function ShelfMoveButtons({ id, first, last }: { id: number; first: boolean; last: boolean }) {
-  return (
-    <Form method="post" style={{ display: "flex" }}>
-      <input type="hidden" name="intent" value="move-shelf" />
-      <input type="hidden" name="id" value={id} />
-      <Button type="submit" name="direction" value="up" disabled={first}
-        variant="subtle" color="gray" size="xs" px={6} aria-label="Move up">
-        <IconChevronUp size={14} />
-      </Button>
-      <Button type="submit" name="direction" value="down" disabled={last}
-        variant="subtle" color="gray" size="xs" px={6} aria-label="Move down">
-        <IconChevronDown size={14} />
-      </Button>
-    </Form>
-  );
-}
-
 export default function Items({ loaderData }: Route.ComponentProps) {
   const { allItems, allShelves, allStores, recipesByItem } = loaderData;
 
@@ -284,7 +268,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
                   <Group key={shelf.id} justify="space-between" wrap="nowrap">
                     <RenamableName intent="rename-shelf" id={shelf.id} name={shelf.name} size="sm" />
                     <Group gap={0} wrap="nowrap">
-                      <ShelfMoveButtons id={shelf.id} first={i === 0} last={i === shelves.length - 1} />
+                      <MoveButtons intent="move-shelf" fields={{ id: shelf.id }} first={i === 0} last={i === shelves.length - 1} />
                       <Form method="post">
                         <input type="hidden" name="intent" value="delete-shelf" />
                         <input type="hidden" name="id" value={shelf.id} />

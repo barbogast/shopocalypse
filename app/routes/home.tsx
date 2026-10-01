@@ -14,10 +14,11 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { IconChevronDown, IconChevronUp, IconMinus, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
+import { IconMinus, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
 import { asc, desc, eq, gt, inArray, lt, max, notInArray } from "drizzle-orm";
 import { useState } from "react";
 import { Form, Link } from "react-router";
+import { MoveButtons } from "~/components/move-buttons";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
@@ -181,23 +182,6 @@ export async function action({ request }: Route.ActionArgs) {
   return null;
 }
 
-function MoveButtons({ position, first, last }: { position: number; first: boolean; last: boolean }) {
-  return (
-    <Form method="post" style={{ display: "flex" }}>
-      <input type="hidden" name="intent" value="move" />
-      <input type="hidden" name="position" value={position} />
-      <Button type="submit" name="direction" value="up" disabled={first}
-        variant="subtle" color="gray" size="xs" px={6} aria-label="Move up">
-        <IconChevronUp size={14} />
-      </Button>
-      <Button type="submit" name="direction" value="down" disabled={last}
-        variant="subtle" color="gray" size="xs" px={6} aria-label="Move down">
-        <IconChevronDown size={14} />
-      </Button>
-    </Form>
-  );
-}
-
 function ServingsControl({ position, servings }: { position: number; servings: number }) {
   return (
     <Form method="post" style={{ display: "flex", alignItems: "center" }}>
@@ -250,7 +234,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 <ServingsControl position={next.position} servings={next.servings} />
               </Stack>
               <Group gap="xs">
-                <MoveButtons position={next.position} first last={upcoming.length === 0} />
+                <MoveButtons intent="move" fields={{ position: next.position }} first last={upcoming.length === 0} />
                 <Form method="post">
                   <input type="hidden" name="intent" value="remove" />
                   <input type="hidden" name="position" value={next.position} />
@@ -284,7 +268,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     </Stack>
                     <Group gap="xs">
                       <Badge variant="outline" color="gray">#{i + 2}</Badge>
-                      <MoveButtons position={meal.position} first={false} last={i === upcoming.length - 1} />
+                      <MoveButtons intent="move" fields={{ position: meal.position }} first={false} last={i === upcoming.length - 1} />
                       <Button
                         component={Link}
                         to={`/cook/${meal.id}?position=${meal.position}`}
