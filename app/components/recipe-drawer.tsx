@@ -10,7 +10,7 @@ export type RecipeDetails = {
   servingSize: number;
   instructions: string | null;
   comments: string | null;
-  ingredients: (Amount & { name: string })[];
+  ingredients: (Amount & { itemId: number; name: string })[];
 };
 
 // Recipe details scaled to a meal's servings, shown without leaving the page
@@ -34,7 +34,7 @@ export function RecipeDrawer({ recipe, note, onClose }: { recipe: RecipeDetails 
           <Table>
             <Table.Tbody>
               {recipe.ingredients.map((ing) => (
-                <Table.Tr key={ing.name}>
+                <Table.Tr key={ing.itemId}>
                   <Table.Td>{ing.name}</Table.Td>
                   <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
                 </Table.Tr>
