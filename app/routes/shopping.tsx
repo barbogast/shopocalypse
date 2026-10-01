@@ -35,16 +35,8 @@ import {
   stores,
 } from "~/db/schema";
 import { int } from "~/forms";
-import {
-  type Amount,
-  combineAmounts,
-  DEFAULT_UNIT,
-  formatAmounts,
-  parseAmount,
-  roundUpToBuy,
-  scaleAmount,
-  UNIT_OPTIONS,
-} from "~/units";
+import { listAmounts } from "~/shopping-list";
+import { combineAmounts, DEFAULT_UNIT, formatAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/shopping";
 
 export function meta() {
@@ -170,28 +162,20 @@ export async function action({ request }: Route.ActionArgs) {
               .all()
           : [];
 
-      // Collect ingredient amounts across selected meals, per item
-      const mealAmounts = new Map<number, Amount[]>();
-      for (const meal of scheduled) {
-        // Always-available items are assumed to be in stock unless asked for
-        const ings = tx
-          .select({ itemId: recipeIngredients.itemId, quantity: recipeIngredients.quantity, unit: recipeIngredients.unit })
-          .from(recipeIngredients)
-          .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-          .where(and(
-            eq(recipeIngredients.recipeId, meal.recipeId),
-            includeInStock ? undefined : eq(items.alwaysAvailable, false),
-          ))
-          .all();
-        for (const ing of ings) {
-          const amount = scaleAmount(ing, meal.servings, meal.servingSize);
-          mealAmounts.set(ing.itemId, [...(mealAmounts.get(ing.itemId) ?? []), amount]);
-        }
-      }
-
+      const ingredients = tx
+        .select({
+          recipeId: recipeIngredients.recipeId,
+          itemId: recipeIngredients.itemId,
+          quantity: recipeIngredients.quantity,
+          unit: recipeIngredients.unit,
+          alwaysAvailable: items.alwaysAvailable,
+        })
+        .from(recipeIngredients)
+        .innerJoin(items, eq(recipeIngredients.itemId, items.id))
+        .where(inArray(recipeIngredients.recipeId, scheduled.map((m) => m.recipeId)))
+        .all();
       // Stock tracking is deferred (no units yet), so nothing is subtracted
-      const toAdd = new Map<number, Amount[]>();
-      for (const [itemId, amounts] of mealAmounts) toAdd.set(itemId, roundUpToBuy(combineAmounts(amounts)));
+      const toAdd = listAmounts(scheduled, ingredients, includeInStock);
 
       const list = tx
         .insert(shoppingLists)
