@@ -39,6 +39,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     .orderBy(asc(items.name));
 
   const meal = scheduledMeal(request, id);
+  // A stale link (meal already cooked or removed): cook it as a one-off instead
+  if (!meal && new URL(request.url).searchParams.has("position")) return redirect(`/cook/${id}`);
   const servings = meal?.servings ?? recipe.servingSize;
   return {
     recipe,
@@ -53,6 +55,9 @@ export async function action({ params, request }: Route.ActionArgs) {
   const form = await request.formData();
   const comments = String(form.get("comments") ?? "").trim() || null;
   const position = scheduledMeal(request, id)?.position ?? null;
+  // The loader drops stale positions, so a missing one means this is a repeated
+  // submit after the meal was already recorded
+  if (position == null && new URL(request.url).searchParams.has("position")) return redirect("/");
 
   db.transaction((tx) => {
     tx.update(recipes).set({ comments }).where(eq(recipes.id, id)).run();
