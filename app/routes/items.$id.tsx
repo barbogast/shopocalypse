@@ -8,6 +8,10 @@ import { listShelves, parseItemForm } from "~/db/items.server";
 import { items, stores } from "~/db/schema";
 import type { Route } from "./+types/items.$id";
 
+export function meta({ data }: Route.MetaArgs) {
+  return [{ title: `${data?.item.name ?? "Item"} – Shopocalypse` }];
+}
+
 export async function loader({ params }: Route.LoaderArgs) {
   const id = Number(params.id);
   const [item] = await db.select().from(items).where(eq(items.id, id));

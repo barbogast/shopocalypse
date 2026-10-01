@@ -29,6 +29,10 @@ import { int, optionalText, text } from "~/forms";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/recipes.$id";
 
+export function meta({ data }: Route.MetaArgs) {
+  return [{ title: `${data?.recipe.name ?? "Recipe"} – Shopocalypse` }];
+}
+
 export async function loader({ params }: Route.LoaderArgs) {
   const id = Number(params.id);
   const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
