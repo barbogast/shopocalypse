@@ -1,14 +1,15 @@
 import { Badge, Box, Button, Container, Group, Stack, Table, Text, Textarea, Title } from "@mantine/core";
 import { IconCheck, IconPencil } from "@tabler/icons-react";
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { useEffect, useRef } from "react";
 import { Form, Link, redirect, useLocation, useNavigate } from "react-router";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
 import { isDateString, localDate } from "~/dates";
 import { db } from "~/db/client";
-import { items, mealHistory, mealSchedule, recipeIngredients, recipes } from "~/db/schema";
-import { formatAmount, scaleAmount } from "~/units";
+import { withIngredients } from "~/db/recipes.server";
+import { mealHistory, mealSchedule, recipes } from "~/db/schema";
+import { formatAmount } from "~/units";
 import type { Route } from "./+types/cook.$id";
 
 export function meta({ data }: Route.MetaArgs) {
@@ -32,23 +33,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
   if (!recipe) throw new Response("Not found", { status: 404 });
 
-  const ingredients = await db
-    .select({ itemId: items.id, name: items.name, quantity: recipeIngredients.quantity, unit: recipeIngredients.unit })
-    .from(recipeIngredients)
-    .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-    .where(eq(recipeIngredients.recipeId, id))
-    .orderBy(asc(items.name));
-
   const meal = scheduledMeal(request, id);
   // A stale link (meal already cooked or removed): cook it as a one-off instead
   if (!meal && new URL(request.url).searchParams.has("position")) return redirect(`/cook/${id}`);
   const servings = meal?.servings ?? recipe.servingSize;
-  return {
-    recipe,
-    servings,
-    ingredients: ingredients.map((i) => ({ ...i, ...scaleAmount(i, servings, recipe.servingSize) })),
-    scheduled: meal != null,
-  };
+  const [{ ingredients }] = await withIngredients([{ ...recipe, servings }]);
+  return { recipe, servings, ingredients, scheduled: meal != null };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {

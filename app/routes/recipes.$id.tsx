@@ -17,13 +17,13 @@ import {
 import { IconArchive, IconArchiveOff, IconCheck, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useRef, useState } from "react";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { ItemFields } from "~/components/item-fields";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { listShelves, parseItemForm } from "~/db/items.server";
-import { deleteOrArchiveRecipe, formatCookedAt, restoreRecipe } from "~/db/recipes.server";
+import { deleteOrArchiveRecipe, formatCookedAt, restoreRecipe, withIngredients } from "~/db/recipes.server";
 import { items, mealHistory, recipeIngredients, recipes, stores } from "~/db/schema";
 import { int, optionalText, text } from "~/forms";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
@@ -38,12 +38,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
   if (!recipe) throw new Response("Not found", { status: 404 });
 
-  const ingredients = await db
-    .select({ itemId: items.id, name: items.name, quantity: recipeIngredients.quantity, unit: recipeIngredients.unit })
-    .from(recipeIngredients)
-    .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-    .where(eq(recipeIngredients.recipeId, id))
-    .orderBy(asc(items.name));
+  const [{ ingredients }] = await withIngredients([{ ...recipe, servings: recipe.servingSize }]);
 
   const allItems = await db
     .select({ id: items.id, name: items.name, defaultUnit: items.defaultUnit })
