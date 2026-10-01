@@ -22,6 +22,7 @@ import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { withIngredients } from "~/db/recipes.server";
+import { getActiveList } from "~/db/shopping.server";
 import {
   itemCategories,
   items,
@@ -78,11 +79,7 @@ function countRecipes<T extends { id: number; servings: number }>(rows: T[]) {
 }
 
 export async function loader() {
-  const [activeList] = await db
-    .select()
-    .from(shoppingLists)
-    .where(eq(shoppingLists.status, "active"))
-    .limit(1);
+  const activeList = getActiveList();
 
   const scheduled = await db
     .select({
@@ -161,7 +158,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     // One transaction, so a double submit can't create a second active list
     db.transaction((tx) => {
-      if (tx.select().from(shoppingLists).where(eq(shoppingLists.status, "active")).get()) return;
+      if (getActiveList(tx)) return;
 
       const scheduled =
         positions.length > 0
@@ -229,11 +226,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "add-manual") {
-    const [activeList] = await db
-      .select()
-      .from(shoppingLists)
-      .where(eq(shoppingLists.status, "active"))
-      .limit(1);
+    const activeList = getActiveList();
     if (!activeList) return null;
 
     const itemId = int(form, "itemId");
@@ -281,11 +274,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "finish") {
-    const [activeList] = await db
-      .select()
-      .from(shoppingLists)
-      .where(eq(shoppingLists.status, "active"))
-      .limit(1);
+    const activeList = getActiveList();
     if (!activeList) return null;
 
     // Stock tracking is deferred, so finishing doesn't add bought items to it
@@ -296,11 +285,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "discard") {
-    const [activeList] = await db
-      .select()
-      .from(shoppingLists)
-      .where(eq(shoppingLists.status, "active"))
-      .limit(1);
+    const activeList = getActiveList();
     if (!activeList) return null;
     db.transaction((tx) => {
       tx.delete(shoppingListItems).where(eq(shoppingListItems.shoppingListId, activeList.id)).run();
