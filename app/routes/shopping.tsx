@@ -302,9 +302,11 @@ export async function action({ request }: Route.ActionArgs) {
       .where(eq(shoppingLists.status, "active"))
       .limit(1);
     if (!activeList) return null;
-    await db.delete(shoppingListItems).where(eq(shoppingListItems.shoppingListId, activeList.id));
-    await db.delete(shoppingListRecipes).where(eq(shoppingListRecipes.shoppingListId, activeList.id));
-    await db.delete(shoppingLists).where(eq(shoppingLists.id, activeList.id));
+    db.transaction((tx) => {
+      tx.delete(shoppingListItems).where(eq(shoppingListItems.shoppingListId, activeList.id)).run();
+      tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.shoppingListId, activeList.id)).run();
+      tx.delete(shoppingLists).where(eq(shoppingLists.id, activeList.id)).run();
+    });
   }
 
   return null;
