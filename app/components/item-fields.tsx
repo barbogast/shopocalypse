@@ -1,9 +1,10 @@
 import { Checkbox, Select, TextInput } from "@mantine/core";
 import { StoreShelfFields } from "~/components/store-shelf-fields";
+import type { itemCategories, stores } from "~/db/schema";
 import { UNIT_OPTIONS } from "~/units";
 
-type Store = { id: number; name: string };
-type Shelf = { id: number; name: string; storeId: number };
+type Store = typeof stores.$inferSelect;
+type Shelf = typeof itemCategories.$inferSelect;
 
 // The item form's fields, read on the server by parseItemForm
 export function ItemFields({

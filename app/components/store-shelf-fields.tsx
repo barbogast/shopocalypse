@@ -1,8 +1,9 @@
 import { Select } from "@mantine/core";
 import { useState } from "react";
+import type { itemCategories, stores } from "~/db/schema";
 
-type Store = { id: number; name: string };
-type Shelf = { id: number; name: string; storeId: number };
+type Store = typeof stores.$inferSelect;
+type Shelf = typeof itemCategories.$inferSelect;
 
 // Store and shelf pickers for the item form; only the chosen store's shelves are offered
 export function StoreShelfFields({
