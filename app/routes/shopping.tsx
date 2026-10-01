@@ -16,7 +16,7 @@ import {
 import { IconCheck, IconPlus, IconShoppingCart, IconTrash, IconUsers } from "@tabler/icons-react";
 import { useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import { Form } from "react-router";
+import { Form, useFetcher, useFetchers } from "react-router";
 import { LocalDateTime } from "~/components/local-date-time";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
@@ -342,7 +342,9 @@ function PrepareList({ scheduled }: { scheduled: { position: number; name: strin
   );
 }
 
-type ListRecipe = Extract<Awaited<ReturnType<typeof loader>>, { activeList: object }>["listRecipes"][number];
+type ActiveListData = Extract<Awaited<ReturnType<typeof loader>>, { activeList: object }>;
+type ListRecipe = ActiveListData["listRecipes"][number];
+type ListItem = ActiveListData["listItems"][number];
 
 // "For: …" line; tapping a recipe opens its details without leaving the list
 function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
@@ -401,9 +403,70 @@ function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit
   );
 }
 
+// One line of the list. Ticking and removing go through a fetcher, so the row
+// updates at once instead of waiting for the server and a reload of the list.
+function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | undefined }) {
+  const fetcher = useFetcher();
+  const ticked = item.bought;
+
+  return (
+    <Table.Tr opacity={ticked ? 0.5 : 1}>
+      <Table.Td>
+        <Text td={ticked ? "line-through" : undefined}>{item.itemName}</Text>
+        {usedIn && <Text size="xs" c="dimmed">{usedIn.join(", ")}</Text>}
+        {item.source === "manual" && (
+          <Badge size="xs" variant="outline" color="gray">manual</Badge>
+        )}
+      </Table.Td>
+      <Table.Td style={{ width: 110 }} c="dimmed">
+        {formatAmounts(item.amounts)}
+      </Table.Td>
+      <Table.Td style={{ width: 60 }}>
+        <fetcher.Form method="post">
+          <input type="hidden" name="id" value={item.id} />
+          {!ticked ? (
+            <Button type="submit" name="intent" value="tick" size="xs" color="green" px={6} aria-label={`Tick off ${item.itemName}`}>
+              <IconCheck size={14} />
+            </Button>
+          ) : (
+            <Button type="submit" name="intent" value="untick" size="xs" variant="subtle">Undo</Button>
+          )}
+        </fetcher.Form>
+      </Table.Td>
+      <Table.Td style={{ width: 32 }}>
+        <fetcher.Form method="post">
+          <input type="hidden" name="intent" value="remove-item" />
+          <input type="hidden" name="id" value={item.id} />
+          <Button type="submit" size="xs" variant="subtle" color="red" px={4} aria-label={`Remove ${item.itemName}`}>
+            <IconTrash size={12} />
+          </Button>
+        </fetcher.Form>
+      </Table.Td>
+    </Table.Tr>
+  );
+}
+
+// Applies ticks and removals that are still on their way to the server
+function withPendingChanges(listItems: ListItem[], fetchers: ReturnType<typeof useFetchers>) {
+  const pending = new Map<number, FormDataEntryValue | null>();
+  for (const f of fetchers) {
+    if (f.formData) pending.set(Number(f.formData.get("id")), f.formData.get("intent"));
+  }
+  return listItems
+    .filter((i) => pending.get(i.id) !== "remove-item")
+    .map((i) => {
+      const intent = pending.get(i.id);
+      return intent === "tick" ? { ...i, bought: true } : intent === "untick" ? { ...i, bought: false } : i;
+    });
+}
+
 export default function Shopping({ loaderData }: Route.ComponentProps) {
   if (!loaderData.activeList) return <PrepareList scheduled={loaderData.scheduled} />;
-  const { activeList, listRecipes, listItems, allItems } = loaderData;
+  return <ListView {...loaderData} />;
+}
+
+function ListView({ activeList, listRecipes, listItems: loadedItems, allItems }: ActiveListData) {
+  const listItems = withPendingChanges(loadedItems, useFetchers());
 
   const groups = groupByStoreAndShelf(listItems);
   const tickedCount = listItems.filter((i) => i.bought).length;
@@ -446,51 +509,9 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
                       </Table.Tr>,
                     ]
                   : []),
-                ...shelfItems.map((item) => {
-                  const ticked = item.bought;
-                  return (
-                    <Table.Tr key={item.id} opacity={ticked ? 0.5 : 1}>
-                      <Table.Td>
-                        <Text td={ticked ? "line-through" : undefined}>{item.itemName}</Text>
-                        {recipesByItem.has(item.itemId) && (
-                          <Text size="xs" c="dimmed">{recipesByItem.get(item.itemId)!.join(", ")}</Text>
-                        )}
-                        {item.source === "manual" && (
-                          <Badge size="xs" variant="outline" color="gray">manual</Badge>
-                        )}
-                      </Table.Td>
-                      <Table.Td style={{ width: 110 }} c="dimmed">
-                        {formatAmounts(item.amounts)}
-                      </Table.Td>
-                      <Table.Td style={{ width: 60 }}>
-                        {!ticked ? (
-                          <Form method="post">
-                            <input type="hidden" name="intent" value="tick" />
-                            <input type="hidden" name="id" value={item.id} />
-                            <Button type="submit" size="xs" color="green" px={6}>
-                              <IconCheck size={14} />
-                            </Button>
-                          </Form>
-                        ) : (
-                          <Form method="post">
-                            <input type="hidden" name="intent" value="untick" />
-                            <input type="hidden" name="id" value={item.id} />
-                            <Button type="submit" size="xs" variant="subtle">Undo</Button>
-                          </Form>
-                        )}
-                      </Table.Td>
-                      <Table.Td style={{ width: 32 }}>
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="remove-item" />
-                          <input type="hidden" name="id" value={item.id} />
-                          <Button type="submit" size="xs" variant="subtle" color="red" px={4}>
-                            <IconTrash size={12} />
-                          </Button>
-                        </Form>
-                      </Table.Td>
-                    </Table.Tr>
-                  );
-                }),
+                ...shelfItems.map((item) => (
+                  <ListItemRow key={item.id} item={item} usedIn={recipesByItem.get(item.itemId)} />
+                )),
               ])}
             </Table.Tbody>
           </Table>
