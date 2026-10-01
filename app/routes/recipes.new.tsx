@@ -1,5 +1,6 @@
 import { Container, NumberInput, Stack, Textarea, TextInput, Title } from "@mantine/core";
 import { Form, redirect } from "react-router";
+import { FormError } from "~/components/form-error";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { recipes } from "~/db/schema";
@@ -33,7 +34,7 @@ export default function NewRecipe({ actionData }: Route.ComponentProps) {
           <NumberInput name="servingSize" label="Serving size" min={1} allowDecimal={false} defaultValue={4} required />
           <Textarea name="instructions" label="Cooking instructions" description="Supports markdown" autosize minRows={4} />
           <Textarea name="comments" label="Comments" autosize minRows={2} />
-          {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
+          <FormError error={actionData?.error} />
           <SubmitButton>Create</SubmitButton>
         </Stack>
       </Form>

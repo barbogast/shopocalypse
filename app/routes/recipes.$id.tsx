@@ -19,6 +19,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useRef, useState } from "react";
 import { and, desc, eq } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
+import { FormError } from "~/components/form-error";
 import { ItemFields } from "~/components/item-fields";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
@@ -203,7 +204,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <Stack mb="xl">
           <TextInput name="name" label="Name" defaultValue={recipe.name} required />
           <NumberInput name="servingSize" label="Serving size" defaultValue={recipe.servingSize} min={1} allowDecimal={false} required />
-          {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
+          <FormError error={actionData?.error} />
           <Group>
             <SaveButton saved={saved} />
             {recipe.archived ? (
@@ -293,7 +294,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
               defaults={{ name: createName, defaultUnit: unit }}
               autoFocus
             />
-            {createError && <p style={{ color: "red" }}>{createError}</p>}
+            <FormError error={createError} />
             <Group justify="flex-end">
               <Button variant="subtle" onClick={createModal.close}>Cancel</Button>
               <SubmitButton>Create</SubmitButton>

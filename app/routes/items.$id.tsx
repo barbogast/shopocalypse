@@ -1,6 +1,7 @@
 import { Button, Container, Group, Stack, Title } from "@mantine/core";
 import { eq } from "drizzle-orm";
 import { Form, Link, redirect } from "react-router";
+import { FormError } from "~/components/form-error";
 import { ItemFields } from "~/components/item-fields";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
@@ -42,7 +43,7 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
       <Form method="post">
         <Stack>
           <ItemFields stores={allStores} shelves={allShelves} defaults={item} />
-          {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
+          <FormError error={actionData?.error} />
           <Group>
             <SubmitButton>Save</SubmitButton>
             <Button component={Link} to="/items" variant="subtle">Cancel</Button>
