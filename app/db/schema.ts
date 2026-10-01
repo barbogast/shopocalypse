@@ -1,4 +1,5 @@
-import { integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { Amount, UnitKey } from "../units";
 
 export const stores = sqliteTable("stores", {
@@ -77,7 +78,10 @@ export const shoppingLists = sqliteTable("shopping_lists", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   createdAt: text("created_at").notNull(),
   status: text("status", { enum: ["active", "completed"] }).notNull().default("active"),
-});
+}, (t) => [
+  // At most one active list
+  uniqueIndex("one_active_list").on(t.status).where(sql`status = 'active'`),
+]);
 
 // Meals a shopping list was prepared for (a recipe may appear more than once)
 export const shoppingListRecipes = sqliteTable("shopping_list_recipes", {

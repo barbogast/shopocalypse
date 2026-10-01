@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `one_active_list` ON `shopping_lists` (`status`) WHERE status = 'active';

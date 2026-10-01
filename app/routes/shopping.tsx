@@ -162,63 +162,73 @@ export async function action({ request }: Route.ActionArgs) {
     const positions = form.getAll("position").map(Number);
     const includeInStock = form.get("includeInStock") === "on";
 
-    const scheduled =
-      positions.length > 0
-        ? await db
-            .select({
-              recipeId: mealSchedule.recipeId,
-              servings: mealServings(mealSchedule.servings),
-              servingSize: recipes.servingSize,
-            })
-            .from(mealSchedule)
-            .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
-            .where(inArray(mealSchedule.position, positions))
-            .orderBy(asc(mealSchedule.position))
-        : [];
+    // One transaction, so a double submit can't create a second active list
+    db.transaction((tx) => {
+      if (tx.select().from(shoppingLists).where(eq(shoppingLists.status, "active")).get()) return;
 
-    // Collect ingredient amounts across selected meals, per item
-    const mealAmounts = new Map<number, Amount[]>();
-    for (const meal of scheduled) {
-      // Always-available items are assumed to be in stock unless asked for
-      const ings = await db
-        .select({ itemId: recipeIngredients.itemId, quantity: recipeIngredients.quantity, unit: recipeIngredients.unit })
-        .from(recipeIngredients)
-        .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-        .where(and(
-          eq(recipeIngredients.recipeId, meal.recipeId),
-          includeInStock ? undefined : eq(items.alwaysAvailable, false),
-        ));
-      for (const ing of ings) {
-        const amount = scaleAmount(ing, meal.servings, meal.servingSize);
-        mealAmounts.set(ing.itemId, [...(mealAmounts.get(ing.itemId) ?? []), amount]);
+      const scheduled =
+        positions.length > 0
+          ? tx
+              .select({
+                recipeId: mealSchedule.recipeId,
+                servings: mealServings(mealSchedule.servings),
+                servingSize: recipes.servingSize,
+              })
+              .from(mealSchedule)
+              .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
+              .where(inArray(mealSchedule.position, positions))
+              .orderBy(asc(mealSchedule.position))
+              .all()
+          : [];
+
+      // Collect ingredient amounts across selected meals, per item
+      const mealAmounts = new Map<number, Amount[]>();
+      for (const meal of scheduled) {
+        // Always-available items are assumed to be in stock unless asked for
+        const ings = tx
+          .select({ itemId: recipeIngredients.itemId, quantity: recipeIngredients.quantity, unit: recipeIngredients.unit })
+          .from(recipeIngredients)
+          .innerJoin(items, eq(recipeIngredients.itemId, items.id))
+          .where(and(
+            eq(recipeIngredients.recipeId, meal.recipeId),
+            includeInStock ? undefined : eq(items.alwaysAvailable, false),
+          ))
+          .all();
+        for (const ing of ings) {
+          const amount = scaleAmount(ing, meal.servings, meal.servingSize);
+          mealAmounts.set(ing.itemId, [...(mealAmounts.get(ing.itemId) ?? []), amount]);
+        }
       }
-    }
 
-    // Stock tracking is deferred (no units yet), so nothing is subtracted
-    const toAdd = new Map<number, Amount[]>();
-    for (const [itemId, amounts] of mealAmounts) toAdd.set(itemId, roundUpToBuy(combineAmounts(amounts)));
+      // Stock tracking is deferred (no units yet), so nothing is subtracted
+      const toAdd = new Map<number, Amount[]>();
+      for (const [itemId, amounts] of mealAmounts) toAdd.set(itemId, roundUpToBuy(combineAmounts(amounts)));
 
-    const [list] = await db
-      .insert(shoppingLists)
-      .values({ createdAt: new Date().toISOString(), status: "active" })
-      .returning();
+      const list = tx
+        .insert(shoppingLists)
+        .values({ createdAt: new Date().toISOString(), status: "active" })
+        .returning()
+        .get();
 
-    if (scheduled.length > 0) {
-      await db
-        .insert(shoppingListRecipes)
-        .values(scheduled.map((meal) => ({ shoppingListId: list.id, recipeId: meal.recipeId, servings: meal.servings })));
-    }
+      if (scheduled.length > 0) {
+        tx.insert(shoppingListRecipes)
+          .values(scheduled.map((meal) => ({ shoppingListId: list.id, recipeId: meal.recipeId, servings: meal.servings })))
+          .run();
+      }
 
-    if (toAdd.size > 0) {
-      await db.insert(shoppingListItems).values(
-        [...toAdd.entries()].map(([itemId, amounts]) => ({
-          shoppingListId: list.id,
-          itemId,
-          amounts,
-          source: "meal_plan" as const,
-        }))
-      );
-    }
+      if (toAdd.size > 0) {
+        tx.insert(shoppingListItems)
+          .values(
+            [...toAdd.entries()].map(([itemId, amounts]) => ({
+              shoppingListId: list.id,
+              itemId,
+              amounts,
+              source: "meal_plan" as const,
+            }))
+          )
+          .run();
+      }
+    });
   }
 
   if (intent === "add-manual") {
