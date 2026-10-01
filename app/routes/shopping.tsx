@@ -21,7 +21,7 @@ import { LocalDateTime } from "~/components/local-date-time";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { withIngredients } from "~/db/recipes.server";
+import { mealServings, withIngredients } from "~/db/recipes.server";
 import { getActiveList } from "~/db/shopping.server";
 import {
   itemCategories,
@@ -49,11 +49,6 @@ import type { Route } from "./+types/shopping";
 
 export function meta() {
   return [{ title: "Shopping – Shopocalypse" }];
-}
-
-// Servings of a scheduled or listed meal, falling back to the recipe's serving size
-function mealServings(servings: typeof mealSchedule.servings | typeof shoppingListRecipes.servings) {
-  return sql<number>`coalesce(${servings}, ${recipes.servingSize})`;
 }
 
 // Compact servings marker, e.g. "👥 6"

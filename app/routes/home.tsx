@@ -15,13 +15,13 @@ import {
   Title,
 } from "@mantine/core";
 import { IconChevronDown, IconChevronUp, IconMinus, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
-import { asc, desc, eq, gt, inArray, lt, max, notInArray, sql } from "drizzle-orm";
+import { asc, desc, eq, gt, inArray, lt, max, notInArray } from "drizzle-orm";
 import { useState } from "react";
 import { Form, Link } from "react-router";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { formatCookedAt, withIngredients } from "~/db/recipes.server";
+import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
 import { int } from "~/forms";
 import type { Route } from "./+types/home";
@@ -36,7 +36,7 @@ export async function loader() {
       position: mealSchedule.position,
       id: recipes.id,
       name: recipes.name,
-      servings: sql<number>`coalesce(${mealSchedule.servings}, ${recipes.servingSize})`,
+      servings: mealServings(mealSchedule.servings),
       servingSize: recipes.servingSize,
       instructions: recipes.instructions,
       comments: recipes.comments,

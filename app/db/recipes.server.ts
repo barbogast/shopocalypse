@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { scaleAmount } from "~/units";
 import { db } from "./client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes } from "./schema";
@@ -24,6 +24,11 @@ export function deleteOrArchiveRecipe(recipeId: number) {
       tx.delete(recipes).where(eq(recipes.id, recipeId)).run();
     }
   });
+}
+
+// Servings of a scheduled or listed meal, falling back to the recipe's serving size
+export function mealServings(servings: typeof mealSchedule.servings | typeof shoppingListRecipes.servings) {
+  return sql<number>`coalesce(${servings}, ${recipes.servingSize})`;
 }
 
 export function restoreRecipe(recipeId: number) {
