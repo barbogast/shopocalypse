@@ -2,7 +2,7 @@ import { Badge, Box, Button, Container, Group, Stack, Table, Text, Textarea, Tit
 import { IconCheck, IconPencil } from "@tabler/icons-react";
 import { and, asc, eq } from "drizzle-orm";
 import { useEffect, useRef } from "react";
-import { Form, Link, redirect, useNavigate } from "react-router";
+import { Form, Link, redirect, useLocation, useNavigate } from "react-router";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
 import { isDateString, localDate } from "~/dates";
@@ -94,6 +94,8 @@ function useWakeLock() {
 export default function Cook({ loaderData }: Route.ComponentProps) {
   const { recipe, servings, ingredients, scheduled } = loaderData;
   const navigate = useNavigate();
+  // "default" means this is the first page of the visit (opened from a link or bookmark)
+  const cameFromApp = useLocation().key !== "default";
   const cookedOnRef = useRef<HTMLInputElement>(null);
   useWakeLock();
 
@@ -152,7 +154,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
             <SubmitButton color="green" leftSection={<IconCheck size={16} />}>
               Done cooking
             </SubmitButton>
-            <Button variant="subtle" color="gray" onClick={() => navigate(-1)}>
+            <Button variant="subtle" color="gray" onClick={() => (cameFromApp ? navigate(-1) : navigate("/"))}>
               Cancel
             </Button>
           </Group>
