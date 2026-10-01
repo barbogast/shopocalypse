@@ -9,6 +9,7 @@ import { isDateString, localDate } from "~/dates";
 import { db } from "~/db/client";
 import { withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
+import { optionalText } from "~/forms";
 import { formatAmount } from "~/units";
 import type { Route } from "./+types/cook.$id";
 
@@ -44,7 +45,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 export async function action({ params, request }: Route.ActionArgs) {
   const id = Number(params.id);
   const form = await request.formData();
-  const comments = String(form.get("comments") ?? "").trim() || null;
+  const comments = optionalText(form, "comments");
   // The browser sends its local date; the server's time zone may differ
   const cookedOn = form.get("cookedOn");
   const cookedAt = isDateString(cookedOn) ? cookedOn : localDate();

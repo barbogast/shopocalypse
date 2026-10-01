@@ -24,7 +24,7 @@ import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
-import { int } from "~/forms";
+import { int, text } from "~/forms";
 import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
@@ -70,12 +70,13 @@ const MAX_AUTO_FILL = 30;
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
-  // Servings for newly added meals; empty means each recipe's serving size
-  const newServings = Number(form.get("servings")) || null;
-  if (newServings != null && (!Number.isInteger(newServings) || newServings < 1)) return null;
+  // A meal's new servings, or the servings for newly added meals (empty means
+  // each recipe's serving size)
+  const newServings = int(form, "servings");
+  if (text(form, "servings") && !newServings) return null;
+  const position = int(form, "position");
 
-  if (intent === "move") {
-    const position = Number(form.get("position"));
+  if (intent === "move" && position) {
     const up = form.get("direction") === "up";
     // Swap meals with the neighbouring entry (positions may have gaps)
     db.transaction((tx) => {
@@ -99,21 +100,18 @@ export async function action({ request }: Route.ActionArgs) {
     });
   }
 
-  if (intent === "servings") {
-    const position = Number(form.get("position"));
-    const servings = Number(form.get("servings"));
-    if (!Number.isInteger(servings) || servings < 1) return null;
-    await db.update(mealSchedule).set({ servings }).where(eq(mealSchedule.position, position));
+  if (intent === "servings" && position && newServings) {
+    await db.update(mealSchedule).set({ servings: newServings }).where(eq(mealSchedule.position, position));
   }
 
-  if (intent === "remove") {
-    const position = Number(form.get("position"));
+  if (intent === "remove" && position) {
     await db.delete(mealSchedule).where(eq(mealSchedule.position, position));
   }
 
   // Also changes the auto-fill rotation, which goes by last-cooked date
   if (intent === "remove-history") {
-    await db.delete(mealHistory).where(eq(mealHistory.id, Number(form.get("id"))));
+    const historyId = int(form, "id");
+    if (historyId) await db.delete(mealHistory).where(eq(mealHistory.id, historyId));
   }
 
   if (intent === "add") {

@@ -73,7 +73,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "add-ingredient") {
-    const itemId = Number(form.get("itemId"));
+    const itemId = int(form, "itemId");
     if (!itemId) return { error: "Select an item." };
     const parsed = parseAmount(form);
     if ("error" in parsed) return { error: parsed.error };
@@ -96,7 +96,8 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "remove-ingredient") {
-    const itemId = Number(form.get("itemId"));
+    const itemId = int(form, "itemId");
+    if (!itemId) return null;
     await db
       .delete(recipeIngredients)
       .where(and(eq(recipeIngredients.recipeId, id), eq(recipeIngredients.itemId, itemId)));

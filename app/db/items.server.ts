@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, lt, max } from "drizzle-orm";
 import { db } from "./client";
 import { itemCategories, items, recipeIngredients, shoppingListItems, stock, stores } from "./schema";
+import { int, text } from "~/forms";
 import { isUnitKey } from "~/units";
 
 // Shelves in walking order, grouped by store
@@ -11,9 +12,9 @@ export function listShelves() {
 // Reads the item form's name/store/shelf/unit fields; a shelf must belong to the chosen store.
 // Pass the item's own id when editing, so keeping its name isn't a clash.
 export function parseItemForm(form: FormData, itemId?: number) {
-  const name = String(form.get("name")).trim();
-  const storeId = form.get("storeId") ? Number(form.get("storeId")) : null;
-  const categoryId = form.get("categoryId") ? Number(form.get("categoryId")) : null;
+  const name = text(form, "name");
+  const storeId = int(form, "storeId");
+  const categoryId = int(form, "categoryId");
   const rawUnit = form.get("defaultUnit");
   const defaultUnit = isUnitKey(rawUnit) ? rawUnit : null;
   const alwaysAvailable = form.get("alwaysAvailable") === "on";

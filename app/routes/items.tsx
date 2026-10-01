@@ -23,6 +23,7 @@ import { MoveButtons } from "~/components/move-buttons";
 import { db } from "~/db/client";
 import { addShelf, deleteItem, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
 import { itemCategories, items, recipeIngredients, recipes, stores } from "~/db/schema";
+import { int, text } from "~/forms";
 import { unitName } from "~/units";
 import type { Route } from "./+types/items";
 
@@ -63,41 +64,40 @@ export async function loader() {
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
+  const id = int(form, "id");
+  const name = text(form, "name");
 
   if (intent === "delete-item") {
-    deleteItem(Number(form.get("id")));
+    if (id) deleteItem(id);
   }
 
   if (intent === "add-shelf") {
-    const name = String(form.get("name")).trim();
-    if (name) addShelf(Number(form.get("storeId")), name);
+    const storeId = int(form, "storeId");
+    if (storeId && name) addShelf(storeId, name);
   }
 
   if (intent === "rename-shelf") {
-    const name = String(form.get("name")).trim();
-    if (name) await db.update(itemCategories).set({ name }).where(eq(itemCategories.id, Number(form.get("id"))));
+    if (id && name) await db.update(itemCategories).set({ name }).where(eq(itemCategories.id, id));
   }
 
   if (intent === "move-shelf") {
-    moveShelf(Number(form.get("id")), form.get("direction") === "up");
+    if (id) moveShelf(id, form.get("direction") === "up");
   }
 
   if (intent === "delete-shelf") {
-    deleteShelf(Number(form.get("id")));
+    if (id) deleteShelf(id);
   }
 
   if (intent === "add-store") {
-    const name = String(form.get("name")).trim();
     if (name) await db.insert(stores).values({ name });
   }
 
   if (intent === "rename-store") {
-    const name = String(form.get("name")).trim();
-    if (name) await db.update(stores).set({ name }).where(eq(stores.id, Number(form.get("id"))));
+    if (id && name) await db.update(stores).set({ name }).where(eq(stores.id, id));
   }
 
   if (intent === "delete-store") {
-    deleteStore(Number(form.get("id")));
+    if (id) deleteStore(id);
   }
 
   return null;

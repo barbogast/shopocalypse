@@ -140,7 +140,7 @@ export async function action({ request }: Route.ActionArgs) {
   const intent = form.get("intent");
 
   if (intent === "prepare") {
-    const positions = form.getAll("position").map(Number);
+    const positions = form.getAll("position").map(Number).filter(Number.isInteger);
     const includeInStock = form.get("includeInStock") === "on";
 
     // One transaction, so a double submit can't create a second active list
@@ -232,7 +232,8 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "tick") {
-    const id = Number(form.get("id"));
+    const id = int(form, "id");
+    if (!id) return null;
     await db
       .update(shoppingListItems)
       .set({ bought: true })
@@ -240,7 +241,8 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "untick") {
-    const id = Number(form.get("id"));
+    const id = int(form, "id");
+    if (!id) return null;
     await db
       .update(shoppingListItems)
       .set({ bought: false })
@@ -248,7 +250,8 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "remove-item") {
-    const id = Number(form.get("id"));
+    const id = int(form, "id");
+    if (!id) return null;
     await db.delete(shoppingListItems).where(eq(shoppingListItems.id, id));
   }
 
