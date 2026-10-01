@@ -5,6 +5,7 @@ import { Form, Link, useSearchParams } from "react-router";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
 import { mealHistory, recipes } from "~/db/schema";
+import { int } from "~/forms";
 import type { Route } from "./+types/recipes";
 
 export function meta({}: Route.MetaArgs) {
@@ -25,9 +26,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
-  const id = Number(form.get("id"));
-  if (form.get("intent") === "restore") restoreRecipe(id);
-  else deleteOrArchiveRecipe(id);
+  const id = int(form, "id");
+  if (!id) return null;
+  const intent = form.get("intent");
+  if (intent === "restore") restoreRecipe(id);
+  if (intent === "delete") deleteOrArchiveRecipe(id);
   return null;
 }
 
@@ -81,15 +84,13 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
               <Table.Td style={{ width: 40 }}>
                 <Form method="post">
                   <input type="hidden" name="id" value={recipe.id} />
+                  <input type="hidden" name="intent" value={recipe.archived ? "restore" : "delete"} />
                   {recipe.archived ? (
-                    <>
-                      <input type="hidden" name="intent" value="restore" />
-                      <Tooltip label="Restore from archive">
-                        <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="blue" type="submit" aria-label={`Restore ${recipe.name}`}>
-                          <IconArchiveOff size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </>
+                    <Tooltip label="Restore from archive">
+                      <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="blue" type="submit" aria-label={`Restore ${recipe.name}`}>
+                        <IconArchiveOff size={16} />
+                      </ActionIcon>
+                    </Tooltip>
                   ) : recipe.cooked ? (
                     <Tooltip label="Archive">
                       <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="gray" type="submit" aria-label={`Archive ${recipe.name}`}>
