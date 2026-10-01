@@ -22,6 +22,7 @@ import { RecipeDrawer } from "~/components/recipe-drawer";
 import { db } from "~/db/client";
 import { formatCookedAt, withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
+import { int } from "~/forms";
 import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
@@ -111,7 +112,11 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "add") {
-    const recipeId = Number(form.get("recipeId"));
+    const recipeId = int(form, "recipeId");
+    // Nothing picked, or a recipe that's gone or archived since the page loaded
+    if (!recipeId) return null;
+    const recipe = db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
+    if (!recipe || recipe.archived) return null;
     const [{ nextPos }] = await db
       .select({ nextPos: max(mealSchedule.position) })
       .from(mealSchedule);
