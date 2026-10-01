@@ -16,7 +16,8 @@ import {
 import { IconCheck, IconPlus, IconShoppingCart, IconTrash, IconUsers } from "@tabler/icons-react";
 import { useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import { Form, useFetcher, useFetchers } from "react-router";
+import { Form, useActionData, useFetcher, useFetchers } from "react-router";
+import { FormError } from "~/components/form-error";
 import { LocalDateTime } from "~/components/local-date-time";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
@@ -212,7 +213,8 @@ export async function action({ request }: Route.ActionArgs) {
 
       const itemId = int(form, "itemId");
       const parsed = parseAmount(form);
-      if (!itemId || "error" in parsed) return null;
+      if (!itemId) return { addError: "Pick an item first." };
+      if ("error" in parsed) return { addError: parsed.error };
       // An item already on the list gets the amounts added up, and needs buying again
       db.transaction((tx) => {
         const listed = tx
@@ -392,6 +394,7 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
 // Manually add an item; the unit starts on the item's default unit
 function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit: string | null; listed: boolean }[] }) {
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
+  const actionData = useActionData<typeof action>();
 
   return (
     <Form method="post">
@@ -410,6 +413,7 @@ function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit
         <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
         <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
       </Group>
+      <FormError error={actionData?.addError} mt="xs" />
     </Form>
   );
 }

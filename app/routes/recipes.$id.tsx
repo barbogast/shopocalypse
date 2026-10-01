@@ -76,9 +76,9 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     case "add-ingredient": {
       const itemId = int(form, "itemId");
-      if (!itemId) return { error: "Select an item." };
+      if (!itemId) return { ingredientError: "Select an item." };
       const parsed = parseAmount(form);
-      if ("error" in parsed) return { error: parsed.error };
+      if ("error" in parsed) return { ingredientError: parsed.error };
       const { quantity, unit } = parsed.amount;
       await db
         .insert(recipeIngredients)
@@ -204,7 +204,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <Stack mb="xl">
           <TextInput name="name" label="Name" defaultValue={recipe.name} required />
           <NumberInput name="servingSize" label="Serving size" defaultValue={recipe.servingSize} min={1} allowDecimal={false} required />
-          <FormError error={actionData?.error} />
+          <FormError error={actionData && "error" in actionData ? actionData.error : null} />
           <Group>
             <SaveButton saved={saved} />
             {recipe.archived ? (
@@ -282,6 +282,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
           <SubmitButton>Add</SubmitButton>
         </Group>
+        <FormError error={actionData && "ingredientError" in actionData ? actionData.ingredientError : null} mt="xs" />
       </Form>
 
       <Modal opened={createOpened} onClose={createModal.close} title="New item">

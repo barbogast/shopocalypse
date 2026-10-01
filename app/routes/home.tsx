@@ -18,6 +18,7 @@ import { IconMinus, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers,
 import { asc, desc, eq, gt, inArray, lt, max, notInArray } from "drizzle-orm";
 import { useState } from "react";
 import { Form, Link } from "react-router";
+import { FormError } from "~/components/form-error";
 import { MoveButtons } from "~/components/move-buttons";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
@@ -73,7 +74,7 @@ export async function action({ request }: Route.ActionArgs) {
   // A meal's new servings, or the servings for newly added meals (empty means
   // each recipe's serving size)
   const newServings = int(form, "servings");
-  if (text(form, "servings") && !newServings) return null;
+  if (text(form, "servings") && !newServings) return { servingsError: "Servings must be a whole number of at least 1." };
   const position = int(form, "position");
 
   switch (intent) {
@@ -125,9 +126,9 @@ export async function action({ request }: Route.ActionArgs) {
     case "add": {
       const recipeId = int(form, "recipeId");
       // Nothing picked, or a recipe that's gone or archived since the page loaded
-      if (!recipeId) return null;
+      if (!recipeId) return { addError: "Pick a recipe first." };
       const recipe = db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
-      if (!recipe || recipe.archived) return null;
+      if (!recipe || recipe.archived) return { addError: "That recipe is no longer available." };
       const [{ nextPos }] = await db
         .select({ nextPos: max(mealSchedule.position) })
         .from(mealSchedule);
@@ -137,7 +138,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     case "auto-fill": {
       const count = int(form, "count");
-      if (!count || count > MAX_AUTO_FILL) return null;
+      if (!count || count > MAX_AUTO_FILL) return { autoFillError: `Pick a number from 1 to ${MAX_AUTO_FILL}.` };
 
       const queue = await db
         .select({ recipeId: mealSchedule.recipeId })
@@ -214,7 +215,7 @@ function ServingsControl({ position, servings }: { position: number; servings: n
   );
 }
 
-export default function Home({ loaderData }: Route.ComponentProps) {
+export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   const { scheduled, allRecipes, recentlyCooked } = loaderData;
   const [next, ...upcoming] = scheduled;
 
@@ -322,6 +323,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             value={newServings}
             onChange={setNewServings}
             leftSection={<IconUsers size={16} />}
+            error={actionData && "servingsError" in actionData ? actionData.servingsError : undefined}
             maw={260}
           />
         )}
@@ -341,6 +343,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               />
               <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
             </Group>
+            <FormError error={actionData && "addError" in actionData ? actionData.addError : null} mt="xs" />
           </Form>
         )}
 
@@ -363,6 +366,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 Auto-fill
               </SubmitButton>
             </Group>
+            <FormError error={actionData && "autoFillError" in actionData ? actionData.autoFillError : null} mt="xs" />
           </Form>
         )}
       </Stack>
