@@ -26,7 +26,10 @@ export const items = sqliteTable("items", {
   defaultUnit: text("default_unit").$type<UnitKey>(),
   // Assumed to be in stock (salt, oil…): left off prepared shopping lists unless asked for
   alwaysAvailable: integer("always_available", { mode: "boolean" }).notNull().default(false),
-});
+}, (t) => [
+  // Backstop for parseItemForm's check, which also catches non-ASCII case differences
+  uniqueIndex("items_name_unique").on(sql`${t.name} collate nocase`),
+]);
 
 export const recipes = sqliteTable("recipes", {
   id: integer("id").primaryKey({ autoIncrement: true }),

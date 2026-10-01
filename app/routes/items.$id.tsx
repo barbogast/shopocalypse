@@ -21,7 +21,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const id = Number(params.id);
   const form = await request.formData();
 
-  const parsed = parseItemForm(form);
+  const parsed = parseItemForm(form, id);
   if (parsed.error) return { error: parsed.error };
 
   await db.update(items).set(parsed.values).where(eq(items.id, id));

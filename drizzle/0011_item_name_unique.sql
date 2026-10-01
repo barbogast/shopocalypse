@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `items_name_unique` ON `items` ("name" collate nocase);
