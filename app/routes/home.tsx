@@ -14,12 +14,13 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { IconMinus, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
+import { IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
 import { asc, desc, eq, gt, inArray, lt, max, notInArray } from "drizzle-orm";
 import { useState } from "react";
 import { Form, Link } from "react-router";
 import { FormError } from "~/components/form-error";
 import { MoveButtons } from "~/components/move-buttons";
+import { ServingsControl } from "~/components/servings";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
@@ -192,27 +193,6 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   return null;
-}
-
-function ServingsControl({ position, servings }: { position: number; servings: number }) {
-  return (
-    <Form method="post" style={{ display: "flex", alignItems: "center" }}>
-      <input type="hidden" name="intent" value="servings" />
-      <input type="hidden" name="position" value={position} />
-      <Button type="submit" name="servings" value={servings - 1} disabled={servings <= 1}
-        variant="subtle" color="gray" size="xs" px={6} aria-label="Fewer servings">
-        <IconMinus size={14} />
-      </Button>
-      <Group gap={4} wrap="nowrap" c="dimmed" aria-label={`${servings} servings`}>
-        <IconUsers size={14} />
-        <Text size="sm">{servings}</Text>
-      </Group>
-      <Button type="submit" name="servings" value={servings + 1}
-        variant="subtle" color="gray" size="xs" px={6} aria-label="More servings">
-        <IconPlus size={14} />
-      </Button>
-    </Form>
-  );
 }
 
 export default function Home({ loaderData, actionData }: Route.ComponentProps) {

@@ -13,13 +13,14 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { IconCheck, IconPlus, IconShoppingCart, IconTrash, IconUsers } from "@tabler/icons-react";
+import { IconCheck, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { Form, useActionData, useFetcher, useFetchers } from "react-router";
 import { FormError } from "~/components/form-error";
 import { LocalDateTime } from "~/components/local-date-time";
 import { RecipeDrawer } from "~/components/recipe-drawer";
+import { Servings } from "~/components/servings";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { mealServings, withIngredients } from "~/db/recipes.server";
@@ -42,16 +43,6 @@ import type { Route } from "./+types/shopping";
 
 export function meta() {
   return [{ title: "Shopping – Shopocalypse" }];
-}
-
-// Compact servings marker, e.g. "👥 6"
-function Servings({ servings }: { servings: number }) {
-  return (
-    <span style={{ whiteSpace: "nowrap" }} aria-label={`${servings} servings`}>
-      {" "}
-      <IconUsers size="1em" style={{ verticalAlign: "-0.125em" }} /> {servings}
-    </span>
-  );
 }
 
 // Collapse repeated meals (same recipe and servings) into one entry with a count, keeping first-seen order
