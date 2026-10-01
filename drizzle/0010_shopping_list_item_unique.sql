@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `shopping_list_items_list_item` ON `shopping_list_items` (`shopping_list_id`,`item_id`);

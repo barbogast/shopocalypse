@@ -108,4 +108,4 @@ export const shoppingListItems = sqliteTable("shopping_list_items", {
   amounts: text("amounts", { mode: "json" }).$type<Amount[]>().notNull(),
   bought: integer("bought", { mode: "boolean" }).notNull().default(false),
   source: text("source", { enum: ["meal_plan", "stock_deficit", "manual"] }).notNull(),
-});
+}, (t) => [uniqueIndex("shopping_list_items_list_item").on(t.shoppingListId, t.itemId)]);

@@ -71,6 +71,13 @@
       "when": 1790843363752,
       "tag": "0009_one_active_list",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790843466038,
+      "tag": "0010_shopping_list_item_unique",
+      "breakpoints": true
     }
   ]
 }

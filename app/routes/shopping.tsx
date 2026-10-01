@@ -33,6 +33,7 @@ import {
   shoppingLists,
   stores,
 } from "~/db/schema";
+import { int } from "~/forms";
 import {
   type Amount,
   combineAmounts,
@@ -123,12 +124,13 @@ export async function loader() {
       items.name,
     );
 
+  // Items already on the list can be added again to raise their amount
   const listedItemIds = new Set(listItems.map((i) => i.itemId));
   const allItems = await db
     .select({ id: items.id, name: items.name, defaultUnit: items.defaultUnit })
     .from(items)
     .orderBy(items.name)
-    .then((all) => all.filter((i) => !listedItemIds.has(i.id)));
+    .then((all) => all.map((i) => ({ ...i, listed: listedItemIds.has(i.id) })));
 
   const listRecipeRows = await db
     .select({
@@ -234,13 +236,27 @@ export async function action({ request }: Route.ActionArgs) {
       .limit(1);
     if (!activeList) return null;
 
-    const itemId = Number(form.get("itemId"));
+    const itemId = int(form, "itemId");
     const parsed = parseAmount(form);
     if (!itemId || "error" in parsed) return null;
-    await db
-      .insert(shoppingListItems)
-      .values({ shoppingListId: activeList.id, itemId, amounts: combineAmounts([parsed.amount]), source: "manual" })
-      .onConflictDoNothing();
+    // An item already on the list gets the amounts added up, and needs buying again
+    db.transaction((tx) => {
+      const listed = tx
+        .select()
+        .from(shoppingListItems)
+        .where(and(eq(shoppingListItems.shoppingListId, activeList.id), eq(shoppingListItems.itemId, itemId)))
+        .get();
+      if (listed) {
+        tx.update(shoppingListItems)
+          .set({ amounts: combineAmounts([...listed.amounts, parsed.amount]), bought: false })
+          .where(eq(shoppingListItems.id, listed.id))
+          .run();
+      } else {
+        tx.insert(shoppingListItems)
+          .values({ shoppingListId: activeList.id, itemId, amounts: combineAmounts([parsed.amount]), source: "manual" })
+          .run();
+      }
+    });
   }
 
   if (intent === "tick") {
@@ -392,7 +408,7 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
 }
 
 // Manually add an item; the unit starts on the item's default unit
-function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit: string | null }[] }) {
+function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit: string | null; listed: boolean }[] }) {
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
 
   return (
@@ -402,7 +418,7 @@ function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit
         <Select
           name="itemId"
           label="Add item"
-          data={items.map((i) => ({ value: String(i.id), label: i.name }))}
+          data={items.map((i) => ({ value: String(i.id), label: i.listed ? `${i.name} (on list)` : i.name }))}
           searchable
           placeholder="Select item…"
           onChange={(value) => setUnit(items.find((i) => String(i.id) === value)?.defaultUnit ?? DEFAULT_UNIT)}
