@@ -1,6 +1,7 @@
 import { Button, Container, Group, Stack, Title } from "@mantine/core";
-import { redirect } from "react-router";
+import { Form, Link, redirect } from "react-router";
 import { ItemFields } from "~/components/item-fields";
+import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { listShelves, parseItemForm } from "~/db/items.server";
 import { items, stores } from "~/db/schema";
@@ -30,16 +31,16 @@ export default function NewItem({ loaderData, actionData }: Route.ComponentProps
   return (
     <Container size="sm" py="xl">
       <Title mb="lg">New item</Title>
-      <form method="post">
+      <Form method="post">
         <Stack>
           <ItemFields stores={allStores} shelves={allShelves} autoFocus />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
           <Group>
-            <Button type="submit">Create</Button>
-            <Button component="a" href="/items" variant="subtle">Cancel</Button>
+            <SubmitButton>Create</SubmitButton>
+            <Button component={Link} to="/items" variant="subtle">Cancel</Button>
           </Group>
         </Stack>
-      </form>
+      </Form>
     </Container>
   );
 }

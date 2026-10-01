@@ -1,5 +1,6 @@
-import { Button, Container, NumberInput, Stack, Textarea, TextInput, Title } from "@mantine/core";
-import { redirect } from "react-router";
+import { Container, NumberInput, Stack, Textarea, TextInput, Title } from "@mantine/core";
+import { Form, redirect } from "react-router";
+import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { recipes } from "~/db/schema";
 import { int, optionalText, text } from "~/forms";
@@ -26,16 +27,16 @@ export default function NewRecipe({ actionData }: Route.ComponentProps) {
   return (
     <Container size="sm" py="xl">
       <Title mb="lg">New recipe</Title>
-      <form method="post">
+      <Form method="post">
         <Stack>
           <TextInput name="name" label="Name" required autoFocus />
           <NumberInput name="servingSize" label="Serving size" min={1} allowDecimal={false} defaultValue={4} required />
           <Textarea name="instructions" label="Cooking instructions" description="Supports markdown" autosize minRows={4} />
           <Textarea name="comments" label="Comments" autosize minRows={2} />
           {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
-          <Button type="submit">Create</Button>
+          <SubmitButton>Create</SubmitButton>
         </Stack>
-      </form>
+      </Form>
     </Container>
   );
 }
