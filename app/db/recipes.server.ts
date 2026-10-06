@@ -13,15 +13,15 @@ export function formatCookedAt(cookedAt: string) {
 // Recipes with meal history are archived rather than deleted, so the
 // "least recently cooked" rotation keeps its data. Either way the recipe
 // leaves the schedule.
-export function deleteOrArchiveRecipe(recipeId: number) {
-  db.transaction((tx) => {
-    tx.delete(mealSchedule).where(eq(mealSchedule.recipeId, recipeId)).run();
-    if (tx.select().from(mealHistory).where(eq(mealHistory.recipeId, recipeId)).limit(1).get()) {
-      tx.update(recipes).set({ archived: true }).where(eq(recipes.id, recipeId)).run();
+export async function deleteOrArchiveRecipe(recipeId: number) {
+  await db.transaction(async (tx) => {
+    await tx.delete(mealSchedule).where(eq(mealSchedule.recipeId, recipeId)).run();
+    if (await tx.select().from(mealHistory).where(eq(mealHistory.recipeId, recipeId)).limit(1).get()) {
+      await tx.update(recipes).set({ archived: true }).where(eq(recipes.id, recipeId)).run();
     } else {
-      tx.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId)).run();
-      tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.recipeId, recipeId)).run();
-      tx.delete(recipes).where(eq(recipes.id, recipeId)).run();
+      await tx.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId)).run();
+      await tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.recipeId, recipeId)).run();
+      await tx.delete(recipes).where(eq(recipes.id, recipeId)).run();
     }
   });
 }
@@ -31,8 +31,8 @@ export function mealServings(servings: typeof mealSchedule.servings | typeof sho
   return sql<number>`coalesce(${servings}, ${recipes.servingSize})`;
 }
 
-export function restoreRecipe(recipeId: number) {
-  db.update(recipes).set({ archived: false }).where(eq(recipes.id, recipeId)).run();
+export async function restoreRecipe(recipeId: number) {
+  await db.update(recipes).set({ archived: false }).where(eq(recipes.id, recipeId)).run();
 }
 
 // Attach each meal's ingredients, scaled to its servings

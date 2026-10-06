@@ -55,7 +55,7 @@ export async function loader({ params }: Route.LoaderArgs) {
     .orderBy(desc(mealHistory.cookedAt), desc(mealHistory.id))
     .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
 
-  return { recipe, ingredients, allItems, allStores, allShelves: listShelves(), cookedDates };
+  return { recipe, ingredients, allItems, allStores, allShelves: await listShelves(), cookedDates };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -89,7 +89,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     // New item from the ingredient picker; it's then preselected for adding
     case "create-item": {
-      const parsed = parseItemForm(form);
+      const parsed = await parseItemForm(form);
       if (parsed.error) return { createError: parsed.error };
       const [item] = await db
         .insert(items)
@@ -108,12 +108,12 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     case "delete": {
-      deleteOrArchiveRecipe(id);
+      await deleteOrArchiveRecipe(id);
       return redirect("/recipes");
     }
 
     case "restore": {
-      restoreRecipe(id);
+      await restoreRecipe(id);
       break;
     }
     default:

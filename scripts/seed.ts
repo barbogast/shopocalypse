@@ -1,12 +1,13 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "../app/db/schema.ts";
 
-const sqlite = new Database(process.env.DATABASE_URL ?? "shopocalypse.db");
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+const client = createClient({
+  url: process.env.DATABASE_URL ?? "file:shopocalypse.db",
+  authToken: process.env.DATABASE_AUTH_TOKEN,
+});
 
-const db = drizzle(sqlite, { schema });
+const db = drizzle(client, { schema });
 
 const [store] = await db
   .insert(schema.stores)

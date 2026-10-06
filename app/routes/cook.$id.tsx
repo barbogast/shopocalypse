@@ -18,10 +18,10 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 // Returns the schedule entry from ?position=, if it refers to an entry for this recipe
-function scheduledMeal(request: Request, recipeId: number) {
+async function scheduledMeal(request: Request, recipeId: number) {
   const param = new URL(request.url).searchParams.get("position");
   if (param == null) return null;
-  const entry = db
+  const entry = await db
     .select()
     .from(mealSchedule)
     .where(and(eq(mealSchedule.position, Number(param)), eq(mealSchedule.recipeId, recipeId)))
@@ -34,7 +34,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
   if (!recipe) throw new Response("Not found", { status: 404 });
 
-  const meal = scheduledMeal(request, id);
+  const meal = await scheduledMeal(request, id);
   // A stale link (meal already cooked or removed): cook it as a one-off instead
   if (!meal && new URL(request.url).searchParams.has("position")) return redirect(`/cook/${id}`);
   const servings = meal?.servings ?? recipe.servingSize;
@@ -49,15 +49,15 @@ export async function action({ params, request }: Route.ActionArgs) {
   // The browser sends its local date; the server's time zone may differ
   const cookedOn = form.get("cookedOn");
   const cookedAt = isDateString(cookedOn) ? cookedOn : localDate();
-  const position = scheduledMeal(request, id)?.position ?? null;
+  const position = (await scheduledMeal(request, id))?.position ?? null;
   // The loader drops stale positions, so a missing one means this is a repeated
   // submit after the meal was already recorded
   if (position == null && new URL(request.url).searchParams.has("position")) return redirect("/");
 
-  db.transaction((tx) => {
-    tx.update(recipes).set({ comments }).where(eq(recipes.id, id)).run();
-    if (position != null) tx.delete(mealSchedule).where(eq(mealSchedule.position, position)).run();
-    tx.insert(mealHistory).values({ recipeId: id, cookedAt }).run();
+  await db.transaction(async (tx) => {
+    await tx.update(recipes).set({ comments }).where(eq(recipes.id, id)).run();
+    if (position != null) await tx.delete(mealSchedule).where(eq(mealSchedule.position, position)).run();
+    await tx.insert(mealHistory).values({ recipeId: id, cookedAt }).run();
   });
 
   return redirect(position != null ? "/" : `/recipes/${id}`);

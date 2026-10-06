@@ -14,12 +14,12 @@ export function meta() {
 
 export async function loader() {
   const allStores = await db.select().from(stores).orderBy(stores.name);
-  return { allShelves: listShelves(), allStores };
+  return { allShelves: await listShelves(), allStores };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
-  const parsed = parseItemForm(form);
+  const parsed = await parseItemForm(form);
   if (parsed.error) return { error: parsed.error };
 
   await db.insert(items).values(parsed.values);

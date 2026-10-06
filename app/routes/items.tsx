@@ -46,7 +46,7 @@ export async function loader() {
     .leftJoin(stores, eq(items.storeId, stores.id))
     .orderBy(items.name);
 
-  const allShelves = listShelves();
+  const allShelves = await listShelves();
   const allStores = await db.select().from(stores).orderBy(stores.name);
 
   // Recipes each item is used in
@@ -69,13 +69,13 @@ export async function action({ request }: Route.ActionArgs) {
 
   switch (intent) {
     case "delete-item": {
-      if (id) deleteItem(id);
+      if (id) await deleteItem(id);
       break;
     }
 
     case "add-shelf": {
       const storeId = int(form, "storeId");
-      if (storeId && name) addShelf(storeId, name);
+      if (storeId && name) await addShelf(storeId, name);
       break;
     }
 
@@ -85,12 +85,12 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     case "move-shelf": {
-      if (id) moveShelf(id, form.get("direction") === "up");
+      if (id) await moveShelf(id, form.get("direction") === "up");
       break;
     }
 
     case "delete-shelf": {
-      if (id) deleteShelf(id);
+      if (id) await deleteShelf(id);
       break;
     }
 
@@ -105,7 +105,7 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     case "delete-store": {
-      if (id) deleteStore(id);
+      if (id) await deleteStore(id);
       break;
     }
     default:

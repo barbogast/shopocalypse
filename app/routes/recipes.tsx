@@ -30,10 +30,10 @@ export async function action({ request }: Route.ActionArgs) {
   if (!id) return null;
   switch (form.get("intent")) {
     case "restore":
-      restoreRecipe(id);
+      await restoreRecipe(id);
       break;
     case "delete":
-      deleteOrArchiveRecipe(id);
+      await deleteOrArchiveRecipe(id);
       break;
     default:
       throw new Response("Unknown intent", { status: 400 });

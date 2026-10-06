@@ -83,9 +83,9 @@ export async function action({ request }: Route.ActionArgs) {
       if (!position) break;
       const up = form.get("direction") === "up";
       // Swap meals with the neighbouring entry (positions may have gaps)
-      db.transaction((tx) => {
-        const current = tx.select().from(mealSchedule).where(eq(mealSchedule.position, position)).get();
-        const neighbour = tx
+      await db.transaction(async (tx) => {
+        const current = await tx.select().from(mealSchedule).where(eq(mealSchedule.position, position)).get();
+        const neighbour = await tx
           .select()
           .from(mealSchedule)
           .where(up ? lt(mealSchedule.position, position) : gt(mealSchedule.position, position))
@@ -93,11 +93,11 @@ export async function action({ request }: Route.ActionArgs) {
           .limit(1)
           .get();
         if (!current || !neighbour) return;
-        tx.update(mealSchedule)
+        await tx.update(mealSchedule)
           .set({ recipeId: neighbour.recipeId, servings: neighbour.servings })
           .where(eq(mealSchedule.position, current.position))
           .run();
-        tx.update(mealSchedule)
+        await tx.update(mealSchedule)
           .set({ recipeId: current.recipeId, servings: current.servings })
           .where(eq(mealSchedule.position, neighbour.position))
           .run();
@@ -128,7 +128,7 @@ export async function action({ request }: Route.ActionArgs) {
       const recipeId = int(form, "recipeId");
       // Nothing picked, or a recipe that's gone or archived since the page loaded
       if (!recipeId) return { addError: "Pick a recipe first." };
-      const recipe = db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
+      const recipe = await db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
       if (!recipe || recipe.archived) return { addError: "That recipe is no longer available." };
       const [{ nextPos }] = await db
         .select({ nextPos: max(mealSchedule.position) })

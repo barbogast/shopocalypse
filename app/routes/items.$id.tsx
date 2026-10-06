@@ -20,14 +20,14 @@ export async function loader({ params }: Route.LoaderArgs) {
 
   const allStores = await db.select().from(stores).orderBy(stores.name);
 
-  return { item, allShelves: listShelves(), allStores };
+  return { item, allShelves: await listShelves(), allStores };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
   const id = Number(params.id);
   const form = await request.formData();
 
-  const parsed = parseItemForm(form, id);
+  const parsed = await parseItemForm(form, id);
   if (parsed.error) return { error: parsed.error };
 
   await db.update(items).set(parsed.values).where(eq(items.id, id));

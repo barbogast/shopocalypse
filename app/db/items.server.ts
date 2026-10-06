@@ -5,13 +5,13 @@ import { int, text } from "~/forms";
 import { isUnitKey } from "~/units";
 
 // Shelves in walking order, grouped by store
-export function listShelves() {
+export async function listShelves() {
   return db.select().from(itemCategories).orderBy(asc(itemCategories.storeId), asc(itemCategories.position)).all();
 }
 
 // Reads the item form's name/store/shelf/unit fields; a shelf must belong to the chosen store.
 // Pass the item's own id when editing, so keeping its name isn't a clash.
-export function parseItemForm(form: FormData, itemId?: number) {
+export async function parseItemForm(form: FormData, itemId?: number) {
   const name = text(form, "name");
   const storeId = int(form, "storeId");
   const categoryId = int(form, "categoryId");
@@ -21,31 +21,31 @@ export function parseItemForm(form: FormData, itemId?: number) {
 
   if (!name) return { error: "Name is required." } as const;
   const lower = name.toLocaleLowerCase();
-  const clash = db.select({ id: items.id, name: items.name }).from(items).all()
+  const clash = (await db.select({ id: items.id, name: items.name }).from(items).all())
     .find((i) => i.id !== itemId && i.name.toLocaleLowerCase() === lower);
   if (clash) return { error: `There's already an item called "${clash.name}".` } as const;
   if (categoryId != null) {
-    const shelf = db.select().from(itemCategories).where(eq(itemCategories.id, categoryId)).get();
+    const shelf = await db.select().from(itemCategories).where(eq(itemCategories.id, categoryId)).get();
     if (!shelf || shelf.storeId !== storeId) return { error: "That shelf isn't in the chosen store." } as const;
   }
   return { values: { name, storeId, categoryId, defaultUnit, alwaysAvailable } } as const;
 }
 
-export function addShelf(storeId: number, name: string) {
-  const [{ last }] = db
+export async function addShelf(storeId: number, name: string) {
+  const [{ last }] = await db
     .select({ last: max(itemCategories.position) })
     .from(itemCategories)
     .where(eq(itemCategories.storeId, storeId))
     .all();
-  db.insert(itemCategories).values({ name, storeId, position: (last ?? 0) + 1 }).run();
+  await db.insert(itemCategories).values({ name, storeId, position: (last ?? 0) + 1 }).run();
 }
 
 // Swap positions with the neighbouring shelf in the same store
-export function moveShelf(id: number, up: boolean) {
-  db.transaction((tx) => {
-    const current = tx.select().from(itemCategories).where(eq(itemCategories.id, id)).get();
+export async function moveShelf(id: number, up: boolean) {
+  await db.transaction(async (tx) => {
+    const current = await tx.select().from(itemCategories).where(eq(itemCategories.id, id)).get();
     if (!current) return;
-    const neighbour = tx
+    const neighbour = await tx
       .select()
       .from(itemCategories)
       .where(and(
@@ -56,34 +56,34 @@ export function moveShelf(id: number, up: boolean) {
       .limit(1)
       .get();
     if (!neighbour) return;
-    tx.update(itemCategories).set({ position: neighbour.position }).where(eq(itemCategories.id, current.id)).run();
-    tx.update(itemCategories).set({ position: current.position }).where(eq(itemCategories.id, neighbour.id)).run();
+    await tx.update(itemCategories).set({ position: neighbour.position }).where(eq(itemCategories.id, current.id)).run();
+    await tx.update(itemCategories).set({ position: current.position }).where(eq(itemCategories.id, neighbour.id)).run();
   });
 }
 
 // Items on the shelf stay in the store, just without a shelf
-export function deleteShelf(id: number) {
-  db.transaction((tx) => {
-    tx.update(items).set({ categoryId: null }).where(eq(items.categoryId, id)).run();
-    tx.delete(itemCategories).where(eq(itemCategories.id, id)).run();
+export async function deleteShelf(id: number) {
+  await db.transaction(async (tx) => {
+    await tx.update(items).set({ categoryId: null }).where(eq(items.categoryId, id)).run();
+    await tx.delete(itemCategories).where(eq(itemCategories.id, id)).run();
   });
 }
 
 // Removes the store's shelves too; its items are kept without a store or shelf
-export function deleteStore(id: number) {
-  db.transaction((tx) => {
-    tx.update(items).set({ storeId: null, categoryId: null }).where(eq(items.storeId, id)).run();
-    tx.delete(itemCategories).where(eq(itemCategories.storeId, id)).run();
-    tx.delete(stores).where(eq(stores.id, id)).run();
+export async function deleteStore(id: number) {
+  await db.transaction(async (tx) => {
+    await tx.update(items).set({ storeId: null, categoryId: null }).where(eq(items.storeId, id)).run();
+    await tx.delete(itemCategories).where(eq(itemCategories.storeId, id)).run();
+    await tx.delete(stores).where(eq(stores.id, id)).run();
   });
 }
 
 // Items used in recipes can't be deleted; their stock and shopping list entries go with them
-export function deleteItem(id: number) {
-  db.transaction((tx) => {
-    if (tx.select().from(recipeIngredients).where(eq(recipeIngredients.itemId, id)).limit(1).get()) return;
-    tx.delete(stock).where(eq(stock.itemId, id)).run();
-    tx.delete(shoppingListItems).where(eq(shoppingListItems.itemId, id)).run();
-    tx.delete(items).where(eq(items.id, id)).run();
+export async function deleteItem(id: number) {
+  await db.transaction(async (tx) => {
+    if (await tx.select().from(recipeIngredients).where(eq(recipeIngredients.itemId, id)).limit(1).get()) return;
+    await tx.delete(stock).where(eq(stock.itemId, id)).run();
+    await tx.delete(shoppingListItems).where(eq(shoppingListItems.itemId, id)).run();
+    await tx.delete(items).where(eq(items.id, id)).run();
   });
 }

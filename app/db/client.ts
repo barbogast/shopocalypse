@@ -1,9 +1,14 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
-const sqlite = new Database(process.env.DATABASE_URL ?? "shopocalypse.db");
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+// A local file in development, the Turso database in production.
+// Foreign keys aren't enforced: PRAGMA foreign_keys is per connection, and libSQL
+// doesn't keep one connection (Turso requests are stateless, and local transactions
+// get their own). The code keeps references intact itself instead.
+const client = createClient({
+  url: process.env.DATABASE_URL ?? "file:shopocalypse.db",
+  authToken: process.env.DATABASE_AUTH_TOKEN,
+});
 
-export const db = drizzle(sqlite, { schema });
+export const db = drizzle(client, { schema });

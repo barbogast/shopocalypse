@@ -58,7 +58,7 @@ function countRecipes<T extends { id: number; servings: number }>(rows: T[]) {
 }
 
 export async function loader() {
-  const activeList = getActiveList();
+  const activeList = await getActiveList();
 
   const scheduled = await db
     .select({
@@ -137,12 +137,12 @@ export async function action({ request }: Route.ActionArgs) {
       const includeInStock = form.get("includeInStock") === "on";
 
       // One transaction, so a double submit can't create a second active list
-      db.transaction((tx) => {
-        if (getActiveList(tx)) return;
+      await db.transaction(async (tx) => {
+        if (await getActiveList(tx)) return;
 
         const scheduled =
           positions.length > 0
-            ? tx
+            ? await tx
                 .select({
                   recipeId: mealSchedule.recipeId,
                   servings: mealServings(mealSchedule.servings),
@@ -155,7 +155,7 @@ export async function action({ request }: Route.ActionArgs) {
                 .all()
             : [];
 
-        const ingredients = tx
+        const ingredients = await tx
           .select({
             recipeId: recipeIngredients.recipeId,
             itemId: recipeIngredients.itemId,
@@ -170,20 +170,20 @@ export async function action({ request }: Route.ActionArgs) {
         // Stock tracking is deferred (no units yet), so nothing is subtracted
         const toAdd = listAmounts(scheduled, ingredients, includeInStock);
 
-        const list = tx
+        const list = await tx
           .insert(shoppingLists)
           .values({ createdAt: new Date().toISOString(), status: "active" })
           .returning()
           .get();
 
         if (scheduled.length > 0) {
-          tx.insert(shoppingListRecipes)
+          await tx.insert(shoppingListRecipes)
             .values(scheduled.map((meal) => ({ shoppingListId: list.id, recipeId: meal.recipeId, servings: meal.servings })))
             .run();
         }
 
         if (toAdd.size > 0) {
-          tx.insert(shoppingListItems)
+          await tx.insert(shoppingListItems)
             .values(
               [...toAdd.entries()].map(([itemId, amounts]) => ({
                 shoppingListId: list.id,
@@ -199,7 +199,7 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     case "add-manual": {
-      const activeList = getActiveList();
+      const activeList = await getActiveList();
       if (!activeList) return null;
 
       const itemId = int(form, "itemId");
@@ -207,19 +207,19 @@ export async function action({ request }: Route.ActionArgs) {
       if (!itemId) return { addError: "Pick an item first." };
       if ("error" in parsed) return { addError: parsed.error };
       // An item already on the list gets the amounts added up, and needs buying again
-      db.transaction((tx) => {
-        const listed = tx
+      await db.transaction(async (tx) => {
+        const listed = await tx
           .select()
           .from(shoppingListItems)
           .where(and(eq(shoppingListItems.shoppingListId, activeList.id), eq(shoppingListItems.itemId, itemId)))
           .get();
         if (listed) {
-          tx.update(shoppingListItems)
+          await tx.update(shoppingListItems)
             .set({ amounts: combineAmounts([...listed.amounts, parsed.amount]), bought: false })
             .where(eq(shoppingListItems.id, listed.id))
             .run();
         } else {
-          tx.insert(shoppingListItems)
+          await tx.insert(shoppingListItems)
             .values({ shoppingListId: activeList.id, itemId, amounts: combineAmounts([parsed.amount]), source: "manual" })
             .run();
         }
@@ -255,7 +255,7 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     case "finish": {
-      const activeList = getActiveList();
+      const activeList = await getActiveList();
       if (!activeList) return null;
 
       // Stock tracking is deferred, so finishing doesn't add bought items to it
@@ -267,12 +267,12 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     case "discard": {
-      const activeList = getActiveList();
+      const activeList = await getActiveList();
       if (!activeList) return null;
-      db.transaction((tx) => {
-        tx.delete(shoppingListItems).where(eq(shoppingListItems.shoppingListId, activeList.id)).run();
-        tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.shoppingListId, activeList.id)).run();
-        tx.delete(shoppingLists).where(eq(shoppingLists.id, activeList.id)).run();
+      await db.transaction(async (tx) => {
+        await tx.delete(shoppingListItems).where(eq(shoppingListItems.shoppingListId, activeList.id)).run();
+        await tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.shoppingListId, activeList.id)).run();
+        await tx.delete(shoppingLists).where(eq(shoppingLists.id, activeList.id)).run();
       });
       break;
     }

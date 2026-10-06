@@ -13,12 +13,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "@mantine/core": "^9.2.1",
     "@mantine/hooks": "^9.2.1",
     "@react-router/node": "7.15.1",
     "@react-router/serve": "7.15.1",
     "@tabler/icons-react": "^3.44.0",
-    "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
     "isbot": "^5",
     "react": "^19.2.6",
@@ -29,7 +29,6 @@
   },
   "devDependencies": {
     "@react-router/dev": "7.15.1",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
