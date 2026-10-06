@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { eq } from "drizzle-orm";
 import { Form, Link, redirect } from "react-router";
 import { FormError } from "~/components/form-error";
+import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
@@ -60,7 +61,8 @@ function FormatHelp() {
         <List.Item>A quantity without a unit means pieces; a line without a quantity has none</List.Item>
         <List.Item>Quantities: <Code>1.5</Code>, <Code>1,5</Code>, <Code>1/2</Code>, <Code>1 1/2</Code>, <Code>½</Code>; no ranges</List.Item>
         <List.Item>Units: {UNITS.map((u) => u.key).join(", ")}, or spelled out (<Code>tablespoons</Code>)</List.Item>
-        <List.Item>Ingredients are matched to items by name; unknown names become new items</List.Item>
+        <List.Item>A note after <Code> - </Code>, a comma or in parentheses is kept with the ingredient: <Code>1 onion - diced</Code></List.Item>
+        <List.Item>Ingredients are matched to items by name (without the note); unknown names become new items</List.Item>
       </List>
     </Card>
   );
@@ -163,10 +165,11 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
                   <Table.Tr key={ing.line}>
                     <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
                     <Table.Td>
-                      {ing.name}
-                      {!knownItems.has(itemKey(ing.name)) && (
-                        <Badge size="xs" variant="light" color="orange" ml={6}>new item</Badge>
-                      )}
+                      <IngredientName {...ing}>
+                        {!knownItems.has(itemKey(ing.name)) && (
+                          <Badge size="xs" variant="light" color="orange" ml={6}>new item</Badge>
+                        )}
+                      </IngredientName>
                     </Table.Td>
                   </Table.Tr>
                 ))}

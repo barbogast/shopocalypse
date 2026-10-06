@@ -85,6 +85,13 @@
       "when": 1790843496140,
       "tag": "0011_item_name_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791282459308,
+      "tag": "0012_ingredient_note",
+      "breakpoints": true
     }
   ]
 }

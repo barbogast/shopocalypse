@@ -1,5 +1,6 @@
 import { Anchor, Drawer, Stack, Table, Text, Title } from "@mantine/core";
 import { Link } from "react-router";
+import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
 import { type Amount, formatAmount } from "~/units";
 
@@ -10,7 +11,7 @@ export type RecipeDetails = {
   servingSize: number;
   instructions: string | null;
   comments: string | null;
-  ingredients: (Amount & { itemId: number; name: string })[];
+  ingredients: (Amount & { itemId: number; name: string; note: string | null })[];
 };
 
 // Recipe details scaled to a meal's servings, shown without leaving the page
@@ -35,7 +36,7 @@ export function RecipeDrawer({ recipe, note, onClose }: { recipe: RecipeDetails 
             <Table.Tbody>
               {recipe.ingredients.map((ing) => (
                 <Table.Tr key={ing.itemId}>
-                  <Table.Td>{ing.name}</Table.Td>
+                  <Table.Td><IngredientName {...ing} /></Table.Td>
                   <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
                 </Table.Tr>
               ))}

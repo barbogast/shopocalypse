@@ -46,6 +46,7 @@ export async function withIngredients<T extends { id: number; servings: number; 
           name: items.name,
           quantity: recipeIngredients.quantity,
           unit: recipeIngredients.unit,
+          note: recipeIngredients.note,
         })
         .from(recipeIngredients)
         .innerJoin(items, eq(recipeIngredients.itemId, items.id))
@@ -85,6 +86,7 @@ export async function importRecipe({ ingredients, ...recipe }: ParsedRecipe & { 
       itemId: idsByKey.get(itemKey(ing.name))!,
       quantity: ing.quantity,
       unit: ing.unit,
+      note: ing.note,
     }))).run();
 
     return { id, newItems };

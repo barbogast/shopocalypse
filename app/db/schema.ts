@@ -50,6 +50,8 @@ export const recipeIngredients = sqliteTable("recipe_ingredients", {
   // Both null when the recipe gives no quantity (e.g. spices)
   quantity: real("quantity"),
   unit: text("unit").$type<UnitKey>(),
+  // How to prepare it, e.g. "finely chopped"
+  note: text("note"),
 }, (t) => [primaryKey({ columns: [t.recipeId, t.itemId] })]);
 
 export const stock = sqliteTable("stock", {

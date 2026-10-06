@@ -3,6 +3,7 @@ import { IconCheck, IconPencil } from "@tabler/icons-react";
 import { and, eq } from "drizzle-orm";
 import { useEffect, useRef } from "react";
 import { Form, Link, redirect, useLocation, useNavigate } from "react-router";
+import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
 import { isDateString, localDate } from "~/dates";
@@ -108,7 +109,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
         <Table.Tbody>
           {ingredients.map((ing) => (
             <Table.Tr key={ing.itemId}>
-              <Table.Td>{ing.name}</Table.Td>
+              <Table.Td><IngredientName {...ing} /></Table.Td>
               <Table.Td c="dimmed" style={{ width: 100 }}>{formatAmount(ing)}</Table.Td>
             </Table.Tr>
           ))}

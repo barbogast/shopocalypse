@@ -7,6 +7,7 @@
 //   400 g spaghetti
 //   2 eggs              (a number without a unit means pieces)
 //   salt                (no quantity)
+//   1 garlic clove - finely chopped   (a note after " - ", "," or in parentheses)
 //
 //   Instructions
 //   Free markdown…
@@ -19,7 +20,13 @@
 
 import { UNITS, type UnitKey } from "./units";
 
-export type ParsedIngredient = { line: number; name: string; quantity: number | null; unit: UnitKey | null };
+export type ParsedIngredient = {
+  line: number;
+  name: string;
+  quantity: number | null;
+  unit: UnitKey | null;
+  note: string | null;
+};
 
 export type ParsedRecipe = {
   name: string;
@@ -66,21 +73,41 @@ export function itemKey(name: string) {
   return name.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
+// Splits a note off an ingredient name: "garlic - finely chopped", "onion, diced",
+// "feta (or halloumi)". A dash only counts with spaces around it ("chili-flakes"),
+// and a comma inside parentheses doesn't start a note.
+function splitNote(text: string): { name: string; note: string | null } {
+  const masked = text.replace(/\([^)]*\)/g, (m) => "(" + " ".repeat(m.length - 2) + ")");
+  const sep = /\s[-–](?:\s|$)|,/.exec(masked);
+  const notes: string[] = [];
+  const name = (sep ? text.slice(0, sep.index) : text)
+    .replace(/\(([^)]*)\)/g, (_, inner: string) => (notes.push(inner.trim()), " "))
+    .replace(/\s+/g, " ")
+    .trim();
+  if (sep) notes.push(text.slice(sep.index + sep[0].length).trim());
+  return { name, note: notes.filter(Boolean).join("; ") || null };
+}
+
 export function parseIngredient(text: string): Omit<ParsedIngredient, "line"> | { error: string } {
   const rest = text.replace(/^[-*•]\s*/, "").replace(/\s+/g, " ").trim();
   const match = QUANTITY.exec(rest);
-  if (!match) return { name: rest, quantity: null, unit: null };
+  if (!match) {
+    const { name, note } = splitNote(rest);
+    if (!name) return { error: "Missing the ingredient name before the note." };
+    return { name, quantity: null, unit: null, note };
+  }
 
   const quantity = parseQuantity(match[1]);
   if (!(quantity > 0)) return { error: "Quantity must be more than 0." };
 
   const afterQuantity = rest.slice(match[0].length).trim();
   if (/^[-–]\s*\d/.test(afterQuantity)) return { error: "Ranges aren't supported; pick one quantity." };
-  const [word, ...nameWords] = afterQuantity.split(" ");
+  const { name: unitAndName, note } = splitNote(afterQuantity);
+  const [word, ...nameWords] = unitAndName.split(" ");
   const unit = UNIT_ALIASES.get(word.toLowerCase().replace(/\.$/, ""));
-  const name = unit ? nameWords.join(" ") : afterQuantity;
+  const name = unit ? nameWords.join(" ") : unitAndName;
   if (!name) return { error: "Missing the ingredient name after the quantity." };
-  return { name, quantity, unit: unit ?? "pcs" };
+  return { name, quantity, unit: unit ?? "pcs", note };
 }
 
 function sectionOf(line: string): Section | null {
