@@ -15,6 +15,7 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
+import { checkPassword } from "./auth.server";
 import type { Route } from "./+types/root";
 
 const NAV_ITEMS = [
@@ -22,6 +23,14 @@ const NAV_ITEMS = [
   { to: "/recipes", label: "Recipes", icon: IconChefHat, end: false },
   { to: "/shopping", label: "Shopping", icon: IconShoppingCart, end: false },
   { to: "/items", label: "Items", icon: IconListDetails, end: false },
+];
+
+// Runs before every loader and action, so no request gets past without the password
+export const middleware: Route.MiddlewareFunction[] = [
+  ({ request }) => {
+    const denied = checkPassword(request);
+    if (denied) return denied;
+  },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
