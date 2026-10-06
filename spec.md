@@ -9,7 +9,7 @@ A personal tool that helps our family to know which meal to cook and which groce
 
 # Key actions
 
-- manage recipies
+- manage recipies; import a recipe from plain text (live preview while typing; ingredients without a matching item create new items without store or shelf)
 - manage meal schedule: add/remove recipie (or just auto rotate by adding the least recently cooked meals)
 - manage stock _(deferred, see below)_
   - compare virtual stock with what's actually there

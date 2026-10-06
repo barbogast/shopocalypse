@@ -1,4 +1,5 @@
 import { asc, eq, inArray, sql } from "drizzle-orm";
+import { itemKey, type ParsedRecipe } from "~/recipe-import";
 import { scaleAmount } from "~/units";
 import { db } from "./client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes } from "./schema";
@@ -57,4 +58,35 @@ export async function withIngredients<T extends { id: number; servings: number; 
       .filter((i) => i.recipeId === m.id)
       .map((i) => ({ ...i, ...scaleAmount(i, m.servings, m.servingSize) })),
   }));
+}
+
+// Creates a parsed recipe in one go. Ingredients are matched to items by name; missing
+// items are created without a store or shelf, with the recipe's unit as their default.
+// Returns the recipe id and the items it created.
+export async function importRecipe({ ingredients, ...recipe }: ParsedRecipe & { servingSize: number }) {
+  return db.transaction(async (tx) => {
+    const existing = await tx.select({ id: items.id, name: items.name }).from(items).all();
+    const idsByKey = new Map(existing.map((i) => [itemKey(i.name), i.id]));
+
+    const newItems: { id: number; name: string }[] = [];
+    for (const ing of ingredients) {
+      if (idsByKey.has(itemKey(ing.name))) continue;
+      const [item] = await tx
+        .insert(items)
+        .values({ name: ing.name, defaultUnit: ing.unit })
+        .returning({ id: items.id, name: items.name });
+      idsByKey.set(itemKey(item.name), item.id);
+      newItems.push(item);
+    }
+
+    const [{ id }] = await tx.insert(recipes).values(recipe).returning({ id: recipes.id });
+    await tx.insert(recipeIngredients).values(ingredients.map((ing) => ({
+      recipeId: id,
+      itemId: idsByKey.get(itemKey(ing.name))!,
+      quantity: ing.quantity,
+      unit: ing.unit,
+    }))).run();
+
+    return { id, newItems };
+  });
 }
