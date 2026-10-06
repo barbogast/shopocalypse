@@ -29,12 +29,15 @@ database. Each query is a round trip to Turso, so keep both in the same region.
 
    ```sh
    turso auth login
+   # Databases live in a group, which sets the location. Pick the Frankfurt
+   # code from `turso db locations` (or skip this if your group is already there):
+   turso group create default --location <frankfurt-code>
    # Empty:
-   turso db create shopocalypse --location aws-eu-central-1
+   turso db create shopocalypse
    # Or with the existing data (Turso imports WAL-mode files with the WAL checkpointed):
    sqlite3 shopocalypse.db ".backup export.db"
    sqlite3 export.db "PRAGMA journal_mode=wal; PRAGMA wal_checkpoint(truncate);"
-   turso db create shopocalypse --location aws-eu-central-1 --from-file export.db
+   turso db create shopocalypse --from-file export.db
 
    turso db show shopocalypse --url        # → DATABASE_URL
    turso db tokens create shopocalypse     # → DATABASE_AUTH_TOKEN
