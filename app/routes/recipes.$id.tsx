@@ -14,12 +14,13 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconCheck, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconCheck, IconPencil, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useRef, useState } from "react";
 import { and, desc, eq } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { FormError } from "~/components/form-error";
+import { IngredientName } from "~/components/ingredient-name";
 import { ItemFields } from "~/components/item-fields";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
@@ -80,10 +81,12 @@ export async function action({ request, params }: Route.ActionArgs) {
       const parsed = parseAmount(form);
       if ("error" in parsed) return { ingredientError: parsed.error };
       const { quantity, unit } = parsed.amount;
+      const note = optionalText(form, "note");
+      // Also how an existing ingredient is edited
       await db
         .insert(recipeIngredients)
-        .values({ recipeId: id, itemId, quantity, unit })
-        .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit } });
+        .values({ recipeId: id, itemId, quantity, unit, note })
+        .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit, note } });
       break;
     }
 
@@ -145,12 +148,16 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   const { recipe, ingredients, allItems, allStores, allShelves, cookedDates } = loaderData;
   const cooked = cookedDates.length > 0;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
+  // The ingredient loaded into the form for editing, which stays selectable
+  const [editingId, setEditingId] = useState<number | null>(null);
   const availableItems = allItems
-    .filter((i) => !usedItemIds.has(i.id))
+    .filter((i) => !usedItemIds.has(i.id) || i.id === editingId)
     .map((i) => ({ value: String(i.id), label: i.name }));
   const [itemId, setItemId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [quantity, setQuantity] = useState<string | number>("");
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
+  const [note, setNote] = useState("");
   const [createOpened, createModal] = useDisclosure(false);
   const [createName, setCreateName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -169,11 +176,28 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
     setItemId(item ? String(item.id) : null);
     setSearch(item?.name ?? "");
     setUnit(item?.defaultUnit ?? DEFAULT_UNIT);
+    setEditingId(null);
   };
 
-  // Clear the picker once its item has been added to the recipe
+  const resetForm = () => {
+    selectItem(undefined);
+    setQuantity("");
+    setNote("");
+  };
+
+  const editIngredient = (ing: (typeof ingredients)[number]) => {
+    setItemId(String(ing.itemId));
+    setSearch(ing.name);
+    setQuantity(ing.quantity ?? "");
+    setUnit(ing.unit ?? DEFAULT_UNIT);
+    setNote(ing.note ?? "");
+    setEditingId(ing.itemId);
+    quantityRef.current?.focus();
+  };
+
+  // Clear the form once its item has been added to the recipe
   useEffect(() => {
-    if (itemId && usedItemIds.has(Number(itemId))) selectItem(undefined);
+    if (itemId && usedItemIds.has(Number(itemId))) resetForm();
   }, [ingredients]);
 
   useEffect(() => {
@@ -233,8 +257,13 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <Table.Tbody>
           {ingredients.map((ing) => (
             <Table.Tr key={ing.itemId}>
-              <Table.Td>{ing.name}</Table.Td>
+              <Table.Td><IngredientName {...ing} /></Table.Td>
               <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
+              <Table.Td style={{ width: 40 }}>
+                <ActionIcon variant="subtle" onClick={() => editIngredient(ing)} aria-label={`Edit ${ing.name}`}>
+                  <IconPencil size={16} />
+                </ActionIcon>
+              </Table.Td>
               <Table.Td style={{ width: 40 }}>
                 <Form method="post">
                   <input type="hidden" name="intent" value="remove-ingredient" />
@@ -259,7 +288,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <Group align="flex-end" gap="xs">
           <Select
             name="itemId"
-            label="Add ingredient"
+            label={editingId ? "Edit ingredient" : "Add ingredient"}
             placeholder="Search or create…"
             data={itemOptions}
             value={itemId}
@@ -278,9 +307,15 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
             style={{ flex: 1, minWidth: 140 }}
           />
           {/* Leave the quantity empty for ingredients without one, like spices */}
-          <NumberInput ref={quantityRef} name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—" style={{ width: 70 }} />
+          <NumberInput ref={quantityRef} name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—"
+            value={quantity} onChange={setQuantity} style={{ width: 70 }} />
           <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
-          <SubmitButton>Add</SubmitButton>
+        </Group>
+        <Group align="flex-end" gap="xs" mt="xs">
+          <TextInput name="note" placeholder="Note, e.g. finely chopped" value={note}
+            onChange={(e) => setNote(e.currentTarget.value)} style={{ flex: 1 }} />
+          {editingId && <Button variant="subtle" onClick={resetForm}>Cancel</Button>}
+          <SubmitButton>{editingId ? "Save" : "Add"}</SubmitButton>
         </Group>
         <FormError error={actionData && "ingredientError" in actionData ? actionData.ingredientError : null} mt="xs" />
       </Form>
