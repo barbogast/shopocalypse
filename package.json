@@ -10,6 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --experimental-strip-types scripts/seed.ts",
+    "vercel-build": "if [ \"$VERCEL_ENV\" = production ]; then : \"${DATABASE_URL:?must be set for production builds}\" && drizzle-kit migrate; fi && react-router build",
     "test": "vitest run"
   },
   "dependencies": {

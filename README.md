@@ -56,18 +56,17 @@ database. Each query is a round trip to Turso, so keep both in the same region.
 
 ### Schema changes
 
-Migrations aren't run by the build. Before deploying a change that adds a
-migration, apply it to Turso:
-
 ```sh
 yarn db:generate --name <change>     # locally, after editing app/db/schema.ts
 yarn db:migrate                      # local file
-DATABASE_URL=libsql://… DATABASE_AUTH_TOKEN=… yarn db:migrate   # Turso
 ```
 
-Apply them before the deploy so the new code never runs against the old
-schema. Migrations should keep working with the code that's still live until
-the deploy finishes, e.g. add columns before using them.
+Production deploys apply pending migrations to Turso before building (the
+`vercel-build` script); a failed migration fails the deploy. Preview builds
+skip them. Migrations must keep working with the code that's still live until
+the deploy finishes, and with older deploys you might roll back to, since
+Vercel's rollback doesn't undo them, e.g. add columns before using them and
+don't drop or rename ones that live code reads.
 
 ### Notes
 
