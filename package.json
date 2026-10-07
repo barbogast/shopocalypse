@@ -9,8 +9,9 @@
     "typecheck": "react-router typegen && tsc",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:deploy": "node --experimental-strip-types scripts/migrate.ts",
     "db:seed": "node --experimental-strip-types scripts/seed.ts",
-    "vercel-build": "if [ \"$VERCEL_ENV\" = production ]; then : \"${DATABASE_URL:?must be set for production builds}\" && drizzle-kit migrate; fi && react-router build",
+    "vercel-build": "if [ \"$VERCEL_ENV\" = production ]; then yarn -s db:migrate:deploy; fi && react-router build",
     "test": "vitest run"
   },
   "dependencies": {
