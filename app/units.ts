@@ -37,11 +37,12 @@ export function isUnitKey(value: unknown): value is UnitKey {
   return typeof value === "string" && unitsByKey.has(value);
 }
 
-// Reads an optional quantity + unit pair from a form; an empty quantity means no quantity
+// Reads an optional quantity + unit pair from a form; an empty quantity means no quantity.
+// The quantity may use a decimal comma ("1,5").
 export function parseAmount(form: FormData): { amount: Amount } | { error: string } {
   const rawQuantity = String(form.get("quantity") ?? "").trim();
   if (!rawQuantity) return { amount: { quantity: null, unit: null } };
-  const quantity = Number(rawQuantity);
+  const quantity = Number(rawQuantity.replace(",", "."));
   const unit = form.get("unit");
   if (!(quantity > 0)) return { error: "Quantity must be more than 0." };
   if (!isUnitKey(unit)) return { error: "Pick a unit." };
@@ -80,7 +81,7 @@ export function roundUpToBuy(amounts: Amount[]): Amount[] {
   );
 }
 
-const numberFormat = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 });
+const numberFormat = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
 
 export function formatAmount({ quantity, unit }: Amount) {
   if (quantity == null || unit == null) return "—";

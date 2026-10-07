@@ -400,7 +400,7 @@ function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit
           onChange={(value) => setUnit(items.find((i) => String(i.id) === value)?.defaultUnit ?? DEFAULT_UNIT)}
           style={{ flex: 1, minWidth: 140 }}
         />
-        <NumberInput name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—" style={{ width: 70 }} />
+        <NumberInput name="quantity" label="Qty" min={0} decimalScale={2} decimalSeparator="," placeholder="—" style={{ width: 70 }} />
         <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
         <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
       </Group>

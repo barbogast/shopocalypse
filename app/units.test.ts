@@ -79,6 +79,10 @@ describe("parseAmount", () => {
     expect(parseAmount(form({ quantity: "2.5", unit: "kg" }))).toEqual({ amount: { quantity: 2.5, unit: "kg" } });
   });
 
+  it("reads a decimal comma", () => {
+    expect(parseAmount(form({ quantity: "1,5", unit: "l" }))).toEqual({ amount: { quantity: 1.5, unit: "l" } });
+  });
+
   it("rejects zero, negative and non-numeric quantities", () => {
     for (const quantity of ["0", "-1", "abc"]) {
       expect(parseAmount(form({ quantity, unit: "g" }))).toHaveProperty("error");
@@ -95,6 +99,7 @@ describe("formatting", () => {
     expect(formatAmount({ quantity: 1, unit: "can" })).toBe("1 Dose");
     expect(formatAmount({ quantity: 2, unit: "can" })).toBe("2 Dosen");
     expect(formatAmount({ quantity: null, unit: null })).toBe("—");
+    expect(formatAmount({ quantity: 1.5, unit: "tbsp" })).toBe("1,5 EL");
   });
 
   it("joins combined amounts", () => {
