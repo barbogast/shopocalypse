@@ -401,7 +401,7 @@ function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit
           style={{ flex: 1, minWidth: 140 }}
         />
         <NumberInput name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—" style={{ width: 70 }} />
-        <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
+        <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
         <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
       </Group>
       <FormError error={actionData?.addError} mt="xs" />

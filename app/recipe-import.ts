@@ -42,10 +42,16 @@ export type ImportError = { line: number | null; message: string };
 const SECTIONS = ["ingredients", "instructions", "comments"] as const;
 type Section = (typeof SECTIONS)[number];
 
-// Each unit's key, label and plural, plus spelled-out names
+// Each unit's key, German label and plural, plus English and spelled-out names.
+// Matched lowercase and without a trailing dot ("Stk." → "stk").
 const UNIT_ALIASES = new Map<string, UnitKey>();
-for (const u of UNITS) for (const alias of [u.key, u.label, u.plural]) UNIT_ALIASES.set(alias, u.key);
+for (const u of UNITS) {
+  for (const alias of [u.key, u.label, u.plural]) UNIT_ALIASES.set(alias.toLowerCase().replace(/\.$/, ""), u.key);
+}
 for (const [alias, key] of Object.entries({
+  pc: "pcs", pinch: "pinch", pinches: "pinch", can: "can", cans: "can", jar: "jar", jars: "jar",
+  pack: "pack", packs: "pack", bottle: "bottle", bottles: "bottle", crate: "crate", crates: "crate",
+  bunch: "bunch", bunches: "bunch",
   gram: "g", grams: "g",
   kilogram: "kg", kilograms: "kg",
   millilitre: "ml", millilitres: "ml", milliliter: "ml", milliliters: "ml",
@@ -53,6 +59,8 @@ for (const [alias, key] of Object.entries({
   piece: "pcs", pieces: "pcs",
   teaspoon: "tsp", teaspoons: "tsp",
   tablespoon: "tbsp", tablespoons: "tbsp",
+  gramm: "g", kilogramm: "kg", stück: "pcs", teelöffel: "tsp", esslöffel: "tbsp",
+  pck: "pack", pkg: "pack", päckchen: "pack", kiste: "crate", kisten: "crate",
 } satisfies Record<string, UnitKey>)) UNIT_ALIASES.set(alias, key);
 
 const FRACTIONS: Record<string, number> = { "½": 1 / 2, "⅓": 1 / 3, "⅔": 2 / 3, "¼": 1 / 4, "¾": 3 / 4 };

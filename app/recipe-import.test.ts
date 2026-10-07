@@ -10,6 +10,14 @@ describe("parseIngredient", () => {
     expect(parseIngredient("3 cans tomatoes")).toEqual({ name: "tomatoes", quantity: 3, unit: "can", note: null });
   });
 
+  it("reads German units", () => {
+    expect(parseIngredient("2 EL Olivenöl")).toEqual({ name: "Olivenöl", quantity: 2, unit: "tbsp", note: null });
+    expect(parseIngredient("3 Stk. Zwiebeln")).toMatchObject({ name: "Zwiebeln", quantity: 3, unit: "pcs" });
+    expect(parseIngredient("2 Gläser Kapern")).toMatchObject({ name: "Kapern", unit: "jar" });
+    expect(parseIngredient("1 Prise Salz")).toMatchObject({ name: "Salz", unit: "pinch" });
+    expect(parseIngredient("1 Bund Petersilie")).toMatchObject({ name: "Petersilie", unit: "bunch" });
+  });
+
   it("treats a number without a unit as pieces", () => {
     expect(parseIngredient("2 eggs")).toEqual({ name: "eggs", quantity: 2, unit: "pcs", note: null });
   });

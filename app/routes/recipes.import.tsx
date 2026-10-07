@@ -60,7 +60,7 @@ function FormatHelp() {
         <List.Item><Code>Instructions</Code> and <Code>Comments</Code> are optional; instructions support markdown</List.Item>
         <List.Item>A quantity without a unit means pieces; a line without a quantity has none</List.Item>
         <List.Item>Quantities: <Code>1.5</Code>, <Code>1,5</Code>, <Code>1/2</Code>, <Code>1 1/2</Code>, <Code>½</Code>; no ranges</List.Item>
-        <List.Item>Units: {UNITS.map((u) => u.key).join(", ")}, or spelled out (<Code>tablespoons</Code>)</List.Item>
+        <List.Item>Units: {UNITS.map((u) => u.label).join(", ")}, in English (<Code>tbsp</Code>) or spelled out (<Code>Esslöffel</Code>)</List.Item>
         <List.Item>A note after <Code> - </Code>, a comma or in parentheses is kept with the ingredient: <Code>1 onion - diced</Code></List.Item>
         <List.Item>Ingredients are matched to items by name (without the note); unknown names become new items</List.Item>
       </List>

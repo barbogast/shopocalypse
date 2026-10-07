@@ -1,20 +1,20 @@
-// Fixed list of quantity units. Mass and volume units share a kind and are added
+// Fixed list of quantity units, labelled in German; keys are what's stored. Mass and volume units share a kind and are added
 // up via their factor (to g / ml); every other unit is its own kind.
 export const UNITS = [
   { key: "g", label: "g", plural: "g", kind: "mass", factor: 1 },
   { key: "kg", label: "kg", plural: "kg", kind: "mass", factor: 1000 },
   { key: "ml", label: "ml", plural: "ml", kind: "volume", factor: 1 },
   { key: "l", label: "l", plural: "l", kind: "volume", factor: 1000 },
-  { key: "pcs", label: "pc", plural: "pcs", kind: "pcs", factor: 1 },
-  { key: "tsp", label: "tsp", plural: "tsp", kind: "tsp", factor: 1 },
-  { key: "tbsp", label: "tbsp", plural: "tbsp", kind: "tbsp", factor: 1 },
-  { key: "pinch", label: "pinch", plural: "pinches", kind: "pinch", factor: 1 },
-  { key: "can", label: "can", plural: "cans", kind: "can", factor: 1 },
-  { key: "jar", label: "jar", plural: "jars", kind: "jar", factor: 1 },
-  { key: "pack", label: "pack", plural: "packs", kind: "pack", factor: 1 },
-  { key: "bottle", label: "bottle", plural: "bottles", kind: "bottle", factor: 1 },
-  { key: "crate", label: "crate", plural: "crates", kind: "crate", factor: 1 },
-  { key: "bunch", label: "bunch", plural: "bunches", kind: "bunch", factor: 1 },
+  { key: "pcs", label: "Stk.", plural: "Stk.", kind: "pcs", factor: 1 },
+  { key: "tsp", label: "TL", plural: "TL", kind: "tsp", factor: 1 },
+  { key: "tbsp", label: "EL", plural: "EL", kind: "tbsp", factor: 1 },
+  { key: "pinch", label: "Prise", plural: "Prisen", kind: "pinch", factor: 1 },
+  { key: "can", label: "Dose", plural: "Dosen", kind: "can", factor: 1 },
+  { key: "jar", label: "Glas", plural: "Gläser", kind: "jar", factor: 1 },
+  { key: "pack", label: "Packung", plural: "Packungen", kind: "pack", factor: 1 },
+  { key: "bottle", label: "Flasche", plural: "Flaschen", kind: "bottle", factor: 1 },
+  { key: "crate", label: "Kasten", plural: "Kästen", kind: "crate", factor: 1 },
+  { key: "bunch", label: "Bund", plural: "Bund", kind: "bunch", factor: 1 },
 ] as const;
 
 export type UnitKey = (typeof UNITS)[number]["key"];
@@ -28,7 +28,7 @@ export const UNIT_OPTIONS = UNITS.map((u) => ({ value: u.key, label: u.plural })
 
 const unitsByKey = new Map<string, (typeof UNITS)[number]>(UNITS.map((u) => [u.key, u]));
 
-// The name shown in unit pickers, e.g. "bottles"
+// The name shown in unit pickers, e.g. "Flaschen"
 export function unitName(key: UnitKey) {
   return unitsByKey.get(key)?.plural ?? key;
 }

@@ -309,7 +309,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           {/* Leave the quantity empty for ingredients without one, like spices */}
           <NumberInput ref={quantityRef} name="quantity" label="Qty" min={0} decimalScale={2} placeholder="—"
             value={quantity} onChange={setQuantity} style={{ width: 70 }} />
-          <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 95 }} />
+          <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
         </Group>
         <Group align="flex-end" gap="xs" mt="xs">
           <TextInput name="note" placeholder="Note, e.g. finely chopped" value={note}

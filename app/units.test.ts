@@ -92,13 +92,13 @@ describe("parseAmount", () => {
 
 describe("formatting", () => {
   it("uses singular and plural labels", () => {
-    expect(formatAmount({ quantity: 1, unit: "can" })).toBe("1 can");
-    expect(formatAmount({ quantity: 2, unit: "can" })).toBe("2 cans");
+    expect(formatAmount({ quantity: 1, unit: "can" })).toBe("1 Dose");
+    expect(formatAmount({ quantity: 2, unit: "can" })).toBe("2 Dosen");
     expect(formatAmount({ quantity: null, unit: null })).toBe("—");
   });
 
   it("joins combined amounts", () => {
-    expect(formatAmounts([{ quantity: 500, unit: "g" }, { quantity: 2, unit: "pcs" }])).toBe("500 g + 2 pcs");
+    expect(formatAmounts([{ quantity: 500, unit: "g" }, { quantity: 2, unit: "pcs" }])).toBe("500 g + 2 Stk.");
     expect(formatAmounts([])).toBe("—");
   });
 });
