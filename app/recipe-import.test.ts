@@ -16,6 +16,8 @@ describe("parseIngredient", () => {
     expect(parseIngredient("2 Gläser Kapern")).toMatchObject({ name: "Kapern", unit: "jar" });
     expect(parseIngredient("1 Prise Salz")).toMatchObject({ name: "Salz", unit: "pinch" });
     expect(parseIngredient("1 Bund Petersilie")).toMatchObject({ name: "Petersilie", unit: "bunch" });
+    expect(parseIngredient("1 Msp. Muskat")).toMatchObject({ name: "Muskat", unit: "knifetip" });
+    expect(parseIngredient("1 Messerspitze Muskat")).toMatchObject({ name: "Muskat", unit: "knifetip" });
   });
 
   it("treats a number without a unit as pieces", () => {
