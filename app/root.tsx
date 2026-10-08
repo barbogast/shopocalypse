@@ -16,6 +16,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { checkPassword } from "./auth.server";
+import { VersionFooter } from "./components/version-footer";
 import type { Route } from "./+types/root";
 
 const NAV_ITEMS = [
@@ -46,7 +47,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         <MantineProvider>
           <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-            <main style={{ flex: 1, paddingBottom: 70 }}>{children}</main>
+            <main style={{ flex: 1, paddingBottom: 70 }}>
+              {children}
+              <VersionFooter />
+            </main>
             <nav style={{
               position: "fixed", bottom: 0, left: 0, right: 0, height: 64,
               display: "flex", borderTop: "1px solid var(--mantine-color-gray-3)",
