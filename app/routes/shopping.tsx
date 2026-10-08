@@ -87,6 +87,7 @@ export async function loader() {
       itemName: items.name,
       itemPlural: items.plural,
       amounts: shoppingListItems.amounts,
+      notes: shoppingListItems.notes,
       bought: shoppingListItems.bought,
       source: shoppingListItems.source,
       storeName: stores.name,
@@ -172,6 +173,8 @@ export async function action({ request }: Route.ActionArgs) {
             itemId: recipeIngredients.itemId,
             quantity: recipeIngredients.quantity,
             unit: recipeIngredients.unit,
+            note: recipeIngredients.note,
+            noteOnList: recipeIngredients.noteOnList,
             alwaysAvailable: items.alwaysAvailable,
           })
           .from(recipeIngredients)
@@ -196,10 +199,11 @@ export async function action({ request }: Route.ActionArgs) {
         if (toAdd.size > 0) {
           await tx.insert(shoppingListItems)
             .values(
-              [...toAdd.entries()].map(([itemId, amounts]) => ({
+              [...toAdd.entries()].map(([itemId, { amounts, notes }]) => ({
                 shoppingListId: list.id,
                 itemId,
                 amounts,
+                notes,
                 source: "meal_plan" as const,
               }))
             )
@@ -435,6 +439,11 @@ function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | unde
         <Text td={ticked ? "line-through" : undefined}>
           {nameForAmounts({ name: item.itemName, plural: item.itemPlural }, item.amounts)}
         </Text>
+        {item.notes.map((n) => (
+          <Text key={n.note} size="sm" c="dimmed">
+            {n.amounts.length > 0 && `${formatAmounts(n.amounts)} `}{n.note}
+          </Text>
+        ))}
         {usedIn && <Text size="xs" c="dimmed">{usedIn.join(", ")}</Text>}
         {item.source === "manual" && (
           <Badge size="xs" variant="outline" color="gray">manual</Badge>

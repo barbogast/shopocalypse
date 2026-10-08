@@ -3,6 +3,7 @@ import { db } from "./client";
 import { itemCategories, items, recipeIngredients, recipes, shoppingListItems, stock, stores } from "./schema";
 import { int, optionalText, text } from "~/forms";
 import { itemKey, itemKeys } from "~/recipe-import";
+import { addNote } from "~/shopping-list";
 import { combineAmounts, formatAmount, isUnitKey, mergeAmounts } from "~/units";
 
 // Shelves in walking order, grouped by store
@@ -185,12 +186,13 @@ export async function mergeItem(duplicateId: number, keepId: number) {
         } as const;
       }
       const note = [...new Set([kept.note, dup.note].filter(Boolean))].join(", ") || null;
-      folds.push({ recipeId: kept.recipeId, amount, note, position: Math.min(kept.position, dup.position) });
+      const noteOnList = kept.noteOnList || dup.noteOnList;
+      folds.push({ recipeId: kept.recipeId, amount, note, noteOnList, position: Math.min(kept.position, dup.position) });
     }
-    for (const { recipeId, amount, note, position } of folds) {
+    for (const { recipeId, amount, note, noteOnList, position } of folds) {
       await tx
         .update(recipeIngredients)
-        .set({ ...amount, note, position })
+        .set({ ...amount, note, noteOnList, position })
         .where(and(eq(recipeIngredients.recipeId, recipeId), eq(recipeIngredients.itemId, keepId)))
         .run();
       await tx
@@ -211,7 +213,11 @@ export async function mergeItem(duplicateId: number, keepId: number) {
       if (kept) {
         await tx
           .update(shoppingListItems)
-          .set({ amounts: combineAmounts([...kept.amounts, ...dup.amounts]), bought: kept.bought && dup.bought })
+          .set({
+            amounts: combineAmounts([...kept.amounts, ...dup.amounts]),
+            notes: addNote(kept.notes, ...dup.notes),
+            bought: kept.bought && dup.bought,
+          })
           .where(eq(shoppingListItems.id, kept.id))
           .run();
         await tx.delete(shoppingListItems).where(eq(shoppingListItems.id, dup.id)).run();

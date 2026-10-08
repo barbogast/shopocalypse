@@ -1,4 +1,4 @@
-import { Alert, Anchor, Badge, Button, Card, Code, Container, Group, List, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
+import { Alert, Anchor, Badge, Button, Card, Checkbox, Code, Container, Group, List, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
 import { IconAlertCircle, IconCheck, IconFileImport } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { eq } from "drizzle-orm";
@@ -13,7 +13,7 @@ import { setPlural } from "~/db/items.server";
 import { importRecipe } from "~/db/recipes.server";
 import { items, recipes } from "~/db/schema";
 import { int, text } from "~/forms";
-import { itemKey, itemKeys, likelySingular, parseRecipeText } from "~/recipe-import";
+import { itemKey, itemKeys, likelySingular, type ParsedIngredient, parseRecipeText } from "~/recipe-import";
 import { formatAmount, UNITS } from "~/units";
 import type { Route } from "./+types/recipes.import";
 
@@ -54,7 +54,10 @@ export async function action({ request }: Route.ActionArgs) {
   const { recipe, errors } = parseRecipeText(text(form, "text"));
   if (errors.length || recipe.servingSize == null) return { error: "Fix the errors in the text first.", imported: null };
 
-  const { id, newItems, storeName } = await importRecipe({ ...recipe, servingSize: recipe.servingSize });
+  // Lines whose note was ticked in the preview to go on the shopping list
+  const noteOnListLines = new Set(form.getAll("noteOnList").map(Number));
+  const ingredients = recipe.ingredients.map((ing) => ({ ...ing, noteOnList: ing.note !== null && noteOnListLines.has(ing.line) }));
+  const { id, newItems, storeName } = await importRecipe({ ...recipe, servingSize: recipe.servingSize, ingredients });
   return { error: null, imported: { id, name: recipe.name, newItems, storeName } };
 }
 
@@ -74,7 +77,7 @@ function FormatHelp() {
         <List.Item>A quantity without a unit means pieces; a line without a quantity has none</List.Item>
         <List.Item>Quantities: <Code>1.5</Code>, <Code>1,5</Code>, <Code>1/2</Code>, <Code>1 1/2</Code>, <Code>½</Code>; no ranges</List.Item>
         <List.Item>Units: {UNITS.map((u) => u.label).join(", ")}, in English (<Code>tbsp</Code>) or spelled out (<Code>Esslöffel</Code>)</List.Item>
-        <List.Item>A note after <Code> - </Code>, a comma or in parentheses is kept with the ingredient: <Code>1 onion - diced</Code></List.Item>
+        <List.Item>A note after <Code> - </Code>, a comma or in parentheses is kept with the ingredient: <Code>1 onion - diced</Code>. Tick it in the preview if it matters when buying, like <Code>mind. 30% Fett</Code></List.Item>
         <List.Item>Quotes keep a comma, dash or parentheses in the name: <Code>"Salz, Pfeffer"</Code></List.Item>
         <List.Item>Ingredients are matched to items by name or plural (without the note); unknown names become new items</List.Item>
       </List>
@@ -187,14 +190,31 @@ function Imported({ id, name, newItems, storeName, onImportAnother }: {
   );
 }
 
+// Identifies a ticked note across edits of the text, which move its line
+const noteKey = (ing: ParsedIngredient) => `${itemKey(ing.name)}\n${ing.note}`;
+
 export default function ImportRecipe({ loaderData, actionData }: Route.ComponentProps) {
   const { allItems, recipeNames } = loaderData;
   const [input, setInput] = useState("");
+  const [notesOnList, setNotesOnList] = useState(() => new Set<string>());
+  const toggleNoteOnList = (ing: ParsedIngredient, checked: boolean) =>
+    setNotesOnList((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(noteKey(ing));
+      else next.delete(noteKey(ing));
+      return next;
+    });
   const { recipe, errors } = useMemo(() => parseRecipeText(input), [input]);
   const knownItems = useMemo(() => new Set(allItems.flatMap(itemKeys)), [allItems]);
   const errorLines = new Set(errors.flatMap((e) => (e.line != null ? [e.line] : [])));
 
-  if (actionData?.imported) return <Imported {...actionData.imported} onImportAnother={() => setInput("")} />;
+  if (actionData?.imported) {
+    const importAnother = () => {
+      setInput("");
+      setNotesOnList(new Set());
+    };
+    return <Imported {...actionData.imported} onImportAnother={importAnother} />;
+  }
 
   const newItemCount = recipe.ingredients.filter((ing) => !knownItems.has(itemKey(ing.name))).length;
   const nameTaken = recipe.name !== "" && recipeNames.some((n) => itemKey(n) === itemKey(recipe.name));
@@ -224,6 +244,9 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
                 </div>
               )}
             />
+            {recipe.ingredients
+              .filter((ing) => ing.note && notesOnList.has(noteKey(ing)))
+              .map((ing) => <input key={ing.line} type="hidden" name="noteOnList" value={ing.line} />)}
             <FormError error={actionData?.error} />
             <Group>
               <SubmitButton disabled={!canImport}>Import</SubmitButton>
@@ -267,7 +290,10 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
                   <Table.Tr key={ing.line}>
                     <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
                     <Table.Td>
-                      <IngredientName {...ing}>
+                      <IngredientName {...ing} noteControl={
+                        <Checkbox size="xs" label="Note on shopping list" checked={notesOnList.has(noteKey(ing))}
+                          onChange={(e) => toggleNoteOnList(ing, e.currentTarget.checked)} />
+                      }>
                         {!knownItems.has(itemKey(ing.name)) && (
                           <>
                             <Badge size="xs" variant="light" color="orange" ml={6}>new item</Badge>

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
-import { itemKey, itemKeys, type ParsedRecipe } from "~/recipe-import";
+import { itemKey, itemKeys, type ParsedIngredient, type ParsedRecipe } from "~/recipe-import";
 import { scaleAmount } from "~/units";
 import { db } from "./client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes, stores } from "./schema";
@@ -48,6 +48,7 @@ export async function withIngredients<T extends { id: number; servings: number; 
           quantity: recipeIngredients.quantity,
           unit: recipeIngredients.unit,
           note: recipeIngredients.note,
+          noteOnList: recipeIngredients.noteOnList,
         })
         .from(recipeIngredients)
         .innerJoin(items, eq(recipeIngredients.itemId, items.id))
@@ -66,13 +67,13 @@ export async function withIngredients<T extends { id: number; servings: number; 
 export async function upsertIngredient(
   recipeId: number,
   itemId: number,
-  { quantity, unit, note }: Pick<typeof recipeIngredients.$inferInsert, "quantity" | "unit" | "note">,
+  { quantity, unit, note, noteOnList }: Pick<typeof recipeIngredients.$inferInsert, "quantity" | "unit" | "note" | "noteOnList">,
 ) {
   const last = sql<number>`(select coalesce(max(${recipeIngredients.position}), 0) + 1 from ${recipeIngredients} where ${recipeIngredients.recipeId} = ${recipeId})`;
   await db
     .insert(recipeIngredients)
-    .values({ recipeId, itemId, quantity, unit, note, position: last })
-    .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit, note } })
+    .values({ recipeId, itemId, quantity, unit, note, noteOnList, position: last })
+    .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit, note, noteOnList } })
     .run();
 }
 
@@ -100,10 +101,14 @@ export async function moveIngredient(recipeId: number, itemId: number, up: boole
 
 const IMPORT_STORE_NAME = "Supermarkt";
 
-// Creates a parsed recipe in one go. Ingredients are matched to items by name or plural; missing
+// Creates a parsed recipe in one go, with the notes ticked to go on the shopping list. Ingredients are
+// matched to items by name or plural; missing
 // items are created in the "Supermarkt" store (if there is one) without a shelf, with the recipe's unit as their default.
 // Returns the recipe id, the items it created and the store they were put in.
-export async function importRecipe({ ingredients, ...recipe }: ParsedRecipe & { servingSize: number }) {
+export async function importRecipe({ ingredients, ...recipe }: Omit<ParsedRecipe, "ingredients"> & {
+  servingSize: number;
+  ingredients: (ParsedIngredient & { noteOnList: boolean })[];
+}) {
   return db.transaction(async (tx) => {
     const existing = await tx.select({ id: items.id, name: items.name, plural: items.plural }).from(items).all();
     const idsByKey = new Map(existing.flatMap((i) => itemKeys(i).map((key) => [key, i.id] as const)));
@@ -130,6 +135,7 @@ export async function importRecipe({ ingredients, ...recipe }: ParsedRecipe & { 
       quantity: ing.quantity,
       unit: ing.unit,
       note: ing.note,
+      noteOnList: ing.noteOnList,
     }))).run();
 
     return { id, newItems, storeName: store?.name ?? null };

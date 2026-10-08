@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { type AnySQLiteColumn, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { ListNote } from "../shopping-list";
 import type { Amount, UnitKey } from "../units";
 
 export const stores = sqliteTable("stores", {
@@ -59,6 +60,8 @@ export const recipeIngredients = sqliteTable("recipe_ingredients", {
   unit: text("unit").$type<UnitKey>(),
   // How to prepare it, e.g. "finely chopped"
   note: text("note"),
+  // Show the note on the shopping list too, e.g. "mind. 30% Fett"
+  noteOnList: integer("note_on_list", { mode: "boolean" }).notNull().default(false),
   // Order within the recipe, as written in the original
   position: integer("position").notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.recipeId, t.itemId] })]);
@@ -120,6 +123,8 @@ export const shoppingListItems = sqliteTable("shopping_list_items", {
     .references(() => items.id),
   // Combined amounts needed, one per unit kind; empty when no quantity is given
   amounts: text("amounts", { mode: "json" }).$type<Amount[]>().notNull(),
+  // Parts of the amounts that come with a note from the recipe ("200 ml mind. 30% Fett")
+  notes: text("notes", { mode: "json" }).$type<ListNote[]>().notNull().default(sql`'[]'`),
   bought: integer("bought", { mode: "boolean" }).notNull().default(false),
   source: text("source", { enum: ["meal_plan", "stock_deficit", "manual"] }).notNull(),
 }, (t) => [uniqueIndex("shopping_list_items_list_item").on(t.shoppingListId, t.itemId)]);

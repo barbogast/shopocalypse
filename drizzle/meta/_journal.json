@@ -120,6 +120,13 @@
       "when": 1791471792489,
       "tag": "0016_item_parent",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791474336459,
+      "tag": "0017_ingredient_note_on_list",
+      "breakpoints": true
     }
   ]
 }

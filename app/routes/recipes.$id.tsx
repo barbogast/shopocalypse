@@ -2,6 +2,7 @@ import {
   ActionIcon,
   Badge,
   Button,
+  Checkbox,
   Container,
   Group,
   Modal,
@@ -94,8 +95,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       if ("error" in parsed) return { ingredientError: parsed.error };
       const { quantity, unit } = parsed.amount;
       const note = optionalText(form, "note");
+      const noteOnList = note !== null && form.get("noteOnList") === "on";
       // Also how an existing ingredient is edited
-      await upsertIngredient(id, itemId, { quantity, unit, note });
+      await upsertIngredient(id, itemId, { quantity, unit, note, noteOnList });
       break;
     }
 
@@ -174,6 +176,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   const [quantity, setQuantity] = useState<string | number>("");
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
   const [note, setNote] = useState("");
+  const [noteOnList, setNoteOnList] = useState(false);
   const [createOpened, createModal] = useDisclosure(false);
   const [createName, setCreateName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -199,6 +202,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
     selectItem(undefined);
     setQuantity("");
     setNote("");
+    setNoteOnList(false);
   };
 
   const editIngredient = (ing: (typeof ingredients)[number]) => {
@@ -207,6 +211,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
     setQuantity(ing.quantity ?? "");
     setUnit(ing.unit ?? DEFAULT_UNIT);
     setNote(ing.note ?? "");
+    setNoteOnList(ing.noteOnList);
     setEditingId(ing.itemId);
     quantityRef.current?.focus();
   };
@@ -336,6 +341,9 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <Group align="flex-end" gap="xs" mt="xs">
           <TextInput name="note" placeholder="Note, e.g. finely chopped" value={note}
             onChange={(e) => setNote(e.currentTarget.value)} style={{ flex: 1 }} />
+          {/* For notes that matter when buying, like "mind. 30% Fett" */}
+          <Checkbox name="noteOnList" label="Note on shopping list" mb={8} disabled={!note.trim()}
+            checked={noteOnList && !!note.trim()} onChange={(e) => setNoteOnList(e.currentTarget.checked)} />
           {editingId && <Button variant="subtle" onClick={resetForm}>Cancel</Button>}
           <SubmitButton>{editingId ? "Save" : "Add"}</SubmitButton>
         </Group>
