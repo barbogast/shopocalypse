@@ -22,10 +22,18 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { ItemFields } from "~/components/item-fields";
+import { MoveButtons } from "~/components/move-buttons";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { listShelves, parseItemForm } from "~/db/items.server";
-import { deleteOrArchiveRecipe, formatCookedAt, restoreRecipe, withIngredients } from "~/db/recipes.server";
+import {
+  deleteOrArchiveRecipe,
+  formatCookedAt,
+  moveIngredient,
+  restoreRecipe,
+  upsertIngredient,
+  withIngredients,
+} from "~/db/recipes.server";
 import { items, mealHistory, recipeIngredients, recipes, stores } from "~/db/schema";
 import { int, optionalText, text } from "~/forms";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
@@ -83,10 +91,14 @@ export async function action({ request, params }: Route.ActionArgs) {
       const { quantity, unit } = parsed.amount;
       const note = optionalText(form, "note");
       // Also how an existing ingredient is edited
-      await db
-        .insert(recipeIngredients)
-        .values({ recipeId: id, itemId, quantity, unit, note })
-        .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit, note } });
+      await upsertIngredient(id, itemId, { quantity, unit, note });
+      break;
+    }
+
+    case "move-ingredient": {
+      const itemId = int(form, "itemId");
+      if (!itemId) return null;
+      await moveIngredient(id, itemId, form.get("direction") === "up");
       break;
     }
 
@@ -255,8 +267,12 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
 
       <Table mb="md">
         <Table.Tbody>
-          {ingredients.map((ing) => (
+          {ingredients.map((ing, index) => (
             <Table.Tr key={ing.itemId}>
+              <Table.Td px={0} style={{ width: 56 }}>
+                <MoveButtons intent="move-ingredient" fields={{ itemId: ing.itemId }}
+                  first={index === 0} last={index === ingredients.length - 1} />
+              </Table.Td>
               <Table.Td><IngredientName {...ing} /></Table.Td>
               <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
               <Table.Td style={{ width: 40 }}>

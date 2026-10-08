@@ -1,4 +1,4 @@
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { itemKey, type ParsedRecipe } from "~/recipe-import";
 import { scaleAmount } from "~/units";
 import { db } from "./client";
@@ -51,7 +51,7 @@ export async function withIngredients<T extends { id: number; servings: number; 
         .from(recipeIngredients)
         .innerJoin(items, eq(recipeIngredients.itemId, items.id))
         .where(inArray(recipeIngredients.recipeId, meals.map((m) => m.id)))
-        .orderBy(asc(items.name))
+        .orderBy(asc(recipeIngredients.position))
     : [];
   return meals.map((m) => ({
     ...m,
@@ -59,6 +59,42 @@ export async function withIngredients<T extends { id: number; servings: number; 
       .filter((i) => i.recipeId === m.id)
       .map((i) => ({ ...i, ...scaleAmount(i, m.servings, m.servingSize) })),
   }));
+}
+
+// Adds an ingredient at the end of the recipe, or edits it in place if it's already there
+export async function upsertIngredient(
+  recipeId: number,
+  itemId: number,
+  { quantity, unit, note }: Pick<typeof recipeIngredients.$inferInsert, "quantity" | "unit" | "note">,
+) {
+  const last = sql<number>`(select coalesce(max(${recipeIngredients.position}), 0) + 1 from ${recipeIngredients} where ${recipeIngredients.recipeId} = ${recipeId})`;
+  await db
+    .insert(recipeIngredients)
+    .values({ recipeId, itemId, quantity, unit, note, position: last })
+    .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit, note } })
+    .run();
+}
+
+// Swap positions with the neighbouring ingredient in the same recipe
+export async function moveIngredient(recipeId: number, itemId: number, up: boolean) {
+  await db.transaction(async (tx) => {
+    const ofItem = (id: number) => and(eq(recipeIngredients.recipeId, recipeId), eq(recipeIngredients.itemId, id));
+    const current = await tx.select().from(recipeIngredients).where(ofItem(itemId)).get();
+    if (!current) return;
+    const neighbour = await tx
+      .select()
+      .from(recipeIngredients)
+      .where(and(
+        eq(recipeIngredients.recipeId, recipeId),
+        up ? lt(recipeIngredients.position, current.position) : gt(recipeIngredients.position, current.position),
+      ))
+      .orderBy(up ? desc(recipeIngredients.position) : asc(recipeIngredients.position))
+      .limit(1)
+      .get();
+    if (!neighbour) return;
+    await tx.update(recipeIngredients).set({ position: neighbour.position }).where(ofItem(current.itemId)).run();
+    await tx.update(recipeIngredients).set({ position: current.position }).where(ofItem(neighbour.itemId)).run();
+  });
 }
 
 // Creates a parsed recipe in one go. Ingredients are matched to items by name; missing
@@ -81,8 +117,9 @@ export async function importRecipe({ ingredients, ...recipe }: ParsedRecipe & { 
     }
 
     const [{ id }] = await tx.insert(recipes).values(recipe).returning({ id: recipes.id });
-    await tx.insert(recipeIngredients).values(ingredients.map((ing) => ({
+    await tx.insert(recipeIngredients).values(ingredients.map((ing, index) => ({
       recipeId: id,
+      position: index + 1,
       itemId: idsByKey.get(itemKey(ing.name))!,
       quantity: ing.quantity,
       unit: ing.unit,

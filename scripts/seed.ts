@@ -59,7 +59,7 @@ const [bolognese, lemonChicken, friedRice] = await db
   ])
   .returning();
 
-await db.insert(schema.recipeIngredients).values([
+const ingredients: (typeof schema.recipeIngredients.$inferInsert)[] = [
   { recipeId: bolognese.id, itemId: pasta.id, quantity: 500, unit: "g" },
   { recipeId: bolognese.id, itemId: tomatoes.id, quantity: 1, unit: "can" },
   { recipeId: bolognese.id, itemId: onion.id, quantity: 1, unit: "pcs" },
@@ -77,7 +77,9 @@ await db.insert(schema.recipeIngredients).values([
   { recipeId: friedRice.id, itemId: rice.id, quantity: 250, unit: "g" },
   { recipeId: friedRice.id, itemId: eggs.id, quantity: 3, unit: "pcs" },
   { recipeId: friedRice.id, itemId: onion.id, quantity: 1, unit: "pcs" },
-]);
+];
+// Listed in recipe order; positions only need to increase within each recipe
+await db.insert(schema.recipeIngredients).values(ingredients.map((ingredient, index) => ({ ...ingredient, position: index + 1 })));
 
 const maxPosition = 100;
 await db.insert(schema.mealSchedule).values([

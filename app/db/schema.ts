@@ -52,6 +52,8 @@ export const recipeIngredients = sqliteTable("recipe_ingredients", {
   unit: text("unit").$type<UnitKey>(),
   // How to prepare it, e.g. "finely chopped"
   note: text("note"),
+  // Order within the recipe, as written in the original
+  position: integer("position").notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.recipeId, t.itemId] })]);
 
 export const stock = sqliteTable("stock", {
