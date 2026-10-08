@@ -59,6 +59,25 @@ describe("parseIngredient", () => {
     expect(parseIngredient("salt -")).toMatchObject({ name: "salt", note: null });
   });
 
+  it("keeps commas, dashes and parentheses inside quotes", () => {
+    expect(parseIngredient('200 g "Tomaten, gehackt"'))
+      .toEqual({ name: "Tomaten, gehackt", quantity: 200, unit: "g", note: null });
+    expect(parseIngredient('200 g "Tomaten, gehackt", abgetropft'))
+      .toMatchObject({ name: "Tomaten, gehackt", note: "abgetropft" });
+    expect(parseIngredient("1 „Salz, grob“ - to taste")).toMatchObject({ name: "Salz, grob", note: "to taste" });
+    expect(parseIngredient("“Salz - grob”")).toMatchObject({ name: "Salz - grob", note: null });
+    expect(parseIngredient('"Salz, Pfeffer"')).toEqual({ name: "Salz, Pfeffer", quantity: null, unit: null, note: null });
+    expect(parseIngredient('"Feta (mild)" (or halloumi)')).toMatchObject({ name: "Feta (mild)", note: "or halloumi" });
+    expect(parseIngredient('2 "Dose Tomaten"')).toMatchObject({ name: "Dose Tomaten", unit: "pcs" });
+  });
+
+  it("rejects unclosed or partial quotes and empty quoted names", () => {
+    expect(parseIngredient('"Salz, Pfeffer')).toEqual({ error: expect.stringContaining("closing quote") });
+    expect(parseIngredient('"Salz" Pfeffer')).toEqual({ error: expect.stringContaining("whole name") });
+    expect(parseIngredient('200 g ""')).toHaveProperty("error");
+    expect(parseIngredient('"", chopped')).toHaveProperty("error");
+  });
+
   it("rejects ranges, zero quantities and missing names", () => {
     expect(parseIngredient("2-3 eggs")).toHaveProperty("error");
     expect(parseIngredient("0 g butter")).toHaveProperty("error");

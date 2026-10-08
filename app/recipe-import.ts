@@ -8,6 +8,7 @@
 //   2 eggs              (a number without a unit means pieces)
 //   salt                (no quantity)
 //   1 garlic clove - finely chopped   (a note after " - ", "," or in parentheses)
+//   "Salz, Pfeffer"     (quotes keep commas, dashes and parentheses in the name)
 //
 //   Instructions
 //   Free markdown…
@@ -81,26 +82,46 @@ export function itemKey(name: string) {
   return name.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
+// A quoted name: "…", “…”, „…“ or „…”
+const QUOTED = /["“„][^"“”„]*["“”]/g;
+const QUOTE_CHAR = /["“”„]/;
+
 // Splits a note off an ingredient name: "garlic - finely chopped", "onion, diced",
 // "feta (or halloumi)". A dash only counts with spaces around it ("chili-flakes"),
-// and a comma inside parentheses doesn't start a note.
+// and a comma inside parentheses or quotes doesn't start a note.
 function splitNote(text: string): { name: string; note: string | null } {
-  const masked = text.replace(/\([^)]*\)/g, (m) => "(" + " ".repeat(m.length - 2) + ")");
+  const masked = text
+    .replace(QUOTED, (m) => m[0] + " ".repeat(m.length - 2) + m[m.length - 1])
+    .replace(/\([^)]*\)/g, (m) => "(" + " ".repeat(m.length - 2) + ")");
   const sep = /\s[-–](?:\s|$)|,/.exec(masked);
+  const end = sep ? sep.index : text.length;
   const notes: string[] = [];
-  const name = (sep ? text.slice(0, sep.index) : text)
-    .replace(/\(([^)]*)\)/g, (_, inner: string) => (notes.push(inner.trim()), " "))
-    .replace(/\s+/g, " ")
-    .trim();
+  // Parentheses in the name become notes; found in the masked text so ones inside quotes stay
+  let name = text.slice(0, end);
+  for (const m of masked.slice(0, end).matchAll(/\( *\)/g)) {
+    notes.push(name.slice(m.index + 1, m.index + m[0].length - 1).trim());
+    name = name.slice(0, m.index) + " ".repeat(m[0].length) + name.slice(m.index + m[0].length);
+  }
   if (sep) notes.push(text.slice(sep.index + sep[0].length).trim());
-  return { name, note: notes.filter(Boolean).join("; ") || null };
+  return { name: name.replace(/\s+/g, " ").trim(), note: notes.filter(Boolean).join("; ") || null };
+}
+
+// Strips the quotes around a name: "Salz, Pfeffer" → Salz, Pfeffer
+function unquote(name: string): string | { error: string } {
+  const quoted = /^["“„]([^"“”„]*)["“”]$/.exec(name);
+  if (quoted) return quoted[1].trim();
+  if (QUOTE_CHAR.test(name)) return { error: "Put the quotes around the whole name." };
+  return name;
 }
 
 export function parseIngredient(text: string): Omit<ParsedIngredient, "line"> | { error: string } {
   const rest = text.replace(/^[-*•]\s*/, "").replace(/\s+/g, " ").trim();
+  if (QUOTE_CHAR.test(rest.replace(QUOTED, ""))) return { error: "Missing the closing quote." };
   const match = QUANTITY.exec(rest);
   if (!match) {
-    const { name, note } = splitNote(rest);
+    const { name: quotedName, note } = splitNote(rest);
+    const name = unquote(quotedName);
+    if (typeof name !== "string") return name;
     if (!name) return { error: "Missing the ingredient name before the note." };
     return { name, quantity: null, unit: null, note };
   }
@@ -113,7 +134,8 @@ export function parseIngredient(text: string): Omit<ParsedIngredient, "line"> | 
   const { name: unitAndName, note } = splitNote(afterQuantity);
   const [word, ...nameWords] = unitAndName.split(" ");
   const unit = UNIT_ALIASES.get(word.toLowerCase().replace(/\.$/, ""));
-  const name = unit ? nameWords.join(" ") : unitAndName;
+  const name = unquote(unit ? nameWords.join(" ") : unitAndName);
+  if (typeof name !== "string") return name;
   if (!name) return { error: "Missing the ingredient name after the quantity." };
   return { name, quantity, unit: unit ?? "pcs", note };
 }
