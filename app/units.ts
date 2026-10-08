@@ -33,6 +33,13 @@ export function unitName(key: UnitKey) {
   return unitsByKey.get(key)?.plural ?? key;
 }
 
+// An item's name for the amounts it's needed in: its plural, if it has one, unless that's at most
+// one piece or no quantity at all ("1 Knoblauchzehe", "5 Knoblauchzehen", "500 g Tomaten")
+export function nameForAmounts(item: { name: string; plural?: string | null }, amounts: Amount[]) {
+  const several = amounts.some((a) => a.quantity != null && !((a.unit ?? "pcs") === "pcs" && a.quantity <= 1));
+  return item.plural && several ? item.plural : item.name;
+}
+
 export function isUnitKey(value: unknown): value is UnitKey {
   return typeof value === "string" && unitsByKey.has(value);
 }

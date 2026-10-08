@@ -24,19 +24,33 @@ export async function parseItemForm(form: FormData, itemId?: number) {
   const alwaysAvailable = form.get("alwaysAvailable") === "on";
 
   if (!name) return { error: "Name is required." } as const;
-  const others = (await db.select({ id: items.id, name: items.name, plural: items.plural }).from(items).all())
-    .filter((i) => i.id !== itemId);
-  for (const word of [name, plural]) {
-    const clash = word && others.find((i) => itemKeys(i).includes(itemKey(word)));
-    if (!clash) continue;
-    if (itemKey(clash.name) === itemKey(word)) return { error: `There's already an item called "${clash.name}".` } as const;
-    return { error: `"${word}" is already the plural of "${clash.name}".` } as const;
-  }
+  const clash = await nameClash([name, plural], itemId);
+  if (clash) return { error: clash } as const;
   if (categoryId != null) {
     const shelf = await db.select().from(itemCategories).where(eq(itemCategories.id, categoryId)).get();
     if (!shelf || shelf.storeId !== storeId) return { error: "That shelf isn't in the chosen store." } as const;
   }
   return { values: { name, plural, storeId, categoryId, defaultUnit, alwaysAvailable } } as const;
+}
+
+// Why one of the words can't be an item's name or plural, or null when no other item uses them
+async function nameClash(words: (string | null)[], itemId?: number) {
+  const others = (await db.select({ id: items.id, name: items.name, plural: items.plural }).from(items).all())
+    .filter((i) => i.id !== itemId);
+  for (const word of words) {
+    const clash = word && others.find((i) => itemKeys(i).includes(itemKey(word)));
+    if (!clash) continue;
+    if (itemKey(clash.name) === itemKey(word)) return `There's already an item called "${clash.name}".` as const;
+    return `"${word}" is already the plural of "${clash.name}".` as const;
+  }
+  return null;
+}
+
+// Gives an item a plural, e.g. when a recipe import uses it
+export async function setPlural(itemId: number, plural: string) {
+  const error = await nameClash([plural], itemId);
+  if (!error) await db.update(items).set({ plural }).where(eq(items.id, itemId)).run();
+  return { error };
 }
 
 export async function addShelf(storeId: number, name: string) {

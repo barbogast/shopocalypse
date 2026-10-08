@@ -39,7 +39,7 @@ import {
 } from "~/db/schema";
 import { int } from "~/forms";
 import { listAmounts } from "~/shopping-list";
-import { combineAmounts, DEFAULT_UNIT, formatAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
+import { combineAmounts, DEFAULT_UNIT, formatAmounts, nameForAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/shopping";
 
 export function meta() {
@@ -81,6 +81,7 @@ export async function loader() {
       id: shoppingListItems.id,
       itemId: shoppingListItems.itemId,
       itemName: items.name,
+      itemPlural: items.plural,
       amounts: shoppingListItems.amounts,
       bought: shoppingListItems.bought,
       source: shoppingListItems.source,
@@ -423,7 +424,9 @@ function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | unde
   return (
     <Table.Tr opacity={ticked ? 0.5 : 1}>
       <Table.Td>
-        <Text td={ticked ? "line-through" : undefined}>{item.itemName}</Text>
+        <Text td={ticked ? "line-through" : undefined}>
+          {nameForAmounts({ name: item.itemName, plural: item.itemPlural }, item.amounts)}
+        </Text>
         {usedIn && <Text size="xs" c="dimmed">{usedIn.join(", ")}</Text>}
         {item.source === "manual" && (
           <Badge size="xs" variant="outline" color="gray">manual</Badge>

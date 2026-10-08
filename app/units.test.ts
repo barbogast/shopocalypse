@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { combineAmounts, formatAmount, formatAmounts, mergeAmounts, parseAmount, roundUpToBuy, scaleAmount } from "./units";
+import { combineAmounts, formatAmount, formatAmounts, mergeAmounts, nameForAmounts, parseAmount, roundUpToBuy, scaleAmount } from "./units";
 
 function form(fields: Record<string, string>) {
   const f = new FormData();
@@ -120,5 +120,26 @@ describe("mergeAmounts", () => {
 
   it("gives up on units that don't add up", () => {
     expect(mergeAmounts({ quantity: 200, unit: "g" }, { quantity: 2, unit: "pcs" })).toBeNull();
+  });
+});
+
+describe("nameForAmounts", () => {
+  const item = { name: "Knoblauchzehe", plural: "Knoblauchzehen" };
+
+  it("uses the plural for more than one piece and for other units", () => {
+    expect(nameForAmounts(item, [{ quantity: 5, unit: "pcs" }])).toBe("Knoblauchzehen");
+    expect(nameForAmounts(item, [{ quantity: 1, unit: "jar" }])).toBe("Knoblauchzehen");
+    expect(nameForAmounts(item, [{ quantity: 1, unit: "pcs" }, { quantity: 20, unit: "g" }])).toBe("Knoblauchzehen");
+  });
+
+  it("uses the name for at most one piece or no quantity", () => {
+    expect(nameForAmounts(item, [{ quantity: 1, unit: "pcs" }])).toBe("Knoblauchzehe");
+    expect(nameForAmounts(item, [{ quantity: 0.5, unit: "pcs" }])).toBe("Knoblauchzehe");
+    expect(nameForAmounts(item, [{ quantity: null, unit: null }])).toBe("Knoblauchzehe");
+    expect(nameForAmounts(item, [])).toBe("Knoblauchzehe");
+  });
+
+  it("uses the name when there's no plural", () => {
+    expect(nameForAmounts({ name: "Salz", plural: null }, [{ quantity: 5, unit: "g" }])).toBe("Salz");
   });
 });

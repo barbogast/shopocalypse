@@ -44,6 +44,7 @@ export async function withIngredients<T extends { id: number; servings: number; 
           recipeId: recipeIngredients.recipeId,
           itemId: recipeIngredients.itemId,
           name: items.name,
+          plural: items.plural,
           quantity: recipeIngredients.quantity,
           unit: recipeIngredients.unit,
           note: recipeIngredients.note,

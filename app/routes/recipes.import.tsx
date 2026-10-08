@@ -2,17 +2,18 @@ import { Alert, Anchor, Badge, Button, Card, Code, Container, Group, List, Simpl
 import { IconAlertCircle, IconCheck, IconFileImport } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { eq } from "drizzle-orm";
-import { Form, Link } from "react-router";
+import { Form, Link, useFetcher } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
 import { Weblink } from "~/components/weblink";
 import { db } from "~/db/client";
+import { setPlural } from "~/db/items.server";
 import { importRecipe } from "~/db/recipes.server";
 import { items, recipes } from "~/db/schema";
-import { text } from "~/forms";
-import { itemKey, itemKeys, parseRecipeText } from "~/recipe-import";
+import { int, text } from "~/forms";
+import { itemKey, itemKeys, likelySingular, parseRecipeText } from "~/recipe-import";
 import { formatAmount, UNITS } from "~/units";
 import type { Route } from "./+types/recipes.import";
 
@@ -33,13 +34,22 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader() {
-  const allItems = await db.select({ name: items.name, plural: items.plural }).from(items);
+  const allItems = await db.select({ id: items.id, name: items.name, plural: items.plural }).from(items);
   const recipeNames = await db.select({ name: recipes.name }).from(recipes).where(eq(recipes.archived, false));
-  return { knownItemKeys: allItems.flatMap(itemKeys), recipeNames: recipeNames.map((r) => r.name) };
+  return { allItems, recipeNames: recipeNames.map((r) => r.name) };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
+
+  // From the preview's plural suggestion, through a fetcher; the loader then matches the ingredient
+  if (form.get("intent") === "set-plural") {
+    const itemId = int(form, "itemId");
+    const plural = text(form, "plural");
+    if (!itemId || !plural) return { error: "Pick an item and a plural.", imported: null };
+    return { ...(await setPlural(itemId, plural)), imported: null };
+  }
+
   // Parsed again here rather than trusting the preview
   const { recipe, errors } = parseRecipeText(text(form, "text"));
   if (errors.length || recipe.servingSize == null) return { error: "Fix the errors in the text first.", imported: null };
@@ -118,6 +128,24 @@ function LineGutter({ text, errorLines }: { text: string; errorLines: Set<number
   );
 }
 
+// Offers to save an unknown ingredient name as the plural of the item it probably is, which
+// then matches it. Never matched without asking: guessing plurals goes wrong too often.
+function PluralSuggestion({ name, singular }: { name: string; singular: { id: number; name: string } | undefined }) {
+  const fetcher = useFetcher<typeof action>();
+  if (!singular) return null;
+  return (
+    <fetcher.Form method="post" style={{ display: "inline" }}>
+      <input type="hidden" name="intent" value="set-plural" />
+      <input type="hidden" name="itemId" value={singular.id} />
+      <input type="hidden" name="plural" value={name} />
+      <Button type="submit" size="compact-xs" variant="subtle" ml={4} loading={fetcher.state !== "idle"}>
+        Plural of {singular.name}?
+      </Button>
+      {fetcher.data?.error && <Text span size="xs" c="red" ml={4}>{fetcher.data.error}</Text>}
+    </fetcher.Form>
+  );
+}
+
 // Shown instead of the form once a recipe is imported
 // Navigating to this same route keeps the component mounted, so the caller
 // clears its text through onImportAnother
@@ -158,10 +186,10 @@ function Imported({ id, name, newItems, onImportAnother }: {
 }
 
 export default function ImportRecipe({ loaderData, actionData }: Route.ComponentProps) {
-  const { knownItemKeys, recipeNames } = loaderData;
+  const { allItems, recipeNames } = loaderData;
   const [input, setInput] = useState("");
   const { recipe, errors } = useMemo(() => parseRecipeText(input), [input]);
-  const knownItems = useMemo(() => new Set(knownItemKeys), [knownItemKeys]);
+  const knownItems = useMemo(() => new Set(allItems.flatMap(itemKeys)), [allItems]);
   const errorLines = new Set(errors.flatMap((e) => (e.line != null ? [e.line] : [])));
 
   if (actionData?.imported) return <Imported {...actionData.imported} onImportAnother={() => setInput("")} />;
@@ -239,7 +267,10 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
                     <Table.Td>
                       <IngredientName {...ing}>
                         {!knownItems.has(itemKey(ing.name)) && (
-                          <Badge size="xs" variant="light" color="orange" ml={6}>new item</Badge>
+                          <>
+                            <Badge size="xs" variant="light" color="orange" ml={6}>new item</Badge>
+                            <PluralSuggestion name={ing.name} singular={likelySingular(ing.name, allItems)} />
+                          </>
                         )}
                       </IngredientName>
                     </Table.Td>

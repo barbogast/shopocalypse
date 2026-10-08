@@ -13,7 +13,7 @@ export type RecipeDetails = {
   instructions: string | null;
   comments: string | null;
   weblink: string | null;
-  ingredients: (Amount & { itemId: number; name: string; note: string | null })[];
+  ingredients: (Amount & { itemId: number; name: string; plural: string | null; note: string | null })[];
 };
 
 // Recipe details scaled to a meal's servings, shown without leaving the page

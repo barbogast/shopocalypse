@@ -88,6 +88,16 @@ export function itemKeys(item: { name: string; plural: string | null }) {
   return item.plural ? [itemKey(item.name), itemKey(item.plural)] : [itemKey(item.name)];
 }
 
+// Common German and English plural endings
+const PLURAL_ENDINGS = ["n", "en", "e", "er", "s", "es"];
+
+// The item without a plural yet that a name is probably the plural of ("Knoblauchzehen" → Knoblauchzehe).
+// Only good for a suggestion: German plurals are too irregular to match on this alone ("Mais" → "Mai").
+export function likelySingular<T extends { name: string; plural: string | null }>(name: string, items: T[]): T | undefined {
+  const key = itemKey(name);
+  return items.find((i) => !i.plural && PLURAL_ENDINGS.some((ending) => itemKey(i.name) + ending === key));
+}
+
 // A quoted name: "…", “…”, „…“ or „…”
 const QUOTED = /["“„][^"“”„]*["“”]/g;
 const QUOTE_CHAR = /["“”„]/;
