@@ -40,6 +40,7 @@ import {
 } from "~/db/schema";
 import { int } from "~/forms";
 import { listAmounts } from "~/shopping-list";
+import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { combineAmounts, DEFAULT_UNIT, formatAmounts, nameForAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/shopping";
 
@@ -296,20 +297,6 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   return null;
-}
-
-// Group list items by store, then by shelf (keeps the loader's order)
-function groupByStoreAndShelf<T extends { storeName: string | null; shelfName: string | null }>(listItems: T[]) {
-  const groups = new Map<string, Map<string | null, T[]>>();
-  for (const item of listItems) {
-    const storeKey = item.storeName ?? "Other";
-    const shelfKey = item.shelfName;
-    if (!groups.has(storeKey)) groups.set(storeKey, new Map());
-    const shelves = groups.get(storeKey)!;
-    if (!shelves.has(shelfKey)) shelves.set(shelfKey, []);
-    shelves.get(shelfKey)!.push(item);
-  }
-  return groups;
 }
 
 function PrepareList({ scheduled }: { scheduled: { position: number; name: string; servings: number; servingSize: number }[] }) {
