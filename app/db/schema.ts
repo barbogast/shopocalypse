@@ -45,6 +45,8 @@ export const recipes = sqliteTable("recipes", {
   comments: text("comments"),
   // Where the recipe came from; always an http(s) URL
   weblink: text("weblink"),
+  // ISO timestamp. Recipes from before it was stored got made-up ones that keep their id order
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
 });
 

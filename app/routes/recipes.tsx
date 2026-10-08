@@ -19,8 +19,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select()
     .from(recipes)
     .where(showArchived ? undefined : eq(recipes.archived, false))
-    // Ids count up, so the highest id is the most recently added
-    .orderBy(params.get("by") === "added" ? desc(recipes.id) : recipes.name);
+    .orderBy(...(params.get("by") === "added" ? [desc(recipes.createdAt), desc(recipes.id)] : [recipes.name]));
   const cooked = await db.selectDistinct({ recipeId: mealHistory.recipeId }).from(mealHistory);
   const cookedIds = new Set(cooked.map((c) => c.recipeId));
   return { recipes: all.map((r) => ({ ...r, cooked: cookedIds.has(r.id) })) };

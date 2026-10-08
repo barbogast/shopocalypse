@@ -33,6 +33,7 @@
 - instructions (free text, optional)
 - comments (free text, optional)
 - weblink (optional) — where the recipe came from; always an http(s) URL
+- created_at — when it was added. Recipes from before 2026-10-08 have made-up times, one second apart in id order, so only their order is meaningful
 - archived (boolean) — recipes that have been cooked are archived instead of deleted, to keep meal history intact
 - ingredients: list of RecipeIngredient
 
