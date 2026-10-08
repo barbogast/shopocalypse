@@ -302,7 +302,10 @@ export default function Items({ loaderData }: Route.ComponentProps) {
   return (
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="md">
-        <Title>Items</Title>
+        <Group gap="xs" align="baseline">
+          <Title>Items</Title>
+          <Text c="dimmed" size="sm">{allItems.length}</Text>
+        </Group>
         <Button component={Link} to="/items/new" leftSection={<IconPlus size={16} />}>
           New
         </Button>

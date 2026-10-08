@@ -1,4 +1,4 @@
-import { ActionIcon, Badge, Button, Container, Group, Switch, Table, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Button, Container, Group, Switch, Table, Text, Title, Tooltip } from "@mantine/core";
 import { IconArchive, IconArchiveOff, IconFileImport, IconPlayerPlay, IconPlus, IconTrash } from "@tabler/icons-react";
 import { eq } from "drizzle-orm";
 import { Form, Link, useSearchParams } from "react-router";
@@ -49,7 +49,10 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
   return (
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="lg">
-        <Title>Recipes</Title>
+        <Group gap="xs" align="baseline">
+          <Title>Recipes</Title>
+          <Text c="dimmed" size="sm">{all.length}</Text>
+        </Group>
         <Group gap="xs">
           <Button component={Link} to="/items" variant="subtle" size="sm">Manage items</Button>
           <Button component={Link} to="/recipes/import" variant="light" leftSection={<IconFileImport size={16} />}>
