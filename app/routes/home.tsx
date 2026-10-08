@@ -16,7 +16,7 @@ import {
 } from "@mantine/core";
 import { IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
 import { asc, desc, eq, gt, inArray, lt, max, notInArray } from "drizzle-orm";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Form, Link } from "react-router";
 import { FormError } from "~/components/form-error";
 import { MoveButtons } from "~/components/move-buttons";
@@ -135,7 +135,8 @@ export async function action({ request }: Route.ActionArgs) {
         .select({ nextPos: max(mealSchedule.position) })
         .from(mealSchedule);
       await db.insert(mealSchedule).values({ position: (nextPos ?? 0) + 1, recipeId, servings: newServings });
-      break;
+      // Tells the page to clear its recipe picker
+      return { added: true };
     }
 
     case "auto-fill": {
@@ -203,6 +204,11 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
   // Shared by the add and auto-fill forms
   const [newServings, setNewServings] = useState<string | number>("");
+  // The add form's recipe, cleared once it's added but kept when adding fails
+  const [addRecipeId, setAddRecipeId] = useState<string | null>(null);
+  useEffect(() => {
+    if (actionData && "added" in actionData) setAddRecipeId(null);
+  }, [actionData]);
   // Tapping a meal's name opens its recipe details
   const [openPosition, setOpenPosition] = useState<number | null>(null);
   const open = scheduled.find((m) => m.position === openPosition);
@@ -318,6 +324,8 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                 name="recipeId"
                 label="Add to schedule"
                 data={availableRecipes}
+                value={addRecipeId}
+                onChange={setAddRecipeId}
                 searchable
                 placeholder="Pick a recipe…"
                 style={{ flex: 1 }}
