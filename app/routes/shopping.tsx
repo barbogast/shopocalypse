@@ -107,9 +107,9 @@ export async function loader() {
       stores.name,
       sql`${itemCategories.position} is null`,
       itemCategories.position,
-      sql`coalesce(${parents.name}, ${items.name})`,
+      sql`coalesce(${parents.name}, ${items.name}) collate nocase`,
       sql`${items.parentId} is not null`,
-      items.name,
+      sql`${items.name} collate nocase`,
     );
 
   // Items already on the list can be added again to raise their amount
@@ -117,7 +117,7 @@ export async function loader() {
   const allItems = await db
     .select({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit })
     .from(items)
-    .orderBy(items.name)
+    .orderBy(sql`${items.name} collate nocase`)
     .then((all) => all.map((i) => ({ ...i, listed: listedItemIds.has(i.id) })));
 
   const listRecipeRows = await db

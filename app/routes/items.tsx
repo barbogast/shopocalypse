@@ -65,9 +65,9 @@ export async function loader({ request }: Route.LoaderArgs) {
             itemCategories.position,
           ]
         : []),
-      sql`coalesce(${parents.name}, ${items.name})`,
+      sql`coalesce(${parents.name}, ${items.name}) collate nocase`,
       sql`${items.parentId} is not null`,
-      items.name,
+      sql`${items.name} collate nocase`,
     );
 
   const allShelves = await listShelves();

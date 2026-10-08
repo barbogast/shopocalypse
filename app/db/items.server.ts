@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lt, max } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, max, sql } from "drizzle-orm";
 import { db } from "./client";
 import { itemCategories, items, recipeIngredients, recipes, shoppingListItems, stock, stores } from "./schema";
 import { int, optionalText, text } from "~/forms";
@@ -16,7 +16,7 @@ export async function listParents(exceptId?: number) {
   return (await db
     .select({ id: items.id, name: items.name, parentId: items.parentId, storeId: items.storeId, categoryId: items.categoryId })
     .from(items)
-    .orderBy(asc(items.name))
+    .orderBy(sql`${items.name} collate nocase`)
     .all())
     .filter((i) => i.parentId == null && i.id !== exceptId);
 }

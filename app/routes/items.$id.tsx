@@ -1,5 +1,5 @@
 import { Button, Container, Divider, Group, Select, Stack, Text, Title } from "@mantine/core";
-import { asc, eq, ne } from "drizzle-orm";
+import { eq, ne, sql } from "drizzle-orm";
 import { Form, Link, redirect } from "react-router";
 import { FormError } from "~/components/form-error";
 import { ItemFields } from "~/components/item-fields";
@@ -25,7 +25,7 @@ export async function loader({ params }: Route.LoaderArgs) {
     .select({ id: items.id, name: items.name })
     .from(items)
     .where(ne(items.id, id))
-    .orderBy(asc(items.name));
+    .orderBy(sql`${items.name} collate nocase`);
 
   // An item with variants can't become a variant itself
   const hasVariants = !!(await db.select().from(items).where(eq(items.parentId, id)).limit(1).get());

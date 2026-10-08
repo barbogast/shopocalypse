@@ -18,7 +18,7 @@ import {
 import { IconArchive, IconArchiveOff, IconCheck, IconPencil, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useRef, useState } from "react";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
@@ -56,7 +56,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   const allItems = await db
     .select({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit })
     .from(items)
-    .orderBy(items.name);
+    .orderBy(sql`${items.name} collate nocase`);
 
   const allStores = await db.select().from(stores).orderBy(stores.name);
 
