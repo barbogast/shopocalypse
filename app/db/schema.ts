@@ -24,7 +24,7 @@ export const items = sqliteTable("items", {
   plural: text("plural"),
   categoryId: integer("category_id").references(() => itemCategories.id),
   storeId: integer("store_id").references(() => stores.id),
-  // Variant of another item ("Berglinsen" of "Linsen"): listed under it, on its store and shelf.
+  // Variant of another item ("Berglinsen" of "Linsen"): listed under it, with its own store and shelf.
   // One level only, so a parent never has a parent itself
   parentId: integer("parent_id").references((): AnySQLiteColumn => items.id),
   // Unit prefilled when adding the item to a recipe or the shopping list

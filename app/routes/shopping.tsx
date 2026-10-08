@@ -82,7 +82,8 @@ export async function loader() {
     .select({
       id: shoppingListItems.id,
       itemId: shoppingListItems.itemId,
-      isVariant: sql<boolean>`${items.parentId} is not null`.mapWith(Boolean),
+      // Indented under its parent only when they share a shelf
+      isVariant: sql<boolean>`${items.parentId} is not null and ${parents.storeId} is ${items.storeId} and ${parents.categoryId} is ${items.categoryId}`.mapWith(Boolean),
       itemName: items.name,
       itemPlural: items.plural,
       amounts: shoppingListItems.amounts,
@@ -98,7 +99,7 @@ export async function loader() {
     .leftJoin(parents, eq(items.parentId, parents.id))
     .where(eq(shoppingListItems.shoppingListId, activeList.id))
     // Stores alphabetically, then shelves in walking order; items without a store or shelf go last.
-    // Variants come right after their parent (variants share their parent's shelf)
+    // Variants on their parent's shelf come right after it
     .orderBy(
       sql`${stores.name} is null`,
       stores.name,

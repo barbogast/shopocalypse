@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lt, max } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, max } from "drizzle-orm";
 import { db } from "./client";
 import { itemCategories, items, recipeIngredients, recipes, shoppingListItems, stock, stores } from "./schema";
 import { int, optionalText, text } from "~/forms";
@@ -12,12 +12,15 @@ export async function listShelves() {
 
 // Items that can be picked as another item's parent: those that aren't variants themselves
 export async function listParents(exceptId?: number) {
-  return (await db.select({ id: items.id, name: items.name, parentId: items.parentId }).from(items).orderBy(asc(items.name)).all())
+  return (await db
+    .select({ id: items.id, name: items.name, parentId: items.parentId, storeId: items.storeId, categoryId: items.categoryId })
+    .from(items)
+    .orderBy(asc(items.name))
+    .all())
     .filter((i) => i.parentId == null && i.id !== exceptId);
 }
 
 // Reads the item form's name/plural/parent/store/shelf/unit fields; a shelf must belong to the chosen store.
-// A variant takes its parent's store and shelf instead of its own.
 // Names and plurals must be unique across all items, so each one matches a single item.
 // Pass the item's own id when editing, so keeping its name isn't a clash.
 export async function parseItemForm(form: FormData, itemId?: number) {
@@ -41,8 +44,6 @@ export async function parseItemForm(form: FormData, itemId?: number) {
     if (itemId != null && await db.select().from(items).where(eq(items.parentId, itemId)).limit(1).get()) {
       return { error: "This item has variants, so it can't be a variant itself." } as const;
     }
-    const values = { name, plural, parentId, storeId: parent.storeId, categoryId: parent.categoryId, defaultUnit, alwaysAvailable };
-    return { values } as const;
   }
   if (categoryId != null) {
     const shelf = await db.select().from(itemCategories).where(eq(itemCategories.id, categoryId)).get();
@@ -53,14 +54,20 @@ export async function parseItemForm(form: FormData, itemId?: number) {
 
 type ItemValues = NonNullable<Awaited<ReturnType<typeof parseItemForm>>["values"]>;
 
-// Saves an edited item; its variants move to its new store and shelf
+// Saves an edited item; variants on its old store and shelf move along, variants elsewhere stay put
 export async function updateItem(id: number, values: ItemValues) {
   await db.transaction(async (tx) => {
+    const old = await tx.select().from(items).where(eq(items.id, id)).get();
+    if (!old) return;
     await tx.update(items).set(values).where(eq(items.id, id)).run();
     await tx
       .update(items)
       .set({ storeId: values.storeId, categoryId: values.categoryId })
-      .where(eq(items.parentId, id))
+      .where(and(
+        eq(items.parentId, id),
+        old.storeId == null ? isNull(items.storeId) : eq(items.storeId, old.storeId),
+        old.categoryId == null ? isNull(items.categoryId) : eq(items.categoryId, old.categoryId),
+      ))
       .run();
   });
 }
@@ -147,7 +154,8 @@ export async function deleteItem(id: number) {
 // Replaces a duplicate item with another one everywhere, then deletes it. Where both are on the same recipe or
 // shopping list, their amounts are added up; a recipe using both in units that don't add up blocks the merge.
 // The kept item takes over the duplicate's store, shelf, plural and default unit if it has none of its own,
-// and the duplicate's variants become variants of the kept item (or of its parent, if it's a variant).
+// and the duplicate's variants become variants of the kept item (or of its parent, if it's a variant), keeping
+// their own store and shelf.
 export async function mergeItem(duplicateId: number, keepId: number) {
   return db.transaction(async (tx) => {
     const duplicate = await tx.select().from(items).where(eq(items.id, duplicateId)).get();
@@ -221,13 +229,10 @@ export async function mergeItem(duplicateId: number, keepId: number) {
 
     // A variant of the duplicate that's kept takes its place
     const keepParentId = keep.parentId === duplicateId ? null : keep.parentId;
-    const location = keep.storeId == null && keepParentId == null
-      ? { storeId: duplicate.storeId, categoryId: duplicate.categoryId }
-      : { storeId: keep.storeId, categoryId: keep.categoryId };
     await tx
       .update(items)
       .set({
-        ...location,
+        ...(keep.storeId == null && { storeId: duplicate.storeId, categoryId: duplicate.categoryId }),
         parentId: keepParentId,
         plural: keep.plural ?? duplicate.plural,
         defaultUnit: keep.defaultUnit ?? duplicate.defaultUnit,
@@ -237,13 +242,6 @@ export async function mergeItem(duplicateId: number, keepId: number) {
     const newParentId = keepParentId ?? keepId;
     await tx.update(items).set({ parentId: newParentId }).where(eq(items.parentId, duplicateId)).run();
     await tx.delete(items).where(eq(items.id, duplicateId)).run();
-    // Variants sit on their parent's shelf
-    const parent = (await tx.select().from(items).where(eq(items.id, newParentId)).get())!;
-    await tx
-      .update(items)
-      .set({ storeId: parent.storeId, categoryId: parent.categoryId })
-      .where(eq(items.parentId, newParentId))
-      .run();
     return { error: null } as const;
   });
 }

@@ -1,4 +1,4 @@
-import { Checkbox, Select, Text, TextInput } from "@mantine/core";
+import { Checkbox, Select, TextInput } from "@mantine/core";
 import { useState } from "react";
 import { StoreShelfFields } from "~/components/store-shelf-fields";
 import type { itemCategories, stores } from "~/db/schema";
@@ -18,7 +18,7 @@ export function ItemFields({
   stores: Store[];
   shelves: Shelf[];
   // Items it can be a variant of; leave out when it can't be one (it has variants itself)
-  parents?: { id: number; name: string }[];
+  parents?: { id: number; name: string; storeId: number | null; categoryId: number | null }[];
   defaults?: {
     name?: string;
     plural?: string | null;
@@ -31,7 +31,11 @@ export function ItemFields({
   autoFocus?: boolean;
 }) {
   const [parentId, setParentId] = useState(defaults.parentId ? String(defaults.parentId) : null);
-  const parentName = parents?.find((p) => String(p.id) === parentId)?.name;
+  // Picking another parent prefills its store and shelf
+  const newParent = parentId !== (defaults.parentId ? String(defaults.parentId) : null)
+    ? parents?.find((p) => String(p.id) === parentId)
+    : undefined;
+  const location = newParent ?? defaults;
 
   return (
     <>
@@ -63,16 +67,13 @@ export function ItemFields({
           placeholder="None"
         />
       )}
-      {parentName ? (
-        <Text size="sm" c="dimmed">Store and shelf: same as {parentName}</Text>
-      ) : (
-        <StoreShelfFields
-          stores={stores}
-          shelves={shelves}
-          defaultStoreId={defaults.storeId}
-          defaultShelfId={defaults.categoryId}
-        />
-      )}
+      <StoreShelfFields
+        key={parentId ?? "none"}
+        stores={stores}
+        shelves={shelves}
+        defaultStoreId={location.storeId}
+        defaultShelfId={location.categoryId}
+      />
       <Select
         name="defaultUnit"
         label="Default unit"
