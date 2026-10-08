@@ -19,6 +19,7 @@
 - id
 - name — unique, ignoring case
 - plural (optional) — also matched when importing recipes and searching items; unique across all names and plurals
+- parent_id (optional) — makes it a variant of another item (Berglinsen of Linsen). Variants are listed right under their parent and always use its store and shelf. One level only: a parent can't be a variant itself
 - store_id
 - category_id — the shelf; must be one of the item's store's shelves
 - default_unit (optional) — prefilled when adding the item to a recipe or the shopping list
@@ -104,5 +105,5 @@ A recipe appears once per scheduled meal, so it can be listed more than once.
 - Stock quantities are still plain integers without units; stock tracking was removed from the app (the table is kept) and needs its own unit design before it comes back
 - Only one ShoppingList can be active at a time; completing it archives the old one
 - Ingredient quantities are scaled by servings / serving_size when preparing a shopping list and when cooking a scheduled meal. Summed list amounts in units bought whole (pcs, can, jar, pack, bottle, crate, bunch) are rounded up
-- The shopping list is grouped by store, then by shelf in the store's shelf order
+- The shopping list is grouped by store, then by shelf in the store's shelf order; within a shelf, variants follow their parent
 - "Cook meal" is the sole mechanism that advances the schedule and writes CookHistory

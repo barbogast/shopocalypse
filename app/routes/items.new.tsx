@@ -4,7 +4,7 @@ import { FormError } from "~/components/form-error";
 import { ItemFields } from "~/components/item-fields";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { listShelves, parseItemForm } from "~/db/items.server";
+import { listParents, listShelves, parseItemForm } from "~/db/items.server";
 import { items, stores } from "~/db/schema";
 import type { Route } from "./+types/items.new";
 
@@ -14,7 +14,7 @@ export function meta() {
 
 export async function loader() {
   const allStores = await db.select().from(stores).orderBy(stores.name);
-  return { allShelves: await listShelves(), allStores };
+  return { allShelves: await listShelves(), allStores, parents: await listParents() };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -27,14 +27,14 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function NewItem({ loaderData, actionData }: Route.ComponentProps) {
-  const { allShelves, allStores } = loaderData;
+  const { allShelves, allStores, parents } = loaderData;
 
   return (
     <Container size="sm" py="xl">
       <Title mb="lg">New item</Title>
       <Form method="post">
         <Stack>
-          <ItemFields stores={allStores} shelves={allShelves} autoFocus />
+          <ItemFields stores={allStores} shelves={allShelves} parents={parents} autoFocus />
           <FormError error={actionData?.error} />
           <Group>
             <SubmitButton>Create</SubmitButton>

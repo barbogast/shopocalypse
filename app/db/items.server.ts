@@ -10,11 +10,19 @@ export async function listShelves() {
   return db.select().from(itemCategories).orderBy(asc(itemCategories.storeId), asc(itemCategories.position)).all();
 }
 
-// Reads the item form's name/plural/store/shelf/unit fields; a shelf must belong to the chosen store.
+// Items that can be picked as another item's parent: those that aren't variants themselves
+export async function listParents(exceptId?: number) {
+  return (await db.select({ id: items.id, name: items.name, parentId: items.parentId }).from(items).orderBy(asc(items.name)).all())
+    .filter((i) => i.parentId == null && i.id !== exceptId);
+}
+
+// Reads the item form's name/plural/parent/store/shelf/unit fields; a shelf must belong to the chosen store.
+// A variant takes its parent's store and shelf instead of its own.
 // Names and plurals must be unique across all items, so each one matches a single item.
 // Pass the item's own id when editing, so keeping its name isn't a clash.
 export async function parseItemForm(form: FormData, itemId?: number) {
   const name = text(form, "name");
+  const parentId = int(form, "parentId");
   const rawPlural = optionalText(form, "plural");
   const plural = rawPlural && itemKey(rawPlural) !== itemKey(name) ? rawPlural : null;
   const storeId = int(form, "storeId");
@@ -26,11 +34,35 @@ export async function parseItemForm(form: FormData, itemId?: number) {
   if (!name) return { error: "Name is required." } as const;
   const clash = await nameClash([name, plural], itemId);
   if (clash) return { error: clash } as const;
+  if (parentId != null) {
+    const parent = await db.select().from(items).where(eq(items.id, parentId)).get();
+    if (!parent || parent.id === itemId) return { error: "Pick another item as the parent." } as const;
+    if (parent.parentId != null) return { error: `"${parent.name}" is a variant itself.` } as const;
+    if (itemId != null && await db.select().from(items).where(eq(items.parentId, itemId)).limit(1).get()) {
+      return { error: "This item has variants, so it can't be a variant itself." } as const;
+    }
+    const values = { name, plural, parentId, storeId: parent.storeId, categoryId: parent.categoryId, defaultUnit, alwaysAvailable };
+    return { values } as const;
+  }
   if (categoryId != null) {
     const shelf = await db.select().from(itemCategories).where(eq(itemCategories.id, categoryId)).get();
     if (!shelf || shelf.storeId !== storeId) return { error: "That shelf isn't in the chosen store." } as const;
   }
-  return { values: { name, plural, storeId, categoryId, defaultUnit, alwaysAvailable } } as const;
+  return { values: { name, plural, parentId, storeId, categoryId, defaultUnit, alwaysAvailable } } as const;
+}
+
+type ItemValues = NonNullable<Awaited<ReturnType<typeof parseItemForm>>["values"]>;
+
+// Saves an edited item; its variants move to its new store and shelf
+export async function updateItem(id: number, values: ItemValues) {
+  await db.transaction(async (tx) => {
+    await tx.update(items).set(values).where(eq(items.id, id)).run();
+    await tx
+      .update(items)
+      .set({ storeId: values.storeId, categoryId: values.categoryId })
+      .where(eq(items.parentId, id))
+      .run();
+  });
 }
 
 // Why one of the words can't be an item's name or plural, or null when no other item uses them
@@ -100,10 +132,12 @@ export async function deleteStore(id: number) {
   });
 }
 
-// Items used in recipes can't be deleted; their stock and shopping list entries go with them
+// Items used in recipes can't be deleted; their stock and shopping list entries go with them.
+// Its variants stay, as items of their own.
 export async function deleteItem(id: number) {
   await db.transaction(async (tx) => {
     if (await tx.select().from(recipeIngredients).where(eq(recipeIngredients.itemId, id)).limit(1).get()) return;
+    await tx.update(items).set({ parentId: null }).where(eq(items.parentId, id)).run();
     await tx.delete(stock).where(eq(stock.itemId, id)).run();
     await tx.delete(shoppingListItems).where(eq(shoppingListItems.itemId, id)).run();
     await tx.delete(items).where(eq(items.id, id)).run();
@@ -112,7 +146,8 @@ export async function deleteItem(id: number) {
 
 // Replaces a duplicate item with another one everywhere, then deletes it. Where both are on the same recipe or
 // shopping list, their amounts are added up; a recipe using both in units that don't add up blocks the merge.
-// The kept item takes over the duplicate's store, shelf, plural and default unit if it has none of its own.
+// The kept item takes over the duplicate's store, shelf, plural and default unit if it has none of its own,
+// and the duplicate's variants become variants of the kept item (or of its parent, if it's a variant).
 export async function mergeItem(duplicateId: number, keepId: number) {
   return db.transaction(async (tx) => {
     const duplicate = await tx.select().from(items).where(eq(items.id, duplicateId)).get();
@@ -184,15 +219,30 @@ export async function mergeItem(duplicateId: number, keepId: number) {
       await tx.update(stock).set({ itemId: keepId }).where(eq(stock.itemId, duplicateId)).run();
     }
 
-    await tx.delete(items).where(eq(items.id, duplicateId)).run();
+    // A variant of the duplicate that's kept takes its place
+    const keepParentId = keep.parentId === duplicateId ? null : keep.parentId;
+    const location = keep.storeId == null && keepParentId == null
+      ? { storeId: duplicate.storeId, categoryId: duplicate.categoryId }
+      : { storeId: keep.storeId, categoryId: keep.categoryId };
     await tx
       .update(items)
       .set({
-        ...(keep.storeId == null && { storeId: duplicate.storeId, categoryId: duplicate.categoryId }),
+        ...location,
+        parentId: keepParentId,
         plural: keep.plural ?? duplicate.plural,
         defaultUnit: keep.defaultUnit ?? duplicate.defaultUnit,
       })
       .where(eq(items.id, keepId))
+      .run();
+    const newParentId = keepParentId ?? keepId;
+    await tx.update(items).set({ parentId: newParentId }).where(eq(items.parentId, duplicateId)).run();
+    await tx.delete(items).where(eq(items.id, duplicateId)).run();
+    // Variants sit on their parent's shelf
+    const parent = (await tx.select().from(items).where(eq(items.id, newParentId)).get())!;
+    await tx
+      .update(items)
+      .set({ storeId: parent.storeId, categoryId: parent.categoryId })
+      .where(eq(items.parentId, newParentId))
       .run();
     return { error: null } as const;
   });

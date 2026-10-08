@@ -16,6 +16,7 @@ import {
 import { IconCheck, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import { Form, useActionData, useFetcher, useFetchers } from "react-router";
 import { FormError } from "~/components/form-error";
 import { itemSearchFilter } from "~/components/item-search";
@@ -76,10 +77,12 @@ export async function loader() {
     return { activeList: null, listItems: [], scheduled };
   }
 
+  const parents = alias(items, "parents");
   const listItems = await db
     .select({
       id: shoppingListItems.id,
       itemId: shoppingListItems.itemId,
+      isVariant: sql<boolean>`${items.parentId} is not null`.mapWith(Boolean),
       itemName: items.name,
       itemPlural: items.plural,
       amounts: shoppingListItems.amounts,
@@ -92,13 +95,17 @@ export async function loader() {
     .innerJoin(items, eq(shoppingListItems.itemId, items.id))
     .leftJoin(stores, eq(items.storeId, stores.id))
     .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
+    .leftJoin(parents, eq(items.parentId, parents.id))
     .where(eq(shoppingListItems.shoppingListId, activeList.id))
-    // Stores alphabetically, then shelves in walking order; items without a store or shelf go last
+    // Stores alphabetically, then shelves in walking order; items without a store or shelf go last.
+    // Variants come right after their parent (variants share their parent's shelf)
     .orderBy(
       sql`${stores.name} is null`,
       stores.name,
       sql`${itemCategories.position} is null`,
       itemCategories.position,
+      sql`coalesce(${parents.name}, ${items.name})`,
+      sql`${items.parentId} is not null`,
       items.name,
     );
 
@@ -423,7 +430,7 @@ function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | unde
 
   return (
     <Table.Tr opacity={ticked ? 0.5 : 1}>
-      <Table.Td>
+      <Table.Td pl={item.isVariant ? "xl" : undefined}>
         <Text td={ticked ? "line-through" : undefined}>
           {nameForAmounts({ name: item.itemName, plural: item.itemPlural }, item.amounts)}
         </Text>

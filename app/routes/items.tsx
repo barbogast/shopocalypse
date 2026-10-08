@@ -17,7 +17,8 @@ import {
 } from "@mantine/core";
 import { IconCheck, IconPencil, IconPlus, IconToolsKitchen2, IconTrash, IconX } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import { Form, Link, useFetcher } from "react-router";
 import { MoveButtons } from "~/components/move-buttons";
 import { db } from "~/db/client";
@@ -32,10 +33,12 @@ export function meta() {
 }
 
 export async function loader() {
+  const parents = alias(items, "parents");
   const allItems = await db
     .select({
       id: items.id,
       name: items.name,
+      parentId: items.parentId,
       defaultUnit: items.defaultUnit,
       alwaysAvailable: items.alwaysAvailable,
       shelfName: itemCategories.name,
@@ -44,7 +47,9 @@ export async function loader() {
     .from(items)
     .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
     .leftJoin(stores, eq(items.storeId, stores.id))
-    .orderBy(items.name);
+    .leftJoin(parents, eq(items.parentId, parents.id))
+    // Variants right after their parent
+    .orderBy(sql`coalesce(${parents.name}, ${items.name})`, sql`${items.parentId} is not null`, items.name);
 
   const allShelves = await listShelves();
   const allStores = await db.select().from(stores).orderBy(stores.name);
@@ -236,7 +241,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
         <Table.Tbody>
           {allItems.map((item) => (
             <Table.Tr key={item.id}>
-              <Table.Td>
+              <Table.Td pl={item.parentId ? "xl" : undefined}>
                 {item.name}
                 {item.alwaysAvailable && (
                   <Badge size="xs" variant="outline" color="gray" ml={6}>always available</Badge>

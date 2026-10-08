@@ -5,7 +5,7 @@ import { FormError } from "~/components/form-error";
 import { ItemFields } from "~/components/item-fields";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { listShelves, mergeItem, parseItemForm } from "~/db/items.server";
+import { listParents, listShelves, mergeItem, parseItemForm, updateItem } from "~/db/items.server";
 import { items, stores } from "~/db/schema";
 import { int } from "~/forms";
 import type { Route } from "./+types/items.$id";
@@ -27,7 +27,11 @@ export async function loader({ params }: Route.LoaderArgs) {
     .where(ne(items.id, id))
     .orderBy(asc(items.name));
 
-  return { item, allShelves: await listShelves(), allStores, otherItems };
+  // An item with variants can't become a variant itself
+  const hasVariants = !!(await db.select().from(items).where(eq(items.parentId, id)).limit(1).get());
+  const parents = hasVariants ? undefined : await listParents(id);
+
+  return { item, allShelves: await listShelves(), allStores, otherItems, parents };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -45,19 +49,19 @@ export async function action({ request, params }: Route.ActionArgs) {
   const parsed = await parseItemForm(form, id);
   if (parsed.error) return { error: parsed.error };
 
-  await db.update(items).set(parsed.values).where(eq(items.id, id));
+  await updateItem(id, parsed.values);
   return redirect("/items");
 }
 
 export default function EditItem({ loaderData, actionData }: Route.ComponentProps) {
-  const { item, allShelves, allStores, otherItems } = loaderData;
+  const { item, allShelves, allStores, otherItems, parents } = loaderData;
 
   return (
     <Container size="sm" py="xl">
       <Title mb="lg">Edit item</Title>
       <Form method="post">
         <Stack>
-          <ItemFields stores={allStores} shelves={allShelves} defaults={item} />
+          <ItemFields stores={allStores} shelves={allShelves} parents={parents} defaults={item} />
           <FormError error={actionData && "error" in actionData ? actionData.error : null} />
           <Group>
             <SubmitButton>Save</SubmitButton>

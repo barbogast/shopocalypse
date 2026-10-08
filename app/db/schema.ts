@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { type AnySQLiteColumn, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { Amount, UnitKey } from "../units";
 
 export const stores = sqliteTable("stores", {
@@ -24,6 +24,9 @@ export const items = sqliteTable("items", {
   plural: text("plural"),
   categoryId: integer("category_id").references(() => itemCategories.id),
   storeId: integer("store_id").references(() => stores.id),
+  // Variant of another item ("Berglinsen" of "Linsen"): listed under it, on its store and shelf.
+  // One level only, so a parent never has a parent itself
+  parentId: integer("parent_id").references((): AnySQLiteColumn => items.id),
   // Unit prefilled when adding the item to a recipe or the shopping list
   defaultUnit: text("default_unit").$type<UnitKey>(),
   // Assumed to be in stock (salt, oil…): left off prepared shopping lists unless asked for

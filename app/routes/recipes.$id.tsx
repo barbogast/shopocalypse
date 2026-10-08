@@ -26,7 +26,7 @@ import { itemSearchFilter } from "~/components/item-search";
 import { MoveButtons } from "~/components/move-buttons";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { listShelves, parseItemForm } from "~/db/items.server";
+import { listParents, listShelves, parseItemForm } from "~/db/items.server";
 import {
   deleteOrArchiveRecipe,
   formatCookedAt,
@@ -66,7 +66,7 @@ export async function loader({ params }: Route.LoaderArgs) {
     .orderBy(desc(mealHistory.cookedAt), desc(mealHistory.id))
     .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
 
-  return { recipe, ingredients, allItems, allStores, allShelves: await listShelves(), cookedDates };
+  return { recipe, ingredients, allItems, allStores, allShelves: await listShelves(), parents: await listParents(), cookedDates };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -161,7 +161,7 @@ function SaveButton({ saved }: { saved: boolean }) {
 }
 
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { recipe, ingredients, allItems, allStores, allShelves, cookedDates } = loaderData;
+  const { recipe, ingredients, allItems, allStores, allShelves, parents, cookedDates } = loaderData;
   const cooked = cookedDates.length > 0;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   // The ingredient loaded into the form for editing, which stays selectable
@@ -349,6 +349,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
             <ItemFields
               stores={allStores}
               shelves={allShelves}
+              parents={parents}
               defaults={{ name: createName, defaultUnit: unit }}
               autoFocus
             />
