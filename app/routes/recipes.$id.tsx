@@ -22,6 +22,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { ItemFields } from "~/components/item-fields";
+import { itemSearchFilter } from "~/components/item-search";
 import { MoveButtons } from "~/components/move-buttons";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
@@ -36,6 +37,7 @@ import {
 } from "~/db/recipes.server";
 import { items, mealHistory, recipeIngredients, recipes, stores } from "~/db/schema";
 import { int, optionalText, optionalUrl, text } from "~/forms";
+import { itemKey, itemKeys } from "~/recipe-import";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/recipes.$id";
 
@@ -51,7 +53,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   const [{ ingredients }] = await withIngredients([{ ...recipe, servings: recipe.servingSize }]);
 
   const allItems = await db
-    .select({ id: items.id, name: items.name, defaultUnit: items.defaultUnit })
+    .select({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit })
     .from(items)
     .orderBy(items.name);
 
@@ -111,7 +113,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       const [item] = await db
         .insert(items)
         .values(parsed.values)
-        .returning({ id: items.id, name: items.name, defaultUnit: items.defaultUnit });
+        .returning({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit });
       return { createdItem: item };
     }
 
@@ -179,9 +181,9 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   const [saved, setSaved] = useState(false);
   const markUnsaved = () => setSaved(false);
 
-  // Offer to create the searched-for item when no item has that name yet
+  // Offer to create the searched-for item when no item has that name or plural yet
   const searchName = search.trim();
-  const canCreate = searchName !== "" && !allItems.some((i) => i.name.toLowerCase() === searchName.toLowerCase());
+  const canCreate = searchName !== "" && !allItems.some((i) => itemKeys(i).includes(itemKey(searchName)));
   const itemOptions = canCreate
     ? [...availableItems, { value: "__create__", label: `+ Create "${searchName}"` }]
     : availableItems;
@@ -312,6 +314,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
             data={itemOptions}
             value={itemId}
             searchable
+            filter={itemSearchFilter(allItems)}
             searchValue={search}
             onSearchChange={setSearch}
             onChange={(value) => {

@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, gt, inArray, lt, max } from "drizzle-orm";
 import { db } from "./client";
 import { itemCategories, items, recipeIngredients, recipes, shoppingListItems, stock, stores } from "./schema";
-import { int, text } from "~/forms";
+import { int, optionalText, text } from "~/forms";
+import { itemKey, itemKeys } from "~/recipe-import";
 import { combineAmounts, formatAmount, isUnitKey, mergeAmounts } from "~/units";
 
 // Shelves in walking order, grouped by store
@@ -9,10 +10,13 @@ export async function listShelves() {
   return db.select().from(itemCategories).orderBy(asc(itemCategories.storeId), asc(itemCategories.position)).all();
 }
 
-// Reads the item form's name/store/shelf/unit fields; a shelf must belong to the chosen store.
+// Reads the item form's name/plural/store/shelf/unit fields; a shelf must belong to the chosen store.
+// Names and plurals must be unique across all items, so each one matches a single item.
 // Pass the item's own id when editing, so keeping its name isn't a clash.
 export async function parseItemForm(form: FormData, itemId?: number) {
   const name = text(form, "name");
+  const rawPlural = optionalText(form, "plural");
+  const plural = rawPlural && itemKey(rawPlural) !== itemKey(name) ? rawPlural : null;
   const storeId = int(form, "storeId");
   const categoryId = int(form, "categoryId");
   const rawUnit = form.get("defaultUnit");
@@ -20,15 +24,19 @@ export async function parseItemForm(form: FormData, itemId?: number) {
   const alwaysAvailable = form.get("alwaysAvailable") === "on";
 
   if (!name) return { error: "Name is required." } as const;
-  const lower = name.toLocaleLowerCase();
-  const clash = (await db.select({ id: items.id, name: items.name }).from(items).all())
-    .find((i) => i.id !== itemId && i.name.toLocaleLowerCase() === lower);
-  if (clash) return { error: `There's already an item called "${clash.name}".` } as const;
+  const others = (await db.select({ id: items.id, name: items.name, plural: items.plural }).from(items).all())
+    .filter((i) => i.id !== itemId);
+  for (const word of [name, plural]) {
+    const clash = word && others.find((i) => itemKeys(i).includes(itemKey(word)));
+    if (!clash) continue;
+    if (itemKey(clash.name) === itemKey(word)) return { error: `There's already an item called "${clash.name}".` } as const;
+    return { error: `"${word}" is already the plural of "${clash.name}".` } as const;
+  }
   if (categoryId != null) {
     const shelf = await db.select().from(itemCategories).where(eq(itemCategories.id, categoryId)).get();
     if (!shelf || shelf.storeId !== storeId) return { error: "That shelf isn't in the chosen store." } as const;
   }
-  return { values: { name, storeId, categoryId, defaultUnit, alwaysAvailable } } as const;
+  return { values: { name, plural, storeId, categoryId, defaultUnit, alwaysAvailable } } as const;
 }
 
 export async function addShelf(storeId: number, name: string) {
@@ -90,7 +98,7 @@ export async function deleteItem(id: number) {
 
 // Replaces a duplicate item with another one everywhere, then deletes it. Where both are on the same recipe or
 // shopping list, their amounts are added up; a recipe using both in units that don't add up blocks the merge.
-// The kept item takes over the duplicate's store, shelf and default unit if it has none of its own.
+// The kept item takes over the duplicate's store, shelf, plural and default unit if it has none of its own.
 export async function mergeItem(duplicateId: number, keepId: number) {
   return db.transaction(async (tx) => {
     const duplicate = await tx.select().from(items).where(eq(items.id, duplicateId)).get();
@@ -167,6 +175,7 @@ export async function mergeItem(duplicateId: number, keepId: number) {
       .update(items)
       .set({
         ...(keep.storeId == null && { storeId: duplicate.storeId, categoryId: duplicate.categoryId }),
+        plural: keep.plural ?? duplicate.plural,
         defaultUnit: keep.defaultUnit ?? duplicate.defaultUnit,
       })
       .where(eq(items.id, keepId))

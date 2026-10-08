@@ -12,7 +12,7 @@ import { db } from "~/db/client";
 import { importRecipe } from "~/db/recipes.server";
 import { items, recipes } from "~/db/schema";
 import { text } from "~/forms";
-import { itemKey, parseRecipeText } from "~/recipe-import";
+import { itemKey, itemKeys, parseRecipeText } from "~/recipe-import";
 import { formatAmount, UNITS } from "~/units";
 import type { Route } from "./+types/recipes.import";
 
@@ -33,9 +33,9 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader() {
-  const itemNames = await db.select({ name: items.name }).from(items);
+  const allItems = await db.select({ name: items.name, plural: items.plural }).from(items);
   const recipeNames = await db.select({ name: recipes.name }).from(recipes).where(eq(recipes.archived, false));
-  return { itemNames: itemNames.map((i) => i.name), recipeNames: recipeNames.map((r) => r.name) };
+  return { knownItemKeys: allItems.flatMap(itemKeys), recipeNames: recipeNames.map((r) => r.name) };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -66,7 +66,7 @@ function FormatHelp() {
         <List.Item>Units: {UNITS.map((u) => u.label).join(", ")}, in English (<Code>tbsp</Code>) or spelled out (<Code>Esslöffel</Code>)</List.Item>
         <List.Item>A note after <Code> - </Code>, a comma or in parentheses is kept with the ingredient: <Code>1 onion - diced</Code></List.Item>
         <List.Item>Quotes keep a comma, dash or parentheses in the name: <Code>"Salz, Pfeffer"</Code></List.Item>
-        <List.Item>Ingredients are matched to items by name (without the note); unknown names become new items</List.Item>
+        <List.Item>Ingredients are matched to items by name or plural (without the note); unknown names become new items</List.Item>
       </List>
     </Card>
   );
@@ -158,10 +158,10 @@ function Imported({ id, name, newItems, onImportAnother }: {
 }
 
 export default function ImportRecipe({ loaderData, actionData }: Route.ComponentProps) {
-  const { itemNames, recipeNames } = loaderData;
+  const { knownItemKeys, recipeNames } = loaderData;
   const [input, setInput] = useState("");
   const { recipe, errors } = useMemo(() => parseRecipeText(input), [input]);
-  const knownItems = useMemo(() => new Set(itemNames.map(itemKey)), [itemNames]);
+  const knownItems = useMemo(() => new Set(knownItemKeys), [knownItemKeys]);
   const errorLines = new Set(errors.flatMap((e) => (e.line != null ? [e.line] : [])));
 
   if (actionData?.imported) return <Imported {...actionData.imported} onImportAnother={() => setInput("")} />;

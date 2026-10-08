@@ -20,6 +20,8 @@ export const itemCategories = sqliteTable("item_categories", {
 export const items = sqliteTable("items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  // Also matched when importing recipes ("Knoblauchzehen" for "Knoblauchzehe")
+  plural: text("plural"),
   categoryId: integer("category_id").references(() => itemCategories.id),
   storeId: integer("store_id").references(() => stores.id),
   // Unit prefilled when adding the item to a recipe or the shopping list

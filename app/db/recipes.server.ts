@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
-import { itemKey, type ParsedRecipe } from "~/recipe-import";
+import { itemKey, itemKeys, type ParsedRecipe } from "~/recipe-import";
 import { scaleAmount } from "~/units";
 import { db } from "./client";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes } from "./schema";
@@ -97,13 +97,13 @@ export async function moveIngredient(recipeId: number, itemId: number, up: boole
   });
 }
 
-// Creates a parsed recipe in one go. Ingredients are matched to items by name; missing
+// Creates a parsed recipe in one go. Ingredients are matched to items by name or plural; missing
 // items are created without a store or shelf, with the recipe's unit as their default.
 // Returns the recipe id and the items it created.
 export async function importRecipe({ ingredients, ...recipe }: ParsedRecipe & { servingSize: number }) {
   return db.transaction(async (tx) => {
-    const existing = await tx.select({ id: items.id, name: items.name }).from(items).all();
-    const idsByKey = new Map(existing.map((i) => [itemKey(i.name), i.id]));
+    const existing = await tx.select({ id: items.id, name: items.name, plural: items.plural }).from(items).all();
+    const idsByKey = new Map(existing.flatMap((i) => itemKeys(i).map((key) => [key, i.id] as const)));
 
     const newItems: { id: number; name: string }[] = [];
     for (const ing of ingredients) {

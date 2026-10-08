@@ -17,7 +17,8 @@
 ### Item
 
 - id
-- name
+- name — unique, ignoring case
+- plural (optional) — also matched when importing recipes and searching items; unique across all names and plurals
 - store_id
 - category_id — the shelf; must be one of the item's store's shelves
 - default_unit (optional) — prefilled when adding the item to a recipe or the shopping list

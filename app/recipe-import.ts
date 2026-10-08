@@ -83,6 +83,11 @@ export function itemKey(name: string) {
   return name.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
+// An item matches by its name and, if it has one, its plural
+export function itemKeys(item: { name: string; plural: string | null }) {
+  return item.plural ? [itemKey(item.name), itemKey(item.plural)] : [itemKey(item.name)];
+}
+
 // A quoted name: "…", “…”, „…“ or „…”
 const QUOTED = /["“„][^"“”„]*["“”]/g;
 const QUOTE_CHAR = /["“”„]/;

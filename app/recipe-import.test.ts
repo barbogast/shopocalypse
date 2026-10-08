@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { itemKey, parseIngredient, parseRecipeText } from "./recipe-import";
+import { itemKey, itemKeys, parseIngredient, parseRecipeText } from "./recipe-import";
 
 describe("parseIngredient", () => {
   it("reads quantity, unit and name", () => {
@@ -90,6 +90,13 @@ describe("parseIngredient", () => {
 describe("itemKey", () => {
   it("ignores case and spacing", () => {
     expect(itemKey("  Olive   Oil ")).toBe(itemKey("olive oil"));
+  });
+});
+
+describe("itemKeys", () => {
+  it("includes the plural when there is one", () => {
+    expect(itemKeys({ name: "Knoblauchzehe", plural: "Knoblauchzehen" })).toEqual(["knoblauchzehe", "knoblauchzehen"]);
+    expect(itemKeys({ name: "Salz", plural: null })).toEqual(["salz"]);
   });
 });
 

@@ -18,6 +18,7 @@ import { useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { Form, useActionData, useFetcher, useFetchers } from "react-router";
 import { FormError } from "~/components/form-error";
+import { itemSearchFilter } from "~/components/item-search";
 import { LocalDateTime } from "~/components/local-date-time";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { Servings } from "~/components/servings";
@@ -103,7 +104,7 @@ export async function loader() {
   // Items already on the list can be added again to raise their amount
   const listedItemIds = new Set(listItems.map((i) => i.itemId));
   const allItems = await db
-    .select({ id: items.id, name: items.name, defaultUnit: items.defaultUnit })
+    .select({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit })
     .from(items)
     .orderBy(items.name)
     .then((all) => all.map((i) => ({ ...i, listed: listedItemIds.has(i.id) })));
@@ -384,7 +385,9 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
 }
 
 // Manually add an item; the unit starts on the item's default unit
-function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit: string | null; listed: boolean }[] }) {
+function AddItemForm({ items }: {
+  items: { id: number; name: string; plural: string | null; defaultUnit: string | null; listed: boolean }[];
+}) {
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
   const actionData = useActionData<typeof action>();
 
@@ -397,6 +400,7 @@ function AddItemForm({ items }: { items: { id: number; name: string; defaultUnit
           label="Add item"
           data={items.map((i) => ({ value: String(i.id), label: i.listed ? `${i.name} (on list)` : i.name }))}
           searchable
+          filter={itemSearchFilter(items)}
           placeholder="Select item…"
           onChange={(value) => setUnit(items.find((i) => String(i.id) === value)?.defaultUnit ?? DEFAULT_UNIT)}
           style={{ flex: 1, minWidth: 140 }}

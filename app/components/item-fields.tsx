@@ -17,6 +17,7 @@ export function ItemFields({
   shelves: Shelf[];
   defaults?: {
     name?: string;
+    plural?: string | null;
     storeId?: number | null;
     categoryId?: number | null;
     defaultUnit?: string | null;
@@ -34,6 +35,12 @@ export function ItemFields({
         required
         autoFocus={autoFocus}
         data-autofocus={autoFocus || undefined}
+      />
+      <TextInput
+        name="plural"
+        label="Plural"
+        description="Recipe imports match it too"
+        defaultValue={defaults.plural ?? undefined}
       />
       <StoreShelfFields
         stores={stores}
