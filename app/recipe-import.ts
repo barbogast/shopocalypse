@@ -1,19 +1,17 @@
 // Parses a recipe written as plain text, in this format:
 //
 //   Spaghetti Carbonara
-//   Serves 4
-//
-//   Ingredients
+//   4                   (or "Serves 4")
+//   ---                 (or "Ingredients")
 //   400 g spaghetti
 //   2 eggs              (a number without a unit means pieces)
 //   salt                (no quantity)
 //   1 garlic clove - finely chopped   (a note after " - ", "," or in parentheses)
 //   "Salz, Pfeffer"     (quotes keep commas, dashes and parentheses in the name)
 //
-//   Instructions
+//   ---                 (or "Instructions")
 //   Free markdown…
-//
-//   Comments
+//   ---                 (or "Comments")
 //   Free text…
 //
 // It's deliberately strict: anything it doesn't understand is an error on that
@@ -158,6 +156,19 @@ export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: I
     const line = i + 1;
     const trimmed = raw.trim();
 
+    // "---" moves on to the section after the current one
+    if (/^-{3,}$/.test(trimmed)) {
+      const after = section === "header" ? SECTIONS[0] : SECTIONS[SECTIONS.indexOf(section) + 1];
+      if (!after) {
+        errors.push({ line, message: "There's no section after the comments." });
+        return;
+      }
+      if (seen.has(after)) errors.push({ line, message: `"${after[0].toUpperCase() + after.slice(1)}" appears twice.` });
+      seen.add(after);
+      section = after;
+      return;
+    }
+
     const next = sectionOf(raw);
     if (next) {
       if (seen.has(next)) errors.push({ line, message: `"${trimmed}" appears twice.` });
@@ -173,15 +184,15 @@ export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: I
           recipe.name = trimmed.replace(/^#+\s*/, "");
           return;
         }
-        const serves = /^serves\s+(\S+)$/i.exec(trimmed);
+        const serves = /^(?:serves\s+(\S+)|(\d\S*))$/i.exec(trimmed);
         if (serves && servesLine == null) {
           servesLine = line;
-          const n = Number(serves[1]);
+          const n = Number(serves[1] ?? serves[2]);
           if (Number.isInteger(n) && n >= 1) recipe.servingSize = n;
           else errors.push({ line, message: "Servings must be a whole number of at least 1." });
           return;
         }
-        errors.push({ line, message: 'Expected "Serves <number>" or the "Ingredients" heading.' });
+        errors.push({ line, message: 'Expected the servings ("4") or "---" before the ingredients.' });
         return;
       }
 
@@ -210,8 +221,8 @@ export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: I
   recipe.comments = freeText.comments.join("\n").trim() || null;
 
   if (!recipe.name) errors.push({ line: null, message: "The first line must be the recipe name." });
-  else if (servesLine == null) errors.push({ line: null, message: 'Add a "Serves <number>" line below the name.' });
-  if (!seen.has("ingredients")) errors.push({ line: null, message: 'Add an "Ingredients" heading.' });
+  else if (servesLine == null) errors.push({ line: null, message: 'Add the servings ("4") below the name.' });
+  if (!seen.has("ingredients")) errors.push({ line: null, message: 'Add "---" (or "Ingredients") before the ingredients.' });
   else if (recipe.ingredients.length === 0) errors.push({ line: null, message: "List at least one ingredient." });
 
   errors.sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));

@@ -136,7 +136,7 @@ describe("parseRecipeText", () => {
     const { errors } = parseRecipeText("Soup\nServes four\nfor a cold day\nIngredients\n2-3 carrots\n1 carrot\n1 Carrot");
     expect(errors).toEqual([
       { line: 2, message: expect.stringContaining("whole number") },
-      { line: 3, message: expect.stringContaining("Serves") },
+      { line: 3, message: expect.stringContaining("servings") },
       { line: 5, message: expect.stringContaining("Ranges") },
       { line: 7, message: expect.stringContaining("line 6") },
     ]);
@@ -148,7 +148,7 @@ describe("parseRecipeText", () => {
       expect.stringContaining("Ingredients"),
     ]);
     expect(parseRecipeText("Soup\nIngredients\n\nInstructions\nCook.").errors.map((e) => e.message)).toEqual([
-      expect.stringContaining("Serves"),
+      expect.stringContaining("servings"),
       expect.stringContaining("at least one ingredient"),
     ]);
   });
@@ -156,5 +156,45 @@ describe("parseRecipeText", () => {
   it("reports a section that appears twice", () => {
     const { errors } = parseRecipeText("Soup\nServes 2\nIngredients\nwater\nIngredients\nsalt");
     expect(errors).toEqual([{ line: 5, message: expect.stringContaining("twice") }]);
+  });
+
+  it("parses the short form with a bare servings number and separators", () => {
+    const { recipe, errors } = parseRecipeText("Carbonara\n4\n---\n400 g spaghetti\n4 eggs\n---\nBoil the pasta.\n---\nFrom Nonna");
+    expect(errors).toEqual([]);
+    expect(recipe).toEqual({
+      name: "Carbonara",
+      servingSize: 4,
+      ingredients: [
+        { line: 4, name: "spaghetti", quantity: 400, unit: "g", note: null },
+        { line: 5, name: "eggs", quantity: 4, unit: "pcs", note: null },
+      ],
+      instructions: "Boil the pasta.",
+      comments: "From Nonna",
+    });
+  });
+
+  it("accepts only whole servings numbers of at least 1", () => {
+    expect(parseRecipeText("Soup\n2\n---\nwater").errors).toEqual([]);
+    expect(parseRecipeText("Soup\n0\n---\nwater").errors).toEqual([{ line: 2, message: expect.stringContaining("whole number") }]);
+    expect(parseRecipeText("Soup\n2.5\n---\nwater").errors).toEqual([{ line: 2, message: expect.stringContaining("whole number") }]);
+  });
+
+  it("mixes separators with headings", () => {
+    const { recipe, errors } = parseRecipeText("Soup\nServes 2\nIngredients\nwater\n-----\nCook.\nComments\nWarming");
+    expect(errors).toEqual([]);
+    expect(recipe).toMatchObject({ instructions: "Cook.", comments: "Warming" });
+    expect(parseRecipeText("Soup\n2\n---\nwater\n---\nCook.\nInstructions\nAgain").errors)
+      .toEqual([{ line: 7, message: expect.stringContaining("twice") }]);
+  });
+
+  it("allows empty sections and stopping early", () => {
+    expect(parseRecipeText("Soup\n2\n---\nwater\n---\n---\nWarming").recipe)
+      .toMatchObject({ instructions: null, comments: "Warming" });
+    expect(parseRecipeText("Soup\n2\n---\nwater").recipe).toMatchObject({ instructions: null, comments: null });
+  });
+
+  it("reports a separator after the comments", () => {
+    const { errors } = parseRecipeText("Soup\n2\n---\nwater\n---\nCook.\n---\nWarming\n---");
+    expect(errors).toEqual([{ line: 9, message: expect.stringContaining("after the comments") }]);
   });
 });

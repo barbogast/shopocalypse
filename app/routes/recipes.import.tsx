@@ -16,17 +16,14 @@ import { formatAmount, UNITS } from "~/units";
 import type { Route } from "./+types/recipes.import";
 
 const PLACEHOLDER = `Spaghetti Carbonara
-Serves 4
-
-Ingredients
+4
+---
 400 g spaghetti
 4 eggs
 salt
-
-Instructions
+---
 Boil the pasta…
-
-Comments
+---
 Optional notes`;
 
 export function meta({}: Route.MetaArgs) {
@@ -56,7 +53,11 @@ function FormatHelp() {
       <Title order={5} mb="xs">Format</Title>
       <Code block mb="sm">{PLACEHOLDER}</Code>
       <List size="sm" spacing={4}>
-        <List.Item><Code>Instructions</Code> and <Code>Comments</Code> are optional; instructions support markdown</List.Item>
+        <List.Item>
+          The number is the servings; <Code>---</Code> separates ingredients, instructions and comments.
+          The headings <Code>Ingredients</Code>, <Code>Instructions</Code>, <Code>Comments</Code> and <Code>Serves 4</Code> work too
+        </List.Item>
+        <List.Item>Instructions and comments are optional; instructions support markdown</List.Item>
         <List.Item>A quantity without a unit means pieces; a line without a quantity has none</List.Item>
         <List.Item>Quantities: <Code>1.5</Code>, <Code>1,5</Code>, <Code>1/2</Code>, <Code>1 1/2</Code>, <Code>½</Code>; no ranges</List.Item>
         <List.Item>Units: {UNITS.map((u) => u.label).join(", ")}, in English (<Code>tbsp</Code>) or spelled out (<Code>Esslöffel</Code>)</List.Item>
