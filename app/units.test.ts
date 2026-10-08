@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { combineAmounts, formatAmount, formatAmounts, parseAmount, roundUpToBuy, scaleAmount } from "./units";
+import { combineAmounts, formatAmount, formatAmounts, mergeAmounts, parseAmount, roundUpToBuy, scaleAmount } from "./units";
 
 function form(fields: Record<string, string>) {
   const f = new FormData();
@@ -105,5 +105,20 @@ describe("formatting", () => {
   it("joins combined amounts", () => {
     expect(formatAmounts([{ quantity: 500, unit: "g" }, { quantity: 2, unit: "pcs" }])).toBe("500 g + 2 Stk.");
     expect(formatAmounts([])).toBe("—");
+  });
+});
+
+describe("mergeAmounts", () => {
+  it("adds amounts of the same kind", () => {
+    expect(mergeAmounts({ quantity: 200, unit: "g" }, { quantity: 1, unit: "kg" })).toEqual({ quantity: 1.2, unit: "kg" });
+  });
+
+  it("keeps the quantity when only one has one", () => {
+    expect(mergeAmounts({ quantity: null, unit: null }, { quantity: 2, unit: "pcs" })).toEqual({ quantity: 2, unit: "pcs" });
+    expect(mergeAmounts({ quantity: null, unit: null }, { quantity: null, unit: null })).toEqual({ quantity: null, unit: null });
+  });
+
+  it("gives up on units that don't add up", () => {
+    expect(mergeAmounts({ quantity: 200, unit: "g" }, { quantity: 2, unit: "pcs" })).toBeNull();
   });
 });

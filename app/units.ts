@@ -65,6 +65,13 @@ export function combineAmounts(amounts: Amount[]): Amount[] {
   });
 }
 
+// Adds two amounts into one, for a recipe that lists the same item twice; null when their units don't add up
+export function mergeAmounts(a: Amount, b: Amount): Amount | null {
+  const [combined, ...rest] = combineAmounts([a, b]);
+  if (rest.length) return null;
+  return combined ?? { quantity: null, unit: null };
+}
+
 // Scales a recipe amount from the recipe's serving size to the servings being cooked
 export function scaleAmount(amount: Amount, servings: number, servingSize: number): Amount {
   if (amount.quantity == null || servings === servingSize) return amount;

@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, gt, lt, max } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lt, max } from "drizzle-orm";
 import { db } from "./client";
-import { itemCategories, items, recipeIngredients, shoppingListItems, stock, stores } from "./schema";
+import { itemCategories, items, recipeIngredients, recipes, shoppingListItems, stock, stores } from "./schema";
 import { int, text } from "~/forms";
-import { isUnitKey } from "~/units";
+import { combineAmounts, formatAmount, isUnitKey, mergeAmounts } from "~/units";
 
 // Shelves in walking order, grouped by store
 export async function listShelves() {
@@ -85,5 +85,92 @@ export async function deleteItem(id: number) {
     await tx.delete(stock).where(eq(stock.itemId, id)).run();
     await tx.delete(shoppingListItems).where(eq(shoppingListItems.itemId, id)).run();
     await tx.delete(items).where(eq(items.id, id)).run();
+  });
+}
+
+// Replaces a duplicate item with another one everywhere, then deletes it. Where both are on the same recipe or
+// shopping list, their amounts are added up; a recipe using both in units that don't add up blocks the merge.
+// The kept item takes over the duplicate's store, shelf and default unit if it has none of its own.
+export async function mergeItem(duplicateId: number, keepId: number) {
+  return db.transaction(async (tx) => {
+    const duplicate = await tx.select().from(items).where(eq(items.id, duplicateId)).get();
+    const keep = await tx.select().from(items).where(eq(items.id, keepId)).get();
+    if (!duplicate || !keep || duplicateId === keepId) return { error: "Pick another item to merge into." } as const;
+
+    // Recipes listing both: fold the duplicate's ingredient into the kept one
+    const dupIngredients = await tx.select().from(recipeIngredients).where(eq(recipeIngredients.itemId, duplicateId)).all();
+    const keepIngredients = dupIngredients.length === 0 ? [] : await tx
+      .select({ ingredient: recipeIngredients, recipeName: recipes.name })
+      .from(recipeIngredients)
+      .innerJoin(recipes, eq(recipeIngredients.recipeId, recipes.id))
+      .where(and(
+        eq(recipeIngredients.itemId, keepId),
+        inArray(recipeIngredients.recipeId, dupIngredients.map((i) => i.recipeId)),
+      ))
+      .all();
+    // Check every recipe before changing any, so a blocked merge leaves nothing half done
+    const folds = [];
+    for (const { ingredient: kept, recipeName } of keepIngredients) {
+      const dup = dupIngredients.find((i) => i.recipeId === kept.recipeId)!;
+      const amount = mergeAmounts(kept, dup);
+      if (!amount) {
+        return {
+          error: `"${recipeName}" has both, as ${formatAmount(dup)} and ${formatAmount(kept)}, which don't add up. ` +
+            "Change one of them in the recipe first.",
+        } as const;
+      }
+      const note = [...new Set([kept.note, dup.note].filter(Boolean))].join(", ") || null;
+      folds.push({ recipeId: kept.recipeId, amount, note, position: Math.min(kept.position, dup.position) });
+    }
+    for (const { recipeId, amount, note, position } of folds) {
+      await tx
+        .update(recipeIngredients)
+        .set({ ...amount, note, position })
+        .where(and(eq(recipeIngredients.recipeId, recipeId), eq(recipeIngredients.itemId, keepId)))
+        .run();
+      await tx
+        .delete(recipeIngredients)
+        .where(and(eq(recipeIngredients.recipeId, recipeId), eq(recipeIngredients.itemId, duplicateId)))
+        .run();
+    }
+    await tx.update(recipeIngredients).set({ itemId: keepId }).where(eq(recipeIngredients.itemId, duplicateId)).run();
+
+    // Shopping lists with both: add up the amounts; still to buy if either was
+    const dupEntries = await tx.select().from(shoppingListItems).where(eq(shoppingListItems.itemId, duplicateId)).all();
+    for (const dup of dupEntries) {
+      const kept = await tx
+        .select()
+        .from(shoppingListItems)
+        .where(and(eq(shoppingListItems.shoppingListId, dup.shoppingListId), eq(shoppingListItems.itemId, keepId)))
+        .get();
+      if (kept) {
+        await tx
+          .update(shoppingListItems)
+          .set({ amounts: combineAmounts([...kept.amounts, ...dup.amounts]), bought: kept.bought && dup.bought })
+          .where(eq(shoppingListItems.id, kept.id))
+          .run();
+        await tx.delete(shoppingListItems).where(eq(shoppingListItems.id, dup.id)).run();
+      } else {
+        await tx.update(shoppingListItems).set({ itemId: keepId }).where(eq(shoppingListItems.id, dup.id)).run();
+      }
+    }
+
+    // Stock is keyed by item: the kept item's own entry wins
+    if (await tx.select().from(stock).where(eq(stock.itemId, keepId)).get()) {
+      await tx.delete(stock).where(eq(stock.itemId, duplicateId)).run();
+    } else {
+      await tx.update(stock).set({ itemId: keepId }).where(eq(stock.itemId, duplicateId)).run();
+    }
+
+    await tx.delete(items).where(eq(items.id, duplicateId)).run();
+    await tx
+      .update(items)
+      .set({
+        ...(keep.storeId == null && { storeId: duplicate.storeId, categoryId: duplicate.categoryId }),
+        defaultUnit: keep.defaultUnit ?? duplicate.defaultUnit,
+      })
+      .where(eq(items.id, keepId))
+      .run();
+    return { error: null } as const;
   });
 }
