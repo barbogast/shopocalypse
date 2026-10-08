@@ -1,7 +1,7 @@
 // Parses a recipe written as plain text, in this format:
 //
 //   Spaghetti Carbonara
-//   4                   (or "Serves 4")
+//   4                   (or "Serves 4", "4 Personen", "4 Portionen", "für 4", "für 4 Personen")
 //   https://example.com/carbonara   (optional weblink, starting with http(s):// or www.)
 //   ---                 (or "Ingredients")
 //   400 g spaghetti
@@ -141,6 +141,9 @@ export function parseIngredient(text: string): Omit<ParsedIngredient, "line"> | 
   return { name, quantity, unit: unit ?? "pcs", note };
 }
 
+// The servings: "4", "Serves 4", "4 Personen", "4 Portionen", "für 4", "für 4 Personen"
+const SERVES = /^(?:(?:serves|für)\s+(\S+)(?:\s+(?:person|portion)(?:en)?)?|(\S+)\s+(?:person|portion)(?:en)?|(\d\S*))$/i;
+
 function sectionOf(line: string): Section | null {
   const word = line.trim().replace(/^#+\s*/, "").replace(/:$/, "").trim().toLowerCase();
   return (SECTIONS as readonly string[]).includes(word) ? (word as Section) : null;
@@ -198,10 +201,10 @@ export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: I
           }
           return;
         }
-        const serves = /^(?:serves\s+(\S+)|(\d\S*))$/i.exec(trimmed);
+        const serves = SERVES.exec(trimmed);
         if (serves && servesLine == null) {
           servesLine = line;
-          const n = Number(serves[1] ?? serves[2]);
+          const n = Number(serves[1] ?? serves[2] ?? serves[3]);
           if (Number.isInteger(n) && n >= 1) recipe.servingSize = n;
           else errors.push({ line, message: "Servings must be a whole number of at least 1." });
           return;

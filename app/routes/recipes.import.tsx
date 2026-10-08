@@ -57,7 +57,7 @@ function FormatHelp() {
       <List size="sm" spacing={4}>
         <List.Item>
           The number is the servings; <Code>---</Code> separates ingredients, instructions and comments.
-          The headings <Code>Ingredients</Code>, <Code>Instructions</Code>, <Code>Comments</Code> and <Code>Serves 4</Code> work too
+          The headings <Code>Ingredients</Code>, <Code>Instructions</Code>, <Code>Comments</Code> work too, as do <Code>Serves 4</Code>, <Code>4 Personen</Code>, <Code>4 Portionen</Code> and <Code>für 4</Code>
         </List.Item>
         <List.Item>The weblink below the name is optional; it must start with <Code>https://</Code> or <Code>www.</Code></List.Item>
         <List.Item>Instructions and comments are optional; instructions support markdown</List.Item>

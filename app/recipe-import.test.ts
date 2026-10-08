@@ -181,6 +181,17 @@ describe("parseRecipeText", () => {
     expect(parseRecipeText("Soup\n2.5\n---\nwater").errors).toEqual([{ line: 2, message: expect.stringContaining("whole number") }]);
   });
 
+  it("accepts the servings in German", () => {
+    for (const serves of ["4 Personen", "für 4", "Für 4 Personen", "4 Portionen", "4 personen"]) {
+      const { recipe, errors } = parseRecipeText(`Soup\n${serves}\n---\nwater`);
+      expect(errors).toEqual([]);
+      expect(recipe.servingSize).toBe(4);
+    }
+    expect(parseRecipeText("Soup\n1 Person\n---\nwater").recipe.servingSize).toBe(1);
+    expect(parseRecipeText("Soup\nfür vier Personen\n---\nwater").errors)
+      .toEqual([{ line: 2, message: expect.stringContaining("whole number") }]);
+  });
+
   it("mixes separators with headings", () => {
     const { recipe, errors } = parseRecipeText("Soup\nServes 2\nIngredients\nwater\n-----\nCook.\nComments\nWarming");
     expect(errors).toEqual([]);
