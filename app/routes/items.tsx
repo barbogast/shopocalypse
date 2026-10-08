@@ -16,9 +16,9 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { IconCheck, IconPencil, IconPlus, IconToolsKitchen2, IconTrash, IconX } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { eq } from "drizzle-orm";
-import { Form, Link } from "react-router";
+import { Form, Link, useFetcher } from "react-router";
 import { MoveButtons } from "~/components/move-buttons";
 import { db } from "~/db/client";
 import { addShelf, deleteItem, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
@@ -161,6 +161,33 @@ function RenamableName({ intent, id, name, fw, size }: {
   );
 }
 
+// Name field with an Add button; clears the field once the add went through
+function AddNameForm({ intent, storeId, placeholder, size }: {
+  intent: string;
+  storeId?: number;
+  placeholder: string;
+  size?: "xs";
+}) {
+  const fetcher = useFetcher();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // The action returns null, so data is only defined after a finished submit
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data !== undefined) formRef.current?.reset();
+  }, [fetcher.state, fetcher.data]);
+
+  return (
+    <fetcher.Form method="post" ref={formRef}>
+      <input type="hidden" name="intent" value={intent} />
+      {storeId !== undefined && <input type="hidden" name="storeId" value={storeId} />}
+      <Group align="flex-end">
+        <TextInput name="name" placeholder={placeholder} size={size} style={{ flex: 1 }} />
+        <Button type="submit" variant="light" size={size} leftSection={<IconPlus size={14} />}>Add</Button>
+      </Group>
+    </fetcher.Form>
+  );
+}
+
 // Button listing the recipes an item is used in
 function UsedInRecipes({ name, recipes }: { name: string; recipes: { id: number; name: string; archived: boolean }[] }) {
   if (recipes.length === 0) {
@@ -293,26 +320,13 @@ export default function Items({ loaderData }: Route.ComponentProps) {
                 ))}
                 {shelves.length === 0 && <Text size="sm" c="dimmed">No shelves yet.</Text>}
               </Stack>
-              <Form method="post">
-                <input type="hidden" name="intent" value="add-shelf" />
-                <input type="hidden" name="storeId" value={store.id} />
-                <Group align="flex-end">
-                  <TextInput name="name" placeholder="New shelf…" size="xs" style={{ flex: 1 }} />
-                  <Button type="submit" variant="light" size="xs" leftSection={<IconPlus size={14} />}>Add</Button>
-                </Group>
-              </Form>
+              <AddNameForm intent="add-shelf" storeId={store.id} placeholder="New shelf…" size="xs" />
             </Card>
           );
         })}
         {allStores.length === 0 && <Text size="sm" c="dimmed">No stores yet.</Text>}
       </Stack>
-      <Form method="post">
-        <input type="hidden" name="intent" value="add-store" />
-        <Group align="flex-end">
-          <TextInput name="name" placeholder="New store…" style={{ flex: 1 }} />
-          <Button type="submit" variant="light" leftSection={<IconPlus size={14} />}>Add</Button>
-        </Group>
-      </Form>
+      <AddNameForm intent="add-store" placeholder="New store…" />
     </Container>
   );
 }
