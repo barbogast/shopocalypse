@@ -10,6 +10,7 @@ export const UNITS = [
   { key: "tbsp", label: "EL", plural: "EL", kind: "tbsp", factor: 1 },
   { key: "pinch", label: "Prise", plural: "Prisen", kind: "pinch", factor: 1 },
   { key: "knifetip", label: "Msp.", plural: "Msp.", kind: "knifetip", factor: 1 },
+  { key: "handful", label: "Handvoll", plural: "Handvoll", kind: "handful", factor: 1 },
   { key: "can", label: "Dose", plural: "Dosen", kind: "can", factor: 1 },
   { key: "jar", label: "Glas", plural: "Gläser", kind: "jar", factor: 1 },
   { key: "pack", label: "Packung", plural: "Packungen", kind: "pack", factor: 1 },

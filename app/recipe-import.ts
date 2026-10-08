@@ -54,6 +54,7 @@ for (const [alias, key] of Object.entries({
   pc: "pcs", pinch: "pinch", pinches: "pinch", can: "can", cans: "can", jar: "jar", jars: "jar",
   pack: "pack", packs: "pack", bottle: "bottle", bottles: "bottle", crate: "crate", crates: "crate",
   bunch: "bunch", bunches: "bunch", messerspitze: "knifetip", messerspitzen: "knifetip",
+  handful: "handful", handfuls: "handful",
   gram: "g", grams: "g",
   kilogram: "kg", kilograms: "kg",
   millilitre: "ml", millilitres: "ml", milliliter: "ml", milliliters: "ml",
