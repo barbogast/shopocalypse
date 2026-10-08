@@ -4,7 +4,7 @@ import { FormError } from "~/components/form-error";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { recipes } from "~/db/schema";
-import { int, optionalText, text } from "~/forms";
+import { int, optionalText, optionalUrl, text } from "~/forms";
 import type { Route } from "./+types/recipes.new";
 
 export function meta({}: Route.MetaArgs) {
@@ -17,10 +17,12 @@ export async function action({ request }: Route.ActionArgs) {
   const servingSize = int(form, "servingSize");
   const instructions = optionalText(form, "instructions");
   const comments = optionalText(form, "comments");
+  const weblink = optionalUrl(form, "weblink");
 
   if (!name || !servingSize) return { error: "Name and a whole-number serving size are required." };
+  if (weblink === undefined) return { error: "The weblink must be a web address, like https://example.com/recipe." };
 
-  const [recipe] = await db.insert(recipes).values({ name, servingSize, instructions, comments }).returning();
+  const [recipe] = await db.insert(recipes).values({ name, servingSize, instructions, comments, weblink }).returning();
   return redirect(`/recipes/${recipe.id}`);
 }
 
@@ -32,6 +34,7 @@ export default function NewRecipe({ actionData }: Route.ComponentProps) {
         <Stack>
           <TextInput name="name" label="Name" required autoFocus />
           <NumberInput name="servingSize" label="Serving size" min={1} allowDecimal={false} defaultValue={4} required />
+          <TextInput name="weblink" label="Weblink" placeholder="https://…" inputMode="url" />
           <Textarea name="instructions" label="Cooking instructions" description="Supports markdown" autosize minRows={4} />
           <Textarea name="comments" label="Comments" autosize minRows={2} />
           <FormError error={actionData?.error} />

@@ -30,6 +30,7 @@
 - serving_size (integer) — the servings the ingredient quantities are for
 - instructions (free text, optional)
 - comments (free text, optional)
+- weblink (optional) — where the recipe came from; always an http(s) URL
 - archived (boolean) — recipes that have been cooked are archived instead of deleted, to keep meal history intact
 - ingredients: list of RecipeIngredient
 

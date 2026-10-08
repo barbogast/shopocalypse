@@ -6,6 +6,7 @@ import { Form, Link, redirect, useLocation, useNavigate } from "react-router";
 import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
+import { Weblink } from "~/components/weblink";
 import { isDateString, localDate } from "~/dates";
 import { db } from "~/db/client";
 import { withIngredients } from "~/db/recipes.server";
@@ -103,6 +104,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
           </Button>
         </Group>
       </Group>
+      {recipe.weblink && <Weblink href={recipe.weblink} display="block" mt="-sm" mb="lg" />}
 
       <Title order={3} mb="sm">Ingredients</Title>
       <Table mb="xl" fz="lg">

@@ -2,6 +2,7 @@ import { Anchor, Drawer, Stack, Table, Text, Title } from "@mantine/core";
 import { Link } from "react-router";
 import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
+import { Weblink } from "~/components/weblink";
 import { type Amount, formatAmount } from "~/units";
 
 export type RecipeDetails = {
@@ -11,6 +12,7 @@ export type RecipeDetails = {
   servingSize: number;
   instructions: string | null;
   comments: string | null;
+  weblink: string | null;
   ingredients: (Amount & { itemId: number; name: string; note: string | null })[];
 };
 
@@ -32,6 +34,7 @@ export function RecipeDrawer({ recipe, note, onClose }: { recipe: RecipeDetails 
               : `scaled to ${recipe.servings} servings (recipe serves ${recipe.servingSize})`}
             {note && ` · ${note}`}
           </Text>
+          {recipe.weblink && <Weblink href={recipe.weblink} size="sm" />}
           <Table>
             <Table.Tbody>
               {recipe.ingredients.map((ing) => (

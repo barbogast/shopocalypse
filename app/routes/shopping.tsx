@@ -116,6 +116,7 @@ export async function loader() {
       servings: mealServings(shoppingListRecipes.servings),
       instructions: recipes.instructions,
       comments: recipes.comments,
+      weblink: recipes.weblink,
     })
     .from(shoppingListRecipes)
     .innerJoin(recipes, eq(shoppingListRecipes.recipeId, recipes.id))

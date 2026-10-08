@@ -37,6 +37,8 @@ export const recipes = sqliteTable("recipes", {
   servingSize: integer("serving_size").notNull(),
   instructions: text("instructions"),
   comments: text("comments"),
+  // Where the recipe came from; always an http(s) URL
+  weblink: text("weblink"),
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
 });
 

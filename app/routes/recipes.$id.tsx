@@ -35,7 +35,7 @@ import {
   withIngredients,
 } from "~/db/recipes.server";
 import { items, mealHistory, recipeIngredients, recipes, stores } from "~/db/schema";
-import { int, optionalText, text } from "~/forms";
+import { int, optionalText, optionalUrl, text } from "~/forms";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/recipes.$id";
 
@@ -78,8 +78,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       const servingSize = int(form, "servingSize");
       const instructions = optionalText(form, "instructions");
       const comments = optionalText(form, "comments");
+      const weblink = optionalUrl(form, "weblink");
       if (!name || !servingSize) return { error: "Name and a whole-number serving size are required." };
-      await db.update(recipes).set({ name, servingSize, instructions, comments }).where(eq(recipes.id, id));
+      if (weblink === undefined) return { error: "The weblink must be a web address, like https://example.com/recipe." };
+      await db.update(recipes).set({ name, servingSize, instructions, comments, weblink }).where(eq(recipes.id, id));
       return { saved: true };
     }
 
@@ -240,6 +242,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <Stack mb="xl">
           <TextInput name="name" label="Name" defaultValue={recipe.name} required />
           <NumberInput name="servingSize" label="Serving size" defaultValue={recipe.servingSize} min={1} allowDecimal={false} required />
+          <TextInput name="weblink" label="Weblink" placeholder="https://…" inputMode="url" defaultValue={recipe.weblink ?? ""} />
           <FormError error={actionData && "error" in actionData ? actionData.error : null} />
           <Group>
             <SaveButton saved={saved} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { int, optionalText, text } from "./forms";
+import { int, optionalText, optionalUrl, text } from "./forms";
 
 function form(fields: Record<string, string>) {
   const f = new FormData();
@@ -23,5 +23,24 @@ describe("text", () => {
     expect(text(form({ s: "  hi " }), "s")).toBe("hi");
     expect(text(form({}), "s")).toBe("");
     expect(optionalText(form({ s: "  " }), "s")).toBeNull();
+  });
+});
+
+describe("optionalUrl", () => {
+  it("accepts http(s) URLs and adds a missing scheme", () => {
+    expect(optionalUrl(form({ u: " https://example.com/pasta " }), "u")).toBe("https://example.com/pasta");
+    expect(optionalUrl(form({ u: "http://example.com" }), "u")).toBe("http://example.com/");
+    expect(optionalUrl(form({ u: "example.com/pasta" }), "u")).toBe("https://example.com/pasta");
+  });
+
+  it("returns null when empty", () => {
+    expect(optionalUrl(form({}), "u")).toBeNull();
+    expect(optionalUrl(form({ u: "  " }), "u")).toBeNull();
+  });
+
+  it("refuses other schemes and non-URLs", () => {
+    for (const u of ["javascript:alert(1)", "data:text/html,hi", "ftp://example.com", "not a url"]) {
+      expect(optionalUrl(form({ u }), "u")).toBeUndefined();
+    }
   });
 });
