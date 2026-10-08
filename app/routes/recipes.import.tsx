@@ -1,8 +1,8 @@
 import { Alert, Anchor, Badge, Button, Card, Code, Container, Group, List, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
-import { IconAlertCircle, IconCheck } from "@tabler/icons-react";
+import { IconAlertCircle, IconCheck, IconFileImport } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { eq } from "drizzle-orm";
-import { Form, Link, redirect } from "react-router";
+import { Form, Link } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
@@ -46,7 +46,6 @@ export async function action({ request }: Route.ActionArgs) {
   if (errors.length || recipe.servingSize == null) return { error: "Fix the errors in the text first.", imported: null };
 
   const { id, newItems } = await importRecipe({ ...recipe, servingSize: recipe.servingSize });
-  if (newItems.length === 0) return redirect(`/recipes/${id}`);
   return { error: null, imported: { id, name: recipe.name, newItems } };
 }
 
@@ -115,26 +114,40 @@ function LineGutter({ text, errorLines }: { text: string; errorLines: Set<number
   );
 }
 
-// Shown instead of the form once a recipe that created new items is imported
-function Imported({ id, name, newItems }: { id: number; name: string; newItems: { id: number; name: string }[] }) {
+// Shown instead of the form once a recipe is imported
+// Navigating to this same route keeps the component mounted, so the caller
+// clears its text through onImportAnother
+function Imported({ id, name, newItems, onImportAnother }: {
+  id: number;
+  name: string;
+  newItems: { id: number; name: string }[];
+  onImportAnother: () => void;
+}) {
   return (
     <Container size="sm" py="xl">
       <Alert color="green" variant="light" icon={<IconCheck size={16} />} title={`Imported "${name}"`} mb="lg">
-        <Text size="sm" mb="xs">
-          {newItems.length === 1 ? "This new item has" : `These ${newItems.length} new items have`} no store or shelf yet,
-          so the shopping list can't sort {newItems.length === 1 ? "it" : "them"}:
-        </Text>
-        <List size="sm">
-          {newItems.map((item) => (
-            <List.Item key={item.id}>
-              <Anchor component={Link} to={`/items/${item.id}`} size="sm">{item.name}</Anchor>
-            </List.Item>
-          ))}
-        </List>
+        {newItems.length > 0 && (
+          <>
+            <Text size="sm" mb="xs">
+              {newItems.length === 1 ? "This new item has" : `These ${newItems.length} new items have`} no store or shelf yet,
+              so the shopping list can't sort {newItems.length === 1 ? "it" : "them"}:
+            </Text>
+            <List size="sm">
+              {newItems.map((item) => (
+                <List.Item key={item.id}>
+                  <Anchor component={Link} to={`/items/${item.id}`} size="sm">{item.name}</Anchor>
+                </List.Item>
+              ))}
+            </List>
+          </>
+        )}
       </Alert>
       <Group>
         <Button component={Link} to={`/recipes/${id}`}>Open recipe</Button>
-        <Button component={Link} to="/items" variant="subtle">All items</Button>
+        <Button component={Link} to="/recipes/import" onClick={onImportAnother} variant="light" leftSection={<IconFileImport size={16} />}>
+          Import another
+        </Button>
+        {newItems.length > 0 && <Button component={Link} to="/items" variant="subtle">All items</Button>}
       </Group>
     </Container>
   );
@@ -147,7 +160,7 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
   const knownItems = useMemo(() => new Set(itemNames.map(itemKey)), [itemNames]);
   const errorLines = new Set(errors.flatMap((e) => (e.line != null ? [e.line] : [])));
 
-  if (actionData?.imported) return <Imported {...actionData.imported} />;
+  if (actionData?.imported) return <Imported {...actionData.imported} onImportAnother={() => setInput("")} />;
 
   const newItemCount = recipe.ingredients.filter((ing) => !knownItems.has(itemKey(ing.name))).length;
   const nameTaken = recipe.name !== "" && recipeNames.some((n) => itemKey(n) === itemKey(recipe.name));
