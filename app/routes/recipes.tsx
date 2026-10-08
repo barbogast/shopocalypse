@@ -1,6 +1,6 @@
-import { ActionIcon, Badge, Button, Container, Group, Switch, Table, Text, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Button, Container, Group, SegmentedControl, Switch, Table, Text, Title, Tooltip } from "@mantine/core";
 import { IconArchive, IconArchiveOff, IconFileImport, IconPlayerPlay, IconPlus, IconTrash } from "@tabler/icons-react";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Form, Link, useSearchParams } from "react-router";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
@@ -13,12 +13,14 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const showArchived = new URL(request.url).searchParams.has("archived");
+  const params = new URL(request.url).searchParams;
+  const showArchived = params.has("archived");
   const all = await db
     .select()
     .from(recipes)
     .where(showArchived ? undefined : eq(recipes.archived, false))
-    .orderBy(recipes.name);
+    // Ids count up, so the highest id is the most recently added
+    .orderBy(params.get("by") === "added" ? desc(recipes.id) : recipes.name);
   const cooked = await db.selectDistinct({ recipeId: mealHistory.recipeId }).from(mealHistory);
   const cookedIds = new Set(cooked.map((c) => c.recipeId));
   return { recipes: all.map((r) => ({ ...r, cooked: cookedIds.has(r.id) })) };
@@ -45,6 +47,14 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
   const { recipes: all } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
   const showArchived = searchParams.has("archived");
+  const byAdded = searchParams.get("by") === "added";
+  const setParam = (name: string, value: string | null) =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value == null) next.delete(name);
+      else next.set(name, value);
+      return next;
+    }, { replace: true });
 
   return (
     <Container size="sm" py="xl">
@@ -64,12 +74,19 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
         </Group>
       </Group>
 
-      <Switch
-        mb="md"
-        label="Show archived"
-        checked={showArchived}
-        onChange={(e) => setSearchParams(e.currentTarget.checked ? { archived: "" } : {}, { replace: true })}
-      />
+      <Group justify="space-between" mb="md">
+        <SegmentedControl
+          size="xs"
+          data={[{ label: "By name", value: "name" }, { label: "Newest first", value: "added" }]}
+          value={byAdded ? "added" : "name"}
+          onChange={(by) => setParam("by", by === "added" ? by : null)}
+        />
+        <Switch
+          label="Show archived"
+          checked={showArchived}
+          onChange={(e) => setParam("archived", e.currentTarget.checked ? "" : null)}
+        />
+      </Group>
 
       <Table highlightOnHover>
         <Table.Tbody>
