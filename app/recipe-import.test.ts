@@ -116,6 +116,7 @@ describe("parseRecipeText", () => {
     expect(recipe).toEqual({
       name: "Spaghetti Carbonara",
       servingSize: 4,
+      weblink: null,
       ingredients: [
         { line: 5, name: "spaghetti", quantity: 400, unit: "g", note: null },
         { line: 6, name: "eggs", quantity: 4, unit: "pcs", note: null },
@@ -164,6 +165,7 @@ describe("parseRecipeText", () => {
     expect(recipe).toEqual({
       name: "Carbonara",
       servingSize: 4,
+      weblink: null,
       ingredients: [
         { line: 4, name: "spaghetti", quantity: 400, unit: "g", note: null },
         { line: 5, name: "eggs", quantity: 4, unit: "pcs", note: null },
@@ -196,5 +198,21 @@ describe("parseRecipeText", () => {
   it("reports a separator after the comments", () => {
     const { errors } = parseRecipeText("Soup\n2\n---\nwater\n---\nCook.\n---\nWarming\n---");
     expect(errors).toEqual([{ line: 9, message: expect.stringContaining("after the comments") }]);
+  });
+
+  it("reads an optional weblink before or after the servings", () => {
+    const after = parseRecipeText("Soup\n2\nhttps://example.com/soup\n---\nwater");
+    expect(after.errors).toEqual([]);
+    expect(after.recipe).toMatchObject({ servingSize: 2, weblink: "https://example.com/soup" });
+    const before = parseRecipeText("Soup\nwww.example.com/soup\nServes 2\n---\nwater");
+    expect(before.errors).toEqual([]);
+    expect(before.recipe).toMatchObject({ servingSize: 2, weblink: "https://www.example.com/soup" });
+  });
+
+  it("reports an invalid or second weblink", () => {
+    expect(parseRecipeText("Soup\n2\nhttps://exa mple.com\n---\nwater").errors)
+      .toEqual([{ line: 3, message: expect.stringContaining("valid web address") }]);
+    expect(parseRecipeText("Soup\nhttps://a.com\n2\nhttps://b.com\n---\nwater").errors)
+      .toEqual([{ line: 4, message: expect.stringContaining("line 2") }]);
   });
 });

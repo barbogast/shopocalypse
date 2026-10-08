@@ -2,6 +2,7 @@
 //
 //   Spaghetti Carbonara
 //   4                   (or "Serves 4")
+//   https://example.com/carbonara   (optional weblink, starting with http(s):// or www.)
 //   ---                 (or "Ingredients")
 //   400 g spaghetti
 //   2 eggs              (a number without a unit means pieces)
@@ -17,6 +18,7 @@
 // It's deliberately strict: anything it doesn't understand is an error on that
 // line, to be fixed in the text, rather than a guess.
 
+import { webUrl } from "./forms";
 import { UNITS, type UnitKey } from "./units";
 
 export type ParsedIngredient = {
@@ -30,6 +32,7 @@ export type ParsedIngredient = {
 export type ParsedRecipe = {
   name: string;
   servingSize: number | null;
+  weblink: string | null;
   ingredients: ParsedIngredient[];
   instructions: string | null;
   comments: string | null;
@@ -146,11 +149,12 @@ function sectionOf(line: string): Section | null {
 export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: ImportError[] } {
   const lines = text.split(/\r?\n/);
   const errors: ImportError[] = [];
-  const recipe: ParsedRecipe = { name: "", servingSize: null, ingredients: [], instructions: null, comments: null };
+  const recipe: ParsedRecipe = { name: "", servingSize: null, weblink: null, ingredients: [], instructions: null, comments: null };
   const seen = new Set<Section>();
   const freeText: Record<"instructions" | "comments", string[]> = { instructions: [], comments: [] };
   let section: Section | "header" = "header";
   let servesLine: number | null = null;
+  let weblinkLine: number | null = null;
 
   lines.forEach((raw, i) => {
     const line = i + 1;
@@ -184,6 +188,16 @@ export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: I
           recipe.name = trimmed.replace(/^#+\s*/, "");
           return;
         }
+        if (/^(https?:\/\/|www\.)/i.test(trimmed)) {
+          const url = webUrl(trimmed);
+          if (weblinkLine != null) errors.push({ line, message: `There's already a weblink in line ${weblinkLine}.` });
+          else if (!url) errors.push({ line, message: "The weblink isn't a valid web address." });
+          else {
+            weblinkLine = line;
+            recipe.weblink = url;
+          }
+          return;
+        }
         const serves = /^(?:serves\s+(\S+)|(\d\S*))$/i.exec(trimmed);
         if (serves && servesLine == null) {
           servesLine = line;
@@ -192,7 +206,7 @@ export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: I
           else errors.push({ line, message: "Servings must be a whole number of at least 1." });
           return;
         }
-        errors.push({ line, message: 'Expected the servings ("4") or "---" before the ingredients.' });
+        errors.push({ line, message: 'Expected the servings ("4"), a weblink or "---" before the ingredients.' });
         return;
       }
 

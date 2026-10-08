@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { int, optionalText, optionalUrl, text } from "./forms";
+import { int, optionalText, optionalUrl, text, webUrl } from "./forms";
 
 function form(fields: Record<string, string>) {
   const f = new FormData();
@@ -42,5 +42,12 @@ describe("optionalUrl", () => {
     for (const u of ["javascript:alert(1)", "data:text/html,hi", "ftp://example.com", "not a url"]) {
       expect(optionalUrl(form({ u }), "u")).toBeUndefined();
     }
+  });
+});
+
+describe("webUrl", () => {
+  it("accepts http(s) URLs and refuses other schemes", () => {
+    expect(webUrl("www.example.com/pasta")).toBe("https://www.example.com/pasta");
+    expect(webUrl("javascript:alert(1)")).toBeUndefined();
   });
 });

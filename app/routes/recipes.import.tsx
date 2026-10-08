@@ -7,6 +7,7 @@ import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
+import { Weblink } from "~/components/weblink";
 import { db } from "~/db/client";
 import { importRecipe } from "~/db/recipes.server";
 import { items, recipes } from "~/db/schema";
@@ -17,6 +18,7 @@ import type { Route } from "./+types/recipes.import";
 
 const PLACEHOLDER = `Spaghetti Carbonara
 4
+https://example.com/carbonara
 ---
 400 g spaghetti
 4 eggs
@@ -57,6 +59,7 @@ function FormatHelp() {
           The number is the servings; <Code>---</Code> separates ingredients, instructions and comments.
           The headings <Code>Ingredients</Code>, <Code>Instructions</Code>, <Code>Comments</Code> and <Code>Serves 4</Code> work too
         </List.Item>
+        <List.Item>The weblink below the name is optional; it must start with <Code>https://</Code> or <Code>www.</Code></List.Item>
         <List.Item>Instructions and comments are optional; instructions support markdown</List.Item>
         <List.Item>A quantity without a unit means pieces; a line without a quantity has none</List.Item>
         <List.Item>Quantities: <Code>1.5</Code>, <Code>1,5</Code>, <Code>1/2</Code>, <Code>1 1/2</Code>, <Code>½</Code>; no ranges</List.Item>
@@ -224,6 +227,7 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
             <Title order={3}>{recipe.name || <Text span c="dimmed" inherit>Name</Text>}</Title>
             <Text size="sm" c="dimmed" mb="md">
               {recipe.servingSize ? `Serves ${recipe.servingSize}` : "Serves —"}
+              {recipe.weblink && <> · <Weblink href={recipe.weblink} size="sm" /></>}
             </Text>
 
             <Title order={5} mb={4}>Ingredients</Title>
