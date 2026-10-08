@@ -32,3 +32,14 @@ export function optionalUrl(form: FormData, name: string): string | null | undef
   const value = text(form, name);
   return value ? webUrl(value) : null;
 }
+
+// The items view to go back to after editing an item ("/items?by=newest"), or "/items".
+// Only the items list is accepted, so the parameter can't redirect anywhere else.
+export function itemsPath(value: string | null): string {
+  return value && /^\/items(\?|$)/.test(value) ? value : "/items";
+}
+
+// Link to edit an item that comes back to the given items view
+export function editItemPath(id: number, returnTo: string): string {
+  return `/items/${id}?returnTo=${encodeURIComponent(returnTo)}`;
+}

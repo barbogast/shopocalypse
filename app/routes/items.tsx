@@ -18,14 +18,14 @@ import {
 } from "@mantine/core";
 import { IconCheck, IconPencil, IconPlus, IconToolsKitchen2, IconTrash, IconX } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
-import { Form, Link, useFetcher, useSearchParams } from "react-router";
+import { Form, Link, useFetcher, useLocation, useSearchParams } from "react-router";
 import { MoveButtons } from "~/components/move-buttons";
 import { db } from "~/db/client";
 import { addShelf, deleteItem, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
 import { itemCategories, items, recipeIngredients, recipes, stores } from "~/db/schema";
-import { int, text } from "~/forms";
+import { editItemPath, int, text } from "~/forms";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { unitName } from "~/units";
 import type { Route } from "./+types/items";
@@ -35,16 +35,21 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const byShelf = new URL(request.url).searchParams.get("by") === "shelf";
+  const by = new URL(request.url).searchParams.get("by");
+  const byShelf = by === "shelf";
+  const newest = by === "newest";
   const parents = alias(items, "parents");
   const allItems = await db
     .select({
       id: items.id,
       name: items.name,
       // Grouped by shelf, a variant is only indented under its parent when they share a shelf
+      // Newest first, variants aren't next to their parent, so they aren't indented at all
       isVariant: byShelf
         ? sql<boolean>`${items.parentId} is not null and ${parents.storeId} is ${items.storeId} and ${parents.categoryId} is ${items.categoryId}`.mapWith(Boolean)
-        : sql<boolean>`${items.parentId} is not null`.mapWith(Boolean),
+        : newest
+          ? sql<boolean>`0`.mapWith(Boolean)
+          : sql<boolean>`${items.parentId} is not null`.mapWith(Boolean),
       defaultUnit: items.defaultUnit,
       alwaysAvailable: items.alwaysAvailable,
       shelfName: itemCategories.name,
@@ -55,8 +60,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     .leftJoin(stores, eq(items.storeId, stores.id))
     .leftJoin(parents, eq(items.parentId, parents.id))
     // Like the shopping list when grouped by shelf: stores alphabetically, then shelves in walking order,
-    // items without a store or shelf last. Variants right after their parent (on the same shelf)
+    // items without a store or shelf last. Variants right after their parent (on the same shelf).
+    // Newest first, to find the items a recipe import just created; ids only grow
     .orderBy(
+      ...(newest ? [desc(items.id)] : []),
       ...(byShelf
         ? [
             sql`${stores.name} is null`,
@@ -249,6 +256,8 @@ type UsedIn = Route.ComponentProps["loaderData"]["recipesByItem"][number];
 
 // An item with its unit, optionally its shelf and store, and its buttons
 function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedIn; showPlace: boolean }) {
+  // Saving the item comes back to this view
+  const { pathname, search } = useLocation();
   return (
     <Table.Tr>
       <Table.Td pl={item.isVariant ? "xl" : undefined}>
@@ -267,7 +276,7 @@ function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedI
       <Table.Td style={{ width: 104 }}>
         <Group gap={4} wrap="nowrap">
           <UsedInRecipes name={item.name} recipes={usedIn} />
-          <ActionIcon component={Link} to={`/items/${item.id}`} variant="subtle">
+          <ActionIcon component={Link} to={editItemPath(item.id, pathname + search)} variant="subtle">
             <IconPencil size={16} />
           </ActionIcon>
           {usedIn.length > 0 ? (
@@ -297,7 +306,8 @@ function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedI
 export default function Items({ loaderData }: Route.ComponentProps) {
   const { allItems, allShelves, allStores, recipesByItem } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
-  const byShelf = searchParams.get("by") === "shelf";
+  const by = searchParams.get("by");
+  const byShelf = by === "shelf";
 
   return (
     <Container size="sm" py="xl">
@@ -314,9 +324,9 @@ export default function Items({ loaderData }: Route.ComponentProps) {
       <SegmentedControl
         mb="md"
         size="xs"
-        data={[{ label: "By name", value: "name" }, { label: "By shelf", value: "shelf" }]}
-        value={byShelf ? "shelf" : "name"}
-        onChange={(by) => setSearchParams(by === "shelf" ? { by } : {}, { replace: true })}
+        data={[{ label: "By name", value: "name" }, { label: "By shelf", value: "shelf" }, { label: "Newest", value: "newest" }]}
+        value={by === "shelf" || by === "newest" ? by : "name"}
+        onChange={(by) => setSearchParams(by === "name" ? {} : { by }, { replace: true })}
       />
 
       {byShelf ? (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { int, optionalText, optionalUrl, text, webUrl } from "./forms";
+import { editItemPath, int, itemsPath, optionalText, optionalUrl, text, webUrl } from "./forms";
 
 function form(fields: Record<string, string>) {
   const f = new FormData();
@@ -49,5 +49,24 @@ describe("webUrl", () => {
   it("accepts http(s) URLs and refuses other schemes", () => {
     expect(webUrl("www.example.com/pasta")).toBe("https://www.example.com/pasta");
     expect(webUrl("javascript:alert(1)")).toBeUndefined();
+  });
+});
+
+describe("itemsPath", () => {
+  it("keeps views of the items list", () => {
+    expect(itemsPath("/items")).toBe("/items");
+    expect(itemsPath("/items?by=newest")).toBe("/items?by=newest");
+  });
+
+  it("falls back to the items list for anything else", () => {
+    for (const p of [null, "", "/items/3", "/itemsx", "/recipes", "//evil.example", "https://evil.example/items"]) {
+      expect(itemsPath(p)).toBe("/items");
+    }
+  });
+
+  it("round-trips through editItemPath", () => {
+    const url = new URL(editItemPath(3, "/items?by=newest"), "http://x");
+    expect(url.pathname).toBe("/items/3");
+    expect(itemsPath(url.searchParams.get("returnTo"))).toBe("/items?by=newest");
   });
 });

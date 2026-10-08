@@ -12,7 +12,7 @@ import { db } from "~/db/client";
 import { setPlural } from "~/db/items.server";
 import { importRecipe } from "~/db/recipes.server";
 import { items, recipes } from "~/db/schema";
-import { int, text } from "~/forms";
+import { editItemPath, int, text } from "~/forms";
 import { itemKey, itemKeys, likelySingular, type ParsedIngredient, parseRecipeText } from "~/recipe-import";
 import { formatAmount, UNITS } from "~/units";
 import type { Route } from "./+types/recipes.import";
@@ -149,6 +149,9 @@ function PluralSuggestion({ name, singular }: { name: string; singular: { id: nu
   );
 }
 
+// Lists the new items on top, and editing one comes back there, since this page is gone once left
+const NEWEST_ITEMS = "/items?by=newest";
+
 // Shown instead of the form once a recipe is imported
 // Navigating to this same route keeps the component mounted, so the caller
 // clears its text through onImportAnother
@@ -172,7 +175,7 @@ function Imported({ id, name, newItems, storeName, onImportAnother }: {
             <List size="sm">
               {newItems.map((item) => (
                 <List.Item key={item.id}>
-                  <Anchor component={Link} to={`/items/${item.id}`} size="sm">{item.name}</Anchor>
+                  <Anchor component={Link} to={editItemPath(item.id, NEWEST_ITEMS)} size="sm">{item.name}</Anchor>
                 </List.Item>
               ))}
             </List>
@@ -184,7 +187,7 @@ function Imported({ id, name, newItems, storeName, onImportAnother }: {
         <Button component={Link} to="/recipes/import" onClick={onImportAnother} variant="light" leftSection={<IconFileImport size={16} />}>
           Import another
         </Button>
-        {newItems.length > 0 && <Button component={Link} to="/items" variant="subtle">All items</Button>}
+        {newItems.length > 0 && <Button component={Link} to={NEWEST_ITEMS} variant="subtle">Newest items</Button>}
       </Group>
     </Container>
   );
