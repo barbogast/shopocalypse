@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { itemKey, itemKeys, type ParsedRecipe } from "~/recipe-import";
 import { scaleAmount } from "~/units";
 import { db } from "./client";
-import { items, mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes } from "./schema";
+import { items, mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes, stores } from "./schema";
 
 // Cook dates are stored as YYYY-MM-DD; format on the server so client and server render the same string
 export function formatCookedAt(cookedAt: string) {
@@ -98,20 +98,25 @@ export async function moveIngredient(recipeId: number, itemId: number, up: boole
   });
 }
 
+const IMPORT_STORE_NAME = "Supermarkt";
+
 // Creates a parsed recipe in one go. Ingredients are matched to items by name or plural; missing
-// items are created without a store or shelf, with the recipe's unit as their default.
-// Returns the recipe id and the items it created.
+// items are created in the "Supermarkt" store (if there is one) without a shelf, with the recipe's unit as their default.
+// Returns the recipe id, the items it created and the store they were put in.
 export async function importRecipe({ ingredients, ...recipe }: ParsedRecipe & { servingSize: number }) {
   return db.transaction(async (tx) => {
     const existing = await tx.select({ id: items.id, name: items.name, plural: items.plural }).from(items).all();
     const idsByKey = new Map(existing.flatMap((i) => itemKeys(i).map((key) => [key, i.id] as const)));
+
+    const store = await tx.select({ id: stores.id, name: stores.name }).from(stores)
+      .where(eq(stores.name, IMPORT_STORE_NAME)).orderBy(asc(stores.id)).get();
 
     const newItems: { id: number; name: string }[] = [];
     for (const ing of ingredients) {
       if (idsByKey.has(itemKey(ing.name))) continue;
       const [item] = await tx
         .insert(items)
-        .values({ name: ing.name, defaultUnit: ing.unit })
+        .values({ name: ing.name, storeId: store?.id ?? null, defaultUnit: ing.unit })
         .returning({ id: items.id, name: items.name });
       idsByKey.set(itemKey(item.name), item.id);
       newItems.push(item);
@@ -127,6 +132,6 @@ export async function importRecipe({ ingredients, ...recipe }: ParsedRecipe & { 
       note: ing.note,
     }))).run();
 
-    return { id, newItems };
+    return { id, newItems, storeName: store?.name ?? null };
   });
 }

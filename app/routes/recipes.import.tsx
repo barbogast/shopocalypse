@@ -54,8 +54,8 @@ export async function action({ request }: Route.ActionArgs) {
   const { recipe, errors } = parseRecipeText(text(form, "text"));
   if (errors.length || recipe.servingSize == null) return { error: "Fix the errors in the text first.", imported: null };
 
-  const { id, newItems } = await importRecipe({ ...recipe, servingSize: recipe.servingSize });
-  return { error: null, imported: { id, name: recipe.name, newItems } };
+  const { id, newItems, storeName } = await importRecipe({ ...recipe, servingSize: recipe.servingSize });
+  return { error: null, imported: { id, name: recipe.name, newItems, storeName } };
 }
 
 // The text format, kept in view while typing (the placeholder disappears)
@@ -149,10 +149,11 @@ function PluralSuggestion({ name, singular }: { name: string; singular: { id: nu
 // Shown instead of the form once a recipe is imported
 // Navigating to this same route keeps the component mounted, so the caller
 // clears its text through onImportAnother
-function Imported({ id, name, newItems, onImportAnother }: {
+function Imported({ id, name, newItems, storeName, onImportAnother }: {
   id: number;
   name: string;
   newItems: { id: number; name: string }[];
+  storeName: string | null;
   onImportAnother: () => void;
 }) {
   return (
@@ -161,7 +162,8 @@ function Imported({ id, name, newItems, onImportAnother }: {
         {newItems.length > 0 && (
           <>
             <Text size="sm" mb="xs">
-              {newItems.length === 1 ? "This new item has" : `These ${newItems.length} new items have`} no store or shelf yet,
+              {newItems.length === 1 ? "This new item has" : `These ${newItems.length} new items have`}{" "}
+              {storeName ? `no shelf in ${storeName} yet` : "no store or shelf yet"},
               so the shopping list can't sort {newItems.length === 1 ? "it" : "them"}:
             </Text>
             <List size="sm">
