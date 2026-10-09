@@ -40,7 +40,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        {/* Makes the site installable as an app; the files are static, so outside the password */}
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <Meta />
         <Links />
         <ColorSchemeScript />
@@ -49,12 +52,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <MantineProvider>
           <DevMarker />
           <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-            <main style={{ flex: 1, paddingBottom: 70 }}>
+            {/* The safe-area inset keeps the nav clear of the phone's home bar when installed */}
+            <main style={{ flex: 1, paddingBottom: "calc(70px + env(safe-area-inset-bottom))" }}>
               {children}
               <VersionFooter />
             </main>
             <nav style={{
-              position: "fixed", bottom: 0, left: 0, right: 0, height: 64,
+              position: "fixed", bottom: 0, left: 0, right: 0,
+              height: "calc(64px + env(safe-area-inset-bottom))",
+              paddingBottom: "env(safe-area-inset-bottom)",
               display: "flex", borderTop: "1px solid var(--mantine-color-gray-3)",
               background: "var(--mantine-color-body)", zIndex: 100,
             }}>
