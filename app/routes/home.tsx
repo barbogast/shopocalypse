@@ -203,7 +203,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
 
   const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
   // Shared by the add and auto-fill forms
-  const [newServings, setNewServings] = useState<string | number>("");
+  const [newServings, setNewServings] = useState<string | number>(4);
   // The add form's recipe, cleared once it's added but kept when adding fails
   const [addRecipeId, setAddRecipeId] = useState<string | null>(null);
   useEffect(() => {
