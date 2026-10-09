@@ -1,4 +1,4 @@
-import { type Amount, combineAmounts, roundUpToBuy, scaleAmount } from "./units";
+import { type Amount, combineAmounts, formatAmount, formatAmounts, nameForAmounts, roundUpToBuy, scaleAmount } from "./units";
 
 type Meal = { recipeId: number; servings: number; servingSize: number };
 type Ingredient = Amount & {
@@ -40,4 +40,19 @@ export function addNote(notes: ListNote[], ...added: ListNote[]): ListNote[] {
     else result.push({ note, amounts: combineAmounts(amounts) });
   }
   return result;
+}
+
+// The list as plain text to paste into other apps: one line per item still to buy, in list order,
+// amount first ("500 g Tomaten"), with notes in brackets. No store or shelf headings, since apps
+// that turn each pasted line into an entry would make those entries too.
+export function listAsText(listItems: { itemName: string; itemPlural: string | null; amounts: Amount[]; notes: ListNote[]; bought: boolean }[]) {
+  return listItems
+    .filter((i) => !i.bought)
+    .map((i) => {
+      const amounts = combineAmounts(i.amounts).map(formatAmount).join(" + ");
+      const name = nameForAmounts({ name: i.itemName, plural: i.itemPlural }, i.amounts);
+      const notes = i.notes.map((n) => (n.amounts.length > 0 ? `${formatAmounts(n.amounts)} ${n.note}` : n.note));
+      return [amounts, name].filter(Boolean).join(" ") + (notes.length > 0 ? ` (${notes.join("; ")})` : "");
+    })
+    .join("\n");
 }

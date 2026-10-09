@@ -3,6 +3,7 @@ import {
   Button,
   Checkbox,
   Container,
+  CopyButton,
   Anchor,
   Divider,
   Group,
@@ -13,7 +14,7 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { IconCheck, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
+import { IconCheck, IconCopy, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
@@ -39,7 +40,7 @@ import {
   stores,
 } from "~/db/schema";
 import { int } from "~/forms";
-import { listAmounts } from "~/shopping-list";
+import { listAmounts, listAsText } from "~/shopping-list";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { combineAmounts, DEFAULT_UNIT, formatAmounts, nameForAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
 import type { Route } from "./+types/shopping";
@@ -502,7 +503,24 @@ function ListView({ activeList, listRecipes, listItems: loadedItems, allItems }:
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="xs">
         <Title>Shopping</Title>
-        <Text c="dimmed" size="sm">{tickedCount}/{listItems.length}</Text>
+        <Group gap="sm">
+          <Text c="dimmed" size="sm">{tickedCount}/{listItems.length}</Text>
+          {/* Copies what's still to buy, to paste into another app */}
+          <CopyButton value={listAsText(listItems)}>
+            {({ copied, copy }) => (
+              <Button
+                size="xs"
+                variant="light"
+                color={copied ? "green" : undefined}
+                leftSection={copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+                disabled={tickedCount === listItems.length}
+                onClick={copy}
+              >
+                {copied ? "Copied" : "Copy list"}
+              </Button>
+            )}
+          </CopyButton>
+        </Group>
       </Group>
       <Text c="dimmed" size="sm">Created <LocalDateTime iso={activeList.createdAt} /></Text>
       <ListMeals recipes={listRecipes} />

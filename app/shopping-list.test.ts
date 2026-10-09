@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addNote, listAmounts } from "./shopping-list";
+import { addNote, listAmounts, listAsText } from "./shopping-list";
 
 const pasta = { recipeId: 1, itemId: 10, quantity: 500, unit: "g", alwaysAvailable: false, note: null, noteOnList: false } as const;
 const onion = { recipeId: 1, itemId: 11, quantity: 1, unit: "pcs", alwaysAvailable: false, note: null, noteOnList: false } as const;
@@ -87,5 +87,29 @@ describe("addNote", () => {
       { note: "reif", amounts: [] },
     ]);
     expect(notes[0].amounts).toEqual([{ quantity: 1, unit: "pcs" }]);
+  });
+});
+
+describe("listAsText", () => {
+  const row = { itemPlural: null, notes: [], bought: false };
+
+  it("puts each item still to buy on its own line, amount first", () => {
+    expect(listAsText([
+      { ...row, itemName: "Tomate", itemPlural: "Tomaten", amounts: [{ quantity: 500, unit: "g" }] },
+      { ...row, itemName: "Salz", amounts: [] },
+      { ...row, itemName: "Milch", amounts: [{ quantity: 1, unit: "l" }], bought: true },
+      { ...row, itemName: "Ei", itemPlural: "Eier", amounts: [{ quantity: 6, unit: "pcs" }] },
+    ])).toBe("500 g Tomaten\nSalz\n6 Stk. Eier");
+  });
+
+  it("adds notes in brackets", () => {
+    expect(listAsText([
+      {
+        ...row,
+        itemName: "Sahne",
+        amounts: [{ quantity: 400, unit: "ml" }],
+        notes: [{ note: "mind. 30% Fett", amounts: [{ quantity: 200, unit: "ml" }] }, { note: "Bio", amounts: [] }],
+      },
+    ])).toBe("400 ml Sahne (200 ml mind. 30% Fett; Bio)");
   });
 });
