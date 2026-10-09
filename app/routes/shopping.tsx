@@ -390,18 +390,17 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
           {mealCount === 1 ? "1 meal" : `${mealCount} meals`}
         </Button>
         <Collapse expanded={shown}>
-          <Text c="dimmed" size="sm">
-            {recipes.map((r, i) => (
-              <span key={r.key}>
-                {i > 0 && ", "}
+          <List size="sm" c="dimmed">
+            {recipes.map((r) => (
+              <List.Item key={r.key}>
                 <Anchor component="button" type="button" size="sm" onClick={() => setOpenKey(r.key)}>
                   {r.name}
                 </Anchor>
                 {r.servings !== r.servingSize && <Servings servings={r.servings} />}
                 {r.count > 1 && ` ×${r.count}`}
-              </span>
+              </List.Item>
             ))}
-          </Text>
+          </List>
         </Collapse>
       </Stack>
 
@@ -470,9 +469,7 @@ function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | unde
                 </ActionIcon>
               </Popover.Target>
               <Popover.Dropdown>
-                <List size="sm">
-                  {usedIn.map((name) => <List.Item key={name}>{name}</List.Item>)}
-                </List>
+                {usedIn.map((name) => <Text key={name} size="sm">{name}</Text>)}
               </Popover.Dropdown>
             </Popover>
           )}
