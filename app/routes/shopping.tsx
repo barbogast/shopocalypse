@@ -1,20 +1,23 @@
 import {
+  ActionIcon,
   Badge,
   Button,
   Checkbox,
+  Collapse,
   Container,
   CopyButton,
   Anchor,
   Divider,
   Group,
   NumberInput,
+  Popover,
   Select,
   Stack,
   Table,
   Text,
   Title,
 } from "@mantine/core";
-import { IconCheck, IconCopy, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
+import { IconCheck, IconChefHat, IconChevronDown, IconChevronRight, IconCopy, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
@@ -360,28 +363,46 @@ type ActiveListData = Extract<Awaited<ReturnType<typeof loader>>, { activeList: 
 type ListRecipe = ActiveListData["listRecipes"][number];
 type ListItem = ActiveListData["listItems"][number];
 
-// "For: …" line; tapping a recipe opens its details without leaving the list
+// The list's meals, folded away behind a toggle to keep the page short;
+// tapping a recipe opens its details without leaving the list
 function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
+  const [shown, setShown] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const open = recipes.find((r) => r.key === openKey);
 
   if (recipes.length === 0) return <Text c="dimmed" size="sm" mb="lg">No meals</Text>;
 
+  const mealCount = recipes.reduce((sum, r) => sum + r.count, 0);
+
   return (
     <>
-      <Text c="dimmed" size="sm" mb="lg">
-        For:{" "}
-        {recipes.map((r, i) => (
-          <span key={r.key}>
-            {i > 0 && ", "}
-            <Anchor component="button" type="button" size="sm" onClick={() => setOpenKey(r.key)}>
-              {r.name}
-            </Anchor>
-            {r.servings !== r.servingSize && <Servings servings={r.servings} />}
-            {r.count > 1 && ` ×${r.count}`}
-          </span>
-        ))}
-      </Text>
+      <Stack gap={4} mb="lg" align="flex-start">
+        <Button
+          variant="subtle"
+          color="gray"
+          size="compact-sm"
+          px={0}
+          leftSection={shown ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+          onClick={() => setShown((s) => !s)}
+          aria-expanded={shown}
+        >
+          {mealCount === 1 ? "1 meal" : `${mealCount} meals`}
+        </Button>
+        <Collapse expanded={shown}>
+          <Text c="dimmed" size="sm">
+            {recipes.map((r, i) => (
+              <span key={r.key}>
+                {i > 0 && ", "}
+                <Anchor component="button" type="button" size="sm" onClick={() => setOpenKey(r.key)}>
+                  {r.name}
+                </Anchor>
+                {r.servings !== r.servingSize && <Servings servings={r.servings} />}
+                {r.count > 1 && ` ×${r.count}`}
+              </span>
+            ))}
+          </Text>
+        </Collapse>
+      </Stack>
 
       <RecipeDrawer
         recipe={open}
@@ -435,15 +456,29 @@ function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | unde
         <Text c="dimmed">{formatAmounts(item.amounts)}</Text>
       </Table.Td>
       <Table.Td pl={item.isVariant ? "xl" : undefined}>
-        <Text td={ticked ? "line-through" : undefined}>
-          {nameForAmounts({ name: item.itemName, plural: item.itemPlural }, item.amounts)}
-        </Text>
+        <Group gap={4} wrap="nowrap">
+          <Text td={ticked ? "line-through" : undefined}>
+            {nameForAmounts({ name: item.itemName, plural: item.itemPlural }, item.amounts)}
+          </Text>
+          {/* Which meals need it, on request only, so it doesn't crowd the list */}
+          {usedIn && (
+            <Popover position="bottom-start" shadow="sm">
+              <Popover.Target>
+                <ActionIcon variant="subtle" color="gray" size="sm" aria-label={`Meals using ${item.itemName}`}>
+                  <IconChefHat size={14} />
+                </ActionIcon>
+              </Popover.Target>
+              <Popover.Dropdown>
+                {usedIn.map((name) => <Text key={name} size="sm">{name}</Text>)}
+              </Popover.Dropdown>
+            </Popover>
+          )}
+        </Group>
         {item.notes.map((n) => (
           <Text key={n.note} size="sm" c="dimmed">
             {n.amounts.length > 0 && `${formatAmounts(n.amounts)} `}{n.note}
           </Text>
         ))}
-        {usedIn && <Text size="xs" c="dimmed">{usedIn.join(", ")}</Text>}
         {item.source === "manual" && (
           <Badge size="xs" variant="outline" color="gray">manual</Badge>
         )}
