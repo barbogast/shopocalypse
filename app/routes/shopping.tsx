@@ -430,6 +430,10 @@ function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | unde
 
   return (
     <Table.Tr opacity={ticked ? 0.5 : 1}>
+      {/* Right-aligned and level with the name, so the two read as one phrase: "650 g Karotten" */}
+      <Table.Td style={{ width: 110, verticalAlign: "top" }} ta="right">
+        <Text c="dimmed">{formatAmounts(item.amounts)}</Text>
+      </Table.Td>
       <Table.Td pl={item.isVariant ? "xl" : undefined}>
         <Text td={ticked ? "line-through" : undefined}>
           {nameForAmounts({ name: item.itemName, plural: item.itemPlural }, item.amounts)}
@@ -443,9 +447,6 @@ function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | unde
         {item.source === "manual" && (
           <Badge size="xs" variant="outline" color="gray">manual</Badge>
         )}
-      </Table.Td>
-      <Table.Td style={{ width: 110 }} c="dimmed">
-        {formatAmounts(item.amounts)}
       </Table.Td>
       <Table.Td style={{ width: 60 }}>
         <fetcher.Form method="post">
