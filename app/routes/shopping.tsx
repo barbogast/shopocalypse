@@ -538,16 +538,17 @@ function ListView({ activeList, listRecipes, listItems: loadedItems, allItems }:
 
       {[...groups.entries()].map(([storeName, shelves]) => (
         <Stack key={storeName} mb="lg" gap="xs">
-          <Text fw={600} size="sm" c="dimmed">{storeName}</Text>
+          <Title order={4}>{storeName}</Title>
           <Table>
             <Table.Tbody>
               {[...shelves.entries()].flatMap(([shelfName, shelfItems]) => [
                 // No heading when nothing in this store has a shelf
                 ...(shelfName != null || shelves.size > 1
                   ? [
-                      <Table.Tr key={`shelf-${shelfName ?? ""}`}>
-                        <Table.Td colSpan={4} pt="md" pb={4}>
-                          <Text size="xs" fw={600} tt="uppercase" c="dimmed">{shelfName ?? "Other"}</Text>
+                      // A tinted band, so the shelves stand apart from the items between them
+                      <Table.Tr key={`shelf-${shelfName ?? ""}`} bg="var(--mantine-color-gray-light)">
+                        <Table.Td colSpan={4} py={6}>
+                          <Text size="sm" fw={700}>{shelfName ?? "Other"}</Text>
                         </Table.Td>
                       </Table.Tr>,
                     ]
