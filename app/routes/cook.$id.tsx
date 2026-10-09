@@ -13,10 +13,11 @@ import { withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
 import { optionalText } from "~/forms";
 import { formatAmount } from "~/units";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/cook.$id";
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: `Cooking ${data?.recipe.name ?? ""} – Shopocalypse` }];
+  return [{ title: pageTitle(`Cooking ${data?.recipe.name ?? ""}`) }];
 }
 
 // Returns the schedule entry from ?position=, if it refers to an entry for this recipe

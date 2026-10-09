@@ -40,10 +40,11 @@ import { items, mealHistory, recipeIngredients, recipes, stores } from "~/db/sch
 import { int, optionalText, optionalUrl, text } from "~/forms";
 import { itemKey, itemKeys } from "~/recipe-import";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes.$id";
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: `${data?.recipe.name ?? "Recipe"} – Shopocalypse` }];
+  return [{ title: pageTitle(data?.recipe.name ?? "Recipe") }];
 }
 
 export async function loader({ params }: Route.LoaderArgs) {

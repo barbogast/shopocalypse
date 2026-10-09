@@ -5,10 +5,11 @@ import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { recipes } from "~/db/schema";
 import { int, optionalText, optionalUrl, text } from "~/forms";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes.new";
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: "New Recipe – Shopocalypse" }];
+  return [{ title: pageTitle("New Recipe") }];
 }
 
 export async function action({ request }: Route.ActionArgs) {

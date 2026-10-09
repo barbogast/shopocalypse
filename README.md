@@ -18,6 +18,10 @@ yarn test
 Locally the database is the file `shopocalypse.db` and there's no password.
 Environment variables are listed in `.env.example`.
 
+`yarn db:download` replaces `shopocalypse.db` with a copy of production, using
+`PROD_DATABASE_URL` and `PROD_DATABASE_AUTH_TOKEN` from `.env` (not committed).
+Run it again whenever you want a clean state.
+
 ## Deployment (Vercel + Turso)
 
 The app runs as Vercel functions in `fra1` (see `vercel.json`) against a Turso

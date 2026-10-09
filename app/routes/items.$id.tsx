@@ -8,10 +8,11 @@ import { db } from "~/db/client";
 import { listParents, listShelves, mergeItem, parseItemForm, updateItem } from "~/db/items.server";
 import { items, stores } from "~/db/schema";
 import { int, itemsPath } from "~/forms";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items.$id";
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: `${data?.item.name ?? "Item"} – Shopocalypse` }];
+  return [{ title: pageTitle(data?.item.name ?? "Item") }];
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {

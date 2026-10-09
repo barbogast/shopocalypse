@@ -28,10 +28,11 @@ import { itemCategories, items, recipeIngredients, recipes, stores } from "~/db/
 import { editItemPath, int, text } from "~/forms";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { unitName } from "~/units";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items";
 
 export function meta() {
-  return [{ title: "Items – Shopocalypse" }];
+  return [{ title: pageTitle("Items") }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {

@@ -6,10 +6,11 @@ import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { listParents, listShelves, parseItemForm } from "~/db/items.server";
 import { items, stores } from "~/db/schema";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items.new";
 
 export function meta() {
-  return [{ title: "New Item – Shopocalypse" }];
+  return [{ title: pageTitle("New Item") }];
 }
 
 export async function loader() {

@@ -15,6 +15,7 @@ import { items, recipes } from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
 import { itemKey, itemKeys, likelySingular, type ParsedIngredient, parseRecipeText } from "~/recipe-import";
 import { formatAmount, UNITS } from "~/units";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes.import";
 
 const PLACEHOLDER = `Spaghetti Carbonara
@@ -30,7 +31,7 @@ Boil the pasta…
 Optional notes`;
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: "Import Recipe – Shopocalypse" }];
+  return [{ title: pageTitle("Import Recipe") }];
 }
 
 export async function loader() {

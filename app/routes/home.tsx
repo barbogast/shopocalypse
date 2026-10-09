@@ -27,10 +27,11 @@ import { db } from "~/db/client";
 import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
 import { int, text } from "~/forms";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: "Shopocalypse" }];
+  return [{ title: pageTitle() }];
 }
 
 export async function loader() {

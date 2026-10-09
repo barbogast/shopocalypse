@@ -43,10 +43,11 @@ import { int } from "~/forms";
 import { listAmounts, listAsText } from "~/shopping-list";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { combineAmounts, DEFAULT_UNIT, formatAmounts, nameForAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/shopping";
 
 export function meta() {
-  return [{ title: "Shopping – Shopocalypse" }];
+  return [{ title: pageTitle("Shopping") }];
 }
 
 // Collapse repeated meals (same recipe and servings) into one entry with a count, keeping first-seen order

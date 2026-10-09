@@ -16,6 +16,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { checkPassword } from "./auth.server";
+import { DevMarker } from "./components/dev-marker";
 import { VersionFooter } from "./components/version-footer";
 import type { Route } from "./+types/root";
 
@@ -46,6 +47,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <MantineProvider>
+          <DevMarker />
           <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
             <main style={{ flex: 1, paddingBottom: 70 }}>
               {children}

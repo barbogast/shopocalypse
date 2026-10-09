@@ -6,10 +6,11 @@ import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
 import { mealHistory, recipes } from "~/db/schema";
 import { int } from "~/forms";
+import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes";
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: "Recipes – Shopocalypse" }];
+  return [{ title: pageTitle("Recipes") }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
