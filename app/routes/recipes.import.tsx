@@ -292,7 +292,7 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
               <Table.Tbody>
                 {recipe.ingredients.map((ing) => (
                   <Table.Tr key={ing.line}>
-                    <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
+                    <Table.Td c="dimmed" ta="right" style={{ width: 90, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
                     <Table.Td>
                       <IngredientName {...ing} noteControl={
                         <Checkbox size="xs" label="Note on shopping list" checked={notesOnList.has(noteKey(ing))}

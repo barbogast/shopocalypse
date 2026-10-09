@@ -112,8 +112,8 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
         <Table.Tbody>
           {ingredients.map((ing) => (
             <Table.Tr key={ing.itemId}>
+              <Table.Td c="dimmed" ta="right" style={{ width: 100, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
               <Table.Td><IngredientName {...ing} /></Table.Td>
-              <Table.Td c="dimmed" style={{ width: 100 }}>{formatAmount(ing)}</Table.Td>
             </Table.Tr>
           ))}
           {ingredients.length === 0 && (

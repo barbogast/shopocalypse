@@ -39,8 +39,8 @@ export function RecipeDrawer({ recipe, note, onClose }: { recipe: RecipeDetails 
             <Table.Tbody>
               {recipe.ingredients.map((ing) => (
                 <Table.Tr key={ing.itemId}>
+                  <Table.Td c="dimmed" ta="right" style={{ width: 90, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
                   <Table.Td><IngredientName {...ing} /></Table.Td>
-                  <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
                 </Table.Tr>
               ))}
               {recipe.ingredients.length === 0 && (

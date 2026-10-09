@@ -280,13 +280,14 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
       <Table mb="md">
         <Table.Tbody>
           {ingredients.map((ing, index) => (
-            <Table.Tr key={ing.itemId}>
+            // Top-aligned, so the amount stays level with the name when a note makes the row taller
+            <Table.Tr key={ing.itemId} style={{ verticalAlign: "top" }}>
               <Table.Td px={0} style={{ width: 56 }}>
                 <MoveButtons intent="move-ingredient" fields={{ itemId: ing.itemId }}
                   first={index === 0} last={index === ingredients.length - 1} />
               </Table.Td>
+              <Table.Td c="dimmed" ta="right" style={{ width: 90, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
               <Table.Td><IngredientName {...ing} /></Table.Td>
-              <Table.Td c="dimmed" style={{ width: 90 }}>{formatAmount(ing)}</Table.Td>
               <Table.Td style={{ width: 40 }}>
                 <ActionIcon variant="subtle" onClick={() => editIngredient(ing)} aria-label={`Edit ${ing.name}`}>
                   <IconPencil size={16} />
