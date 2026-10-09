@@ -11,7 +11,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:deploy": "node --experimental-strip-types scripts/migrate.ts",
     "db:seed": "node --experimental-strip-types scripts/seed.ts",
-    "db:download": "turso db export shopocalypse --output-file shopocalypse.db.download --overwrite && rm -f shopocalypse.db-wal shopocalypse.db-shm && mv shopocalypse.db.download shopocalypse.db",
+    "db:download": "node --experimental-strip-types --env-file-if-exists=.env scripts/download-prod-db.ts",
     "vercel-build": "if [ \"$VERCEL_ENV\" = production ]; then yarn -s db:migrate:deploy; fi && react-router build",
     "test": "vitest run"
   },
