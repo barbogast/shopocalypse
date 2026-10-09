@@ -195,12 +195,13 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
     setItemId(item ? String(item.id) : null);
     setSearch(item?.name ?? "");
     setUnit(item?.defaultUnit ?? DEFAULT_UNIT);
+    // Items without a default unit, like spices, usually come without a quantity
+    setQuantity(item && !item.defaultUnit ? "" : 1);
     setEditingId(null);
   };
 
   const resetForm = () => {
     selectItem(undefined);
-    setQuantity(1);
     setNote("");
     setNoteOnList(false);
   };
