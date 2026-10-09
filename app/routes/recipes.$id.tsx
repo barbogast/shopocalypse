@@ -173,7 +173,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
     .map((i) => ({ value: String(i.id), label: i.name }));
   const [itemId, setItemId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [quantity, setQuantity] = useState<string | number>("");
+  const [quantity, setQuantity] = useState<string | number>(1);
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
   const [note, setNote] = useState("");
   const [noteOnList, setNoteOnList] = useState(false);
@@ -200,7 +200,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
 
   const resetForm = () => {
     selectItem(undefined);
-    setQuantity("");
+    setQuantity(1);
     setNote("");
     setNoteOnList(false);
   };
