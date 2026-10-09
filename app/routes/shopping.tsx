@@ -9,6 +9,7 @@ import {
   Anchor,
   Divider,
   Group,
+  List,
   NumberInput,
   Popover,
   Select,
@@ -469,7 +470,9 @@ function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | unde
                 </ActionIcon>
               </Popover.Target>
               <Popover.Dropdown>
-                {usedIn.map((name) => <Text key={name} size="sm">{name}</Text>)}
+                <List size="sm">
+                  {usedIn.map((name) => <List.Item key={name}>{name}</List.Item>)}
+                </List>
               </Popover.Dropdown>
             </Popover>
           )}
