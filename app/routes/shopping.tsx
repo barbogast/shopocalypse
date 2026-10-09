@@ -81,12 +81,14 @@ export async function loader() {
   }
 
   const parents = alias(items, "parents");
+  const listedParents = alias(shoppingListItems, "listed_parents");
+  // Indented under its parent only when the parent is on the list too and they share a shelf
+  const isVariant = sql<boolean>`${listedParents.id} is not null and ${parents.storeId} is ${items.storeId} and ${parents.categoryId} is ${items.categoryId}`;
   const listItems = await db
     .select({
       id: shoppingListItems.id,
       itemId: shoppingListItems.itemId,
-      // Indented under its parent only when they share a shelf
-      isVariant: sql<boolean>`${items.parentId} is not null and ${parents.storeId} is ${items.storeId} and ${parents.categoryId} is ${items.categoryId}`.mapWith(Boolean),
+      isVariant: isVariant.mapWith(Boolean),
       itemName: items.name,
       itemPlural: items.plural,
       amounts: shoppingListItems.amounts,
@@ -101,6 +103,10 @@ export async function loader() {
     .leftJoin(stores, eq(items.storeId, stores.id))
     .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
     .leftJoin(parents, eq(items.parentId, parents.id))
+    .leftJoin(listedParents, and(
+      eq(listedParents.shoppingListId, shoppingListItems.shoppingListId),
+      eq(listedParents.itemId, items.parentId),
+    ))
     .where(eq(shoppingListItems.shoppingListId, activeList.id))
     // Stores alphabetically, then shelves in walking order; items without a store or shelf go last.
     // Variants on their parent's shelf come right after it
@@ -109,8 +115,8 @@ export async function loader() {
       stores.name,
       sql`${itemCategories.position} is null`,
       itemCategories.position,
-      sql`coalesce(${parents.name}, ${items.name}) collate nocase`,
-      sql`${items.parentId} is not null`,
+      sql`case when ${isVariant} then ${parents.name} else ${items.name} end collate nocase`,
+      isVariant,
       sql`${items.name} collate nocase`,
     );
 
