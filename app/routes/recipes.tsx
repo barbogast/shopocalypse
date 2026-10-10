@@ -64,7 +64,6 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
           <Text c="dimmed" size="sm">{all.length}</Text>
         </Group>
         <Group gap="xs">
-          <Button component={Link} to="/items" variant="subtle" size="sm">Manage items</Button>
           <Button component={Link} to="/recipes/import" variant="light" leftSection={<IconFileImport size={16} />}>
             Import
           </Button>
