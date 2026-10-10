@@ -10,6 +10,7 @@ import {
   Divider,
   Group,
   List,
+  Modal,
   NumberInput,
   Popover,
   Select,
@@ -19,17 +20,20 @@ import {
   Title,
 } from "@mantine/core";
 import { IconCheck, IconChefHat, IconChevronDown, IconChevronRight, IconCopy, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
-import { useEffect, useState } from "react";
+import { useDisclosure } from "@mantine/hooks";
+import { useEffect, useRef, useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { Form, useActionData, useFetcher, useFetchers } from "react-router";
 import { FormError } from "~/components/form-error";
+import { ItemFields } from "~/components/item-fields";
 import { itemSearchFilter } from "~/components/item-search";
 import { LocalDateTime } from "~/components/local-date-time";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { Servings } from "~/components/servings";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
+import { listParents, listShelves, parseItemForm } from "~/db/items.server";
 import { mealServings, withIngredients } from "~/db/recipes.server";
 import { changeItemsForMeals, getActiveList, listIngredients, listMeals } from "~/db/shopping.server";
 import {
@@ -43,6 +47,7 @@ import {
   stores,
 } from "~/db/schema";
 import { int, text } from "~/forms";
+import { itemKey, itemKeys } from "~/recipe-import";
 import { listAmounts, listAsText } from "~/shopping-list";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { combineAmounts, DEFAULT_UNIT, formatAmounts, nameForAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
@@ -155,7 +160,19 @@ export async function loader() {
     .where(eq(recipes.archived, false))
     .orderBy(sql`${recipes.name} collate nocase`);
 
-  return { activeList, listRecipes, listItems, scheduled, allItems, allRecipes };
+  const allStores = await db.select().from(stores).orderBy(stores.name);
+
+  return {
+    activeList,
+    listRecipes,
+    listItems,
+    scheduled,
+    allItems,
+    allRecipes,
+    allStores,
+    allShelves: await listShelves(),
+    parents: await listParents(),
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -246,6 +263,17 @@ export async function action({ request }: Route.ActionArgs) {
         }
       });
       break;
+    }
+
+    // New item from the item picker; it's then preselected for adding
+    case "create-item": {
+      const parsed = await parseItemForm(form);
+      if (parsed.error) return { createError: parsed.error };
+      const [item] = await db
+        .insert(items)
+        .values(parsed.values)
+        .returning({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit });
+      return { createdItem: item };
     }
 
     case "add-recipe": {
@@ -500,33 +528,100 @@ function AddRecipeForm({ recipes }: { recipes: ActiveListData["allRecipes"] }) {
   );
 }
 
-// Manually add an item; the unit starts on the item's default unit
-function AddItemForm({ items }: {
+// Manually add an item; the unit starts on the item's default unit.
+// Searching for an item that doesn't exist yet offers to create it
+function AddItemForm({ items, stores, shelves, parents }: {
   items: { id: number; name: string; plural: string | null; defaultUnit: string | null; listed: boolean }[];
+  stores: ActiveListData["allStores"];
+  shelves: ActiveListData["allShelves"];
+  parents: ActiveListData["parents"];
 }) {
+  const [itemId, setItemId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
+  const [createOpened, createModal] = useDisclosure(false);
+  const [createName, setCreateName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
   const actionData = useActionData<typeof action>();
 
+  // Offer to create the searched-for item when no item has that name or plural yet
+  const searchName = search.trim();
+  const canCreate = searchName !== "" && !items.some((i) => itemKeys(i).includes(itemKey(searchName)));
+  const itemOptions = items.map((i) => ({ value: String(i.id), label: i.listed ? `${i.name} (on list)` : i.name }));
+  if (canCreate) itemOptions.push({ value: "__create__", label: `+ Create "${searchName}"` });
+
+  const selectItem = (item: { id: number; name: string; defaultUnit: string | null } | undefined) => {
+    setItemId(item ? String(item.id) : null);
+    setSearch(item?.name ?? "");
+    setUnit(item?.defaultUnit ?? DEFAULT_UNIT);
+  };
+
+  useEffect(() => {
+    if (actionData && "createError" in actionData) setCreateError(actionData.createError ?? null);
+    // Arrives before the loader reruns, so the new item isn't in items yet
+    if (actionData && "createdItem" in actionData) {
+      createModal.close();
+      selectItem(actionData.createdItem);
+      quantityRef.current?.focus();
+    }
+  }, [actionData]);
+
   return (
-    <Form method="post">
-      <input type="hidden" name="intent" value="add-manual" />
-      <Group align="flex-end" gap="xs">
-        <Select
-          name="itemId"
-          label="Add item"
-          data={items.map((i) => ({ value: String(i.id), label: i.listed ? `${i.name} (on list)` : i.name }))}
-          searchable
-          filter={itemSearchFilter(items)}
-          placeholder="Select item…"
-          onChange={(value) => setUnit(items.find((i) => String(i.id) === value)?.defaultUnit ?? DEFAULT_UNIT)}
-          style={{ flex: 1, minWidth: 140 }}
-        />
-        <NumberInput name="quantity" label="Qty" min={0} decimalScale={2} decimalSeparator="," placeholder="—" style={{ width: 70 }} />
-        <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
-        <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
-      </Group>
-      <FormError error={actionData?.addError} mt="xs" />
-    </Form>
+    <>
+      <Form method="post">
+        <input type="hidden" name="intent" value="add-manual" />
+        <Group align="flex-end" gap="xs">
+          <Select
+            name="itemId"
+            label="Add item"
+            data={itemOptions}
+            value={itemId}
+            searchable
+            filter={itemSearchFilter(items)}
+            searchValue={search}
+            onSearchChange={setSearch}
+            placeholder="Search or create…"
+            onChange={(value) => {
+              if (value === "__create__") {
+                setCreateName(searchName);
+                setCreateError(null);
+                createModal.open();
+              } else {
+                selectItem(items.find((i) => String(i.id) === value));
+              }
+            }}
+            style={{ flex: 1, minWidth: 140 }}
+          />
+          <NumberInput ref={quantityRef} name="quantity" label="Qty" min={0} decimalScale={2} decimalSeparator=","
+            placeholder="—" style={{ width: 70 }} />
+          <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
+          <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
+        </Group>
+        <FormError error={actionData && "addError" in actionData ? actionData.addError : null} mt="xs" />
+      </Form>
+
+      {/* No returnFocus: it would take focus back from the quantity field to the item picker */}
+      <Modal opened={createOpened} onClose={createModal.close} title="New item" returnFocus={false}>
+        <Form method="post">
+          <input type="hidden" name="intent" value="create-item" />
+          <Stack>
+            <ItemFields
+              stores={stores}
+              shelves={shelves}
+              parents={parents}
+              defaults={{ name: createName, defaultUnit: unit }}
+              autoFocus
+            />
+            <FormError error={createError} />
+            <Group justify="flex-end">
+              <Button variant="subtle" onClick={createModal.close}>Cancel</Button>
+              <SubmitButton>Create</SubmitButton>
+            </Group>
+          </Stack>
+        </Form>
+      </Modal>
+    </>
   );
 }
 
@@ -614,7 +709,16 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
   return <ListView {...loaderData} />;
 }
 
-function ListView({ activeList, listRecipes, listItems: loadedItems, allItems, allRecipes }: ActiveListData) {
+function ListView({
+  activeList,
+  listRecipes,
+  listItems: loadedItems,
+  allItems,
+  allRecipes,
+  allStores,
+  allShelves,
+  parents,
+}: ActiveListData) {
   const listItems = withPendingChanges(loadedItems, useFetchers());
 
   const groups = groupByStoreAndShelf(listItems);
@@ -685,12 +789,8 @@ function ListView({ activeList, listRecipes, listItems: loadedItems, allItems, a
         </Stack>
       ))}
 
-      {allItems.length > 0 && (
-        <>
-          <Divider my="md" />
-          <AddItemForm items={allItems} />
-        </>
-      )}
+      <Divider my="md" />
+      <AddItemForm items={allItems} stores={allStores} shelves={allShelves} parents={parents} />
 
       <Divider my="lg" />
       <Group>

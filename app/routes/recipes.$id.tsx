@@ -356,7 +356,8 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <FormError error={actionData && "ingredientError" in actionData ? actionData.ingredientError : null} mt="xs" />
       </Form>
 
-      <Modal opened={createOpened} onClose={createModal.close} title="New item">
+      {/* No returnFocus: it would take focus back from the quantity field to the item picker */}
+      <Modal opened={createOpened} onClose={createModal.close} title="New item" returnFocus={false}>
         <Form method="post">
           <input type="hidden" name="intent" value="create-item" />
           <Stack>
