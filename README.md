@@ -63,11 +63,12 @@ database. Each query is a round trip to Turso, so keep both in the same region.
 ```sh
 yarn db:generate --name <change>     # locally, after editing app/db/schema.ts
 yarn db:migrate                      # local file
+yarn db:backfill                     # local file: a first version for recipes without one
 ```
 
 Production deploys apply pending migrations to Turso before building (the
 `vercel-build` script); a failed migration fails the deploy. Preview builds
-skip them. Migrations must keep working with the code that's still live until
+skip them. The same step gives recipes without a version their first one. Migrations must keep working with the code that's still live until
 the deploy finishes, and with older deploys you might roll back to, since
 Vercel's rollback doesn't undo them, e.g. add columns before using them and
 don't drop or rename ones that live code reads.

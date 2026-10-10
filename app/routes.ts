@@ -6,6 +6,7 @@ export default [
   route("recipes/new", "routes/recipes.new.tsx"),
   route("recipes/import", "routes/recipes.import.tsx"),
   route("recipes/:id", "routes/recipes.$id.tsx"),
+  route("recipes/:id/history", "routes/recipes.$id.history.tsx"),
   route("cook/:id", "routes/cook.$id.tsx"),
   route("items", "routes/items.tsx"),
   route("items/new", "routes/items.new.tsx"),

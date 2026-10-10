@@ -1,5 +1,6 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
+import { backfillRecipeVersions } from "../app/db/recipe-versions.ts";
 import * as schema from "../app/db/schema.ts";
 
 const client = createClient({
@@ -80,6 +81,8 @@ const ingredients: (typeof schema.recipeIngredients.$inferInsert)[] = [
 ];
 // Listed in recipe order; positions only need to increase within each recipe
 await db.insert(schema.recipeIngredients).values(ingredients.map((ingredient, index) => ({ ...ingredient, position: index + 1 })));
+
+await backfillRecipeVersions(db);
 
 const maxPosition = 100;
 await db.insert(schema.mealSchedule).values([

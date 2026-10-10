@@ -18,8 +18,9 @@
 // It's deliberately strict: anything it doesn't understand is an error on that
 // line, to be fixed in the text, rather than a guess.
 
-import { webUrl } from "./forms";
-import { UNITS, type UnitKey } from "./units";
+// With extensions, so scripts/ can load this file with plain Node (for backfilling recipe versions)
+import { webUrl } from "./forms.ts";
+import { nameForAmounts, UNITS, type UnitKey } from "./units.ts";
 
 export type ParsedIngredient = {
   line: number;
@@ -260,4 +261,47 @@ export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: I
 
   errors.sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));
   return { recipe, errors };
+}
+
+// A recipe written out in the format above, to keep its versions. Reads back with parseRecipeText,
+// unless the instructions have a line that looks like a heading ("Comments", "---")
+export type RecipeForText = {
+  name: string;
+  servingSize: number;
+  weblink: string | null;
+  instructions: string | null;
+  comments: string | null;
+  ingredients: IngredientForText[];
+};
+
+type IngredientForText = { name: string; plural?: string | null; quantity: number | null; unit: UnitKey | null; note: string | null };
+
+// Without grouping: "1.000 g" would read back as 1 g
+const quantityFormat = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 3, useGrouping: false });
+
+export function ingredientToText(ing: IngredientForText): string {
+  const { quantity, note } = ing;
+  const unit = quantity == null ? null : ing.unit ?? "pcs";
+  const name = nameForAmounts(ing, [{ quantity, unit }]);
+  const def = UNITS.find((u) => u.key === unit);
+  // A number alone means pieces
+  const amount = quantity == null ? "" : `${quantityFormat.format(quantity)} ${def && unit !== "pcs" ? `${quantity === 1 ? def.label : def.plural} ` : ""}`;
+  const line = (n: string) => `${amount}${n}${note ? ` - ${note}` : ""}`;
+
+  // Quote the name when it would read back differently: "Salz, Pfeffer", or "Dose Tomaten" after a number
+  const parsed = parseIngredient(line(name));
+  const readsBack = !("error" in parsed) && parsed.name === name && parsed.unit === unit
+    && (parsed.note ?? null) === (note || null);
+  return readsBack ? line(name) : line(`"${name}"`);
+}
+
+export function recipeToText(recipe: RecipeForText): string {
+  const sections = [
+    [recipe.name, String(recipe.servingSize), recipe.weblink].filter(Boolean).join("\n"),
+    ["Ingredients", ...recipe.ingredients.map(ingredientToText)].join("\n"),
+  ];
+  if (recipe.instructions) sections.push(`Instructions\n${recipe.instructions}`);
+  if (recipe.comments) sections.push(`Comments\n${recipe.comments}`);
+  // Textareas submit \r\n
+  return sections.join("\n\n").replace(/\r\n/g, "\n");
 }

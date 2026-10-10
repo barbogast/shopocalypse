@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { itemKey, itemKeys, likelySingular, parseIngredient, parseRecipeText } from "./recipe-import";
+import {
+  ingredientToText,
+  itemKey,
+  itemKeys,
+  likelySingular,
+  parseIngredient,
+  parseRecipeText,
+  type RecipeForText,
+  recipeToText,
+} from "./recipe-import";
 
 describe("parseIngredient", () => {
   it("reads quantity, unit and name", () => {
@@ -256,5 +265,80 @@ describe("parseRecipeText", () => {
       .toEqual([{ line: 3, message: expect.stringContaining("valid web address") }]);
     expect(parseRecipeText("Soup\nhttps://a.com\n2\nhttps://b.com\n---\nwater").errors)
       .toEqual([{ line: 4, message: expect.stringContaining("line 2") }]);
+  });
+});
+
+describe("ingredientToText", () => {
+  it("writes the amount before the name, and the note after a dash", () => {
+    expect(ingredientToText({ name: "Spaghetti", quantity: 400, unit: "g", note: null })).toBe("400 g Spaghetti");
+    expect(ingredientToText({ name: "Olivenöl", quantity: 1, unit: "tbsp", note: null })).toBe("1 EL Olivenöl");
+    expect(ingredientToText({ name: "Tomaten", quantity: 2, unit: "can", note: "gehackt" })).toBe("2 Dosen Tomaten - gehackt");
+    expect(ingredientToText({ name: "Mehl", quantity: 1.5, unit: "kg", note: null })).toBe("1,5 kg Mehl");
+    expect(ingredientToText({ name: "Wasser", quantity: 1000, unit: "ml", note: null })).toBe("1000 ml Wasser");
+    expect(ingredientToText({ name: "Salz", quantity: null, unit: null, note: "nach Geschmack" })).toBe("Salz - nach Geschmack");
+  });
+
+  it("leaves out pcs and uses the plural for several", () => {
+    expect(ingredientToText({ name: "Ei", plural: "Eier", quantity: 4, unit: "pcs", note: null })).toBe("4 Eier");
+    expect(ingredientToText({ name: "Ei", plural: "Eier", quantity: 1, unit: "pcs", note: null })).toBe("1 Ei");
+  });
+
+  it("quotes names that wouldn't read back the same", () => {
+    expect(ingredientToText({ name: "Salz, Pfeffer", quantity: null, unit: null, note: null })).toBe('"Salz, Pfeffer"');
+    expect(ingredientToText({ name: "Feta (mild)", quantity: 200, unit: "g", note: null })).toBe('200 g "Feta (mild)"');
+    expect(ingredientToText({ name: "Dose Tomaten", quantity: 2, unit: "pcs", note: null })).toBe('2 "Dose Tomaten"');
+    expect(ingredientToText({ name: "5-Minuten-Terrine", quantity: null, unit: null, note: null })).toBe('"5-Minuten-Terrine"');
+    expect(ingredientToText({ name: "chili-flakes", quantity: 1, unit: "tsp", note: null })).toBe("1 TL chili-flakes");
+  });
+});
+
+describe("recipeToText", () => {
+  const recipe: RecipeForText = {
+    name: "Carbonara",
+    servingSize: 4,
+    weblink: "https://example.com/carbonara",
+    instructions: "Boil the pasta.\r\n\r\n**Quickly** mix in the eggs.",
+    comments: "From Nonna",
+    ingredients: [
+      { name: "Spaghetti", quantity: 400, unit: "g", note: null },
+      { name: "Eier", quantity: 4, unit: "pcs", note: null },
+      { name: "Salz, grob", quantity: null, unit: null, note: "to taste" },
+      { name: "Pecorino", quantity: 0.5, unit: "pack", note: "fein gerieben; oder Parmesan" },
+    ],
+  };
+
+  it("writes the sections under headings", () => {
+    expect(recipeToText(recipe)).toBe(`Carbonara
+4
+https://example.com/carbonara
+
+Ingredients
+400 g Spaghetti
+4 Eier
+"Salz, grob" - to taste
+0,5 Packungen Pecorino - fein gerieben; oder Parmesan
+
+Instructions
+Boil the pasta.
+
+**Quickly** mix in the eggs.
+
+Comments
+From Nonna`);
+  });
+
+  it("reads back with parseRecipeText", () => {
+    const { recipe: parsed, errors } = parseRecipeText(recipeToText(recipe));
+    expect(errors).toEqual([]);
+    expect({ ...parsed, ingredients: parsed.ingredients.map(({ line, ...ing }) => ing) }).toEqual({
+      ...recipe,
+      instructions: "Boil the pasta.\n\n**Quickly** mix in the eggs.",
+    });
+  });
+
+  it("leaves out empty parts", () => {
+    const text = recipeToText({ ...recipe, weblink: null, instructions: null, comments: "Warming" });
+    expect(text).not.toContain("Instructions");
+    expect(parseRecipeText(text).recipe).toMatchObject({ weblink: null, instructions: null, comments: "Warming" });
   });
 });

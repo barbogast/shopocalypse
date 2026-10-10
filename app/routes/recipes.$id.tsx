@@ -15,10 +15,10 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconCheck, IconPencil, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconCheck, IconHistory, IconPencil, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useRef, useState } from "react";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
@@ -28,6 +28,7 @@ import { MoveButtons } from "~/components/move-buttons";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { listParents, listShelves, parseItemForm } from "~/db/items.server";
+import { recordRecipeVersion } from "~/db/recipe-versions";
 import {
   deleteOrArchiveRecipe,
   formatCookedAt,
@@ -36,7 +37,7 @@ import {
   upsertIngredient,
   withIngredients,
 } from "~/db/recipes.server";
-import { items, mealHistory, recipeIngredients, recipes, stores } from "~/db/schema";
+import { items, mealHistory, recipeIngredients, recipes, recipeVersions, stores } from "~/db/schema";
 import { int, optionalText, optionalUrl, text } from "~/forms";
 import { itemKey, itemKeys } from "~/recipe-import";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
@@ -68,7 +69,15 @@ export async function loader({ params }: Route.LoaderArgs) {
     .orderBy(desc(mealHistory.cookedAt), desc(mealHistory.id))
     .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
 
-  return { recipe, ingredients, allItems, allStores, allShelves: await listShelves(), parents: await listParents(), cookedDates };
+  const { versionCount } = await db
+    .select({ versionCount: count() })
+    .from(recipeVersions)
+    .where(eq(recipeVersions.recipeId, id))
+    .get() ?? { versionCount: 0 };
+
+  return {
+    recipe, ingredients, allItems, allStores, allShelves: await listShelves(), parents: await listParents(), cookedDates, versionCount,
+  };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -87,6 +96,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       if (!name || !servingSize) return { error: "Name and a whole-number serving size are required." };
       if (weblink === undefined) return { error: "The weblink must be a web address, like https://example.com/recipe." };
       await db.update(recipes).set({ name, servingSize, instructions, comments, weblink, autoFill }).where(eq(recipes.id, id));
+      await recordRecipeVersion(db, id);
       return { saved: true };
     }
 
@@ -100,6 +110,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       const noteOnList = note !== null && form.get("noteOnList") === "on";
       // Also how an existing ingredient is edited
       await upsertIngredient(id, itemId, { quantity, unit, note, noteOnList });
+      await recordRecipeVersion(db, id);
       break;
     }
 
@@ -107,6 +118,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       const itemId = int(form, "itemId");
       if (!itemId) return null;
       await moveIngredient(id, itemId, form.get("direction") === "up");
+      await recordRecipeVersion(db, id);
       break;
     }
 
@@ -127,6 +139,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       await db
         .delete(recipeIngredients)
         .where(and(eq(recipeIngredients.recipeId, id), eq(recipeIngredients.itemId, itemId)));
+      await recordRecipeVersion(db, id);
       break;
     }
 
@@ -165,7 +178,7 @@ function SaveButton({ saved }: { saved: boolean }) {
 }
 
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { recipe, ingredients, allItems, allStores, allShelves, parents, cookedDates } = loaderData;
+  const { recipe, ingredients, allItems, allStores, allShelves, parents, cookedDates, versionCount } = loaderData;
   const cooked = cookedDates.length > 0;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   // The ingredient loaded into the form for editing, which stays selectable
@@ -410,6 +423,11 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
       ) : (
         <Text size="sm" c="dimmed">Not cooked yet.</Text>
       )}
+
+      <Button component={Link} to={`/recipes/${recipe.id}/history`} variant="subtle" size="xs" px={0} mt="xl"
+        leftSection={<IconHistory size={14} />}>
+        Edit history ({versionCount === 1 ? "1 version" : `${versionCount} versions`})
+      </Button>
     </Container>
   );
 }

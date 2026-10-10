@@ -2,7 +2,8 @@ import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { itemKey, itemKeys, type ParsedIngredient, type ParsedRecipe } from "~/recipe-import";
 import { scaleAmount } from "~/units";
 import { db } from "./client";
-import { items, mealHistory, mealSchedule, recipeIngredients, recipes, shoppingListRecipes, stores } from "./schema";
+import { recordRecipeVersion } from "./recipe-versions";
+import { items, mealHistory, mealSchedule, recipeIngredients, recipes, recipeVersions, shoppingListRecipes, stores } from "./schema";
 
 // Cook dates are stored as YYYY-MM-DD; format on the server so client and server render the same string
 export function formatCookedAt(cookedAt: string) {
@@ -22,6 +23,7 @@ export async function deleteOrArchiveRecipe(recipeId: number) {
     } else {
       await tx.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId)).run();
       await tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.recipeId, recipeId)).run();
+      await tx.delete(recipeVersions).where(eq(recipeVersions.recipeId, recipeId)).run();
       await tx.delete(recipes).where(eq(recipes.id, recipeId)).run();
     }
   });
@@ -137,6 +139,7 @@ export async function importRecipe({ ingredients, ...recipe }: Omit<ParsedRecipe
       note: ing.note,
       noteOnList: ing.noteOnList,
     }))).run();
+    await recordRecipeVersion(tx, id);
 
     return { id, newItems, storeName: store?.name ?? null };
   });

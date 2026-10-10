@@ -45,6 +45,14 @@
 - quantity (decimal, optional)
 - unit (optional) — both are empty when the recipe gives no quantity (e.g. spices)
 
+### RecipeVersion _(edit history of a recipe)_
+
+- recipe_id
+- saved_at — when the version was last edited
+- text — the recipe written out in the import format (name, servings, weblink, ingredients, instructions, comments). Note-on-list, auto-fill and archived aren't part of it
+
+Recorded after every change to a recipe's content (recipe page, creating, importing, comments when cooking). A change within 30 minutes of the latest version updates it instead of adding one, so an editing session makes one version; a session undone back to the version before leaves nothing. The history page shows each version's line diff against the one before. Recipes from before 2026-10-10 got a first version from their content then, dated with their created_at, so it holds any earlier edits too. That backfill runs on deploy (`scripts/migrate.ts`) and locally with `yarn db:backfill`, since it needs the app's code
+
 ### Stock _(one entry per ingredient)_
 
 - item_id
@@ -94,6 +102,7 @@ A recipe appears once per scheduled meal, so it can be listed more than once. Me
 ## Key relationships
 
 - Recipe ↔ Item: many-to-many via RecipeIngredient
+- RecipeVersion → Recipe: many-to-one
 - Stock → Item: one-to-one
 - MealSchedule → Recipe: many-to-one
 - MealHistory → Recipe: many-to-one

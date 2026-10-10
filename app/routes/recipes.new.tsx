@@ -3,6 +3,7 @@ import { Form, redirect } from "react-router";
 import { FormError } from "~/components/form-error";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
+import { recordRecipeVersion } from "~/db/recipe-versions";
 import { recipes } from "~/db/schema";
 import { int, optionalText, optionalUrl, text } from "~/forms";
 import { pageTitle } from "~/page-title";
@@ -24,6 +25,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (weblink === undefined) return { error: "The weblink must be a web address, like https://example.com/recipe." };
 
   const [recipe] = await db.insert(recipes).values({ name, servingSize, instructions, comments, weblink }).returning();
+  await recordRecipeVersion(db, recipe.id);
   return redirect(`/recipes/${recipe.id}`);
 }
 

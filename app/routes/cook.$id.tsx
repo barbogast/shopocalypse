@@ -9,6 +9,7 @@ import { SubmitButton } from "~/components/submit-button";
 import { Weblink } from "~/components/weblink";
 import { isDateString, localDate } from "~/dates";
 import { db } from "~/db/client";
+import { recordRecipeVersion } from "~/db/recipe-versions";
 import { withIngredients } from "~/db/recipes.server";
 import { mealHistory, mealSchedule, recipes } from "~/db/schema";
 import { optionalText } from "~/forms";
@@ -61,6 +62,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     await tx.update(recipes).set({ comments }).where(eq(recipes.id, id)).run();
     if (position != null) await tx.delete(mealSchedule).where(eq(mealSchedule.position, position)).run();
     await tx.insert(mealHistory).values({ recipeId: id, cookedAt }).run();
+    await recordRecipeVersion(tx, id);
   });
 
   return redirect(position != null ? "/" : `/recipes/${id}`);

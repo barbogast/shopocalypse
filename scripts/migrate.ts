@@ -1,6 +1,8 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
+import { backfillRecipeVersions } from "../app/db/recipe-versions.ts";
+import * as schema from "../app/db/schema.ts";
 
 // Like `drizzle-kit migrate`, but with plain log lines instead of a spinner,
 // which build logs (e.g. Vercel's) can't render. Meant for deployed databases,
@@ -28,11 +30,14 @@ async function appliedCount() {
 
 console.log(`Applying migrations to ${new URL(url).host || url}`);
 const before = await appliedCount();
-await migrate(drizzle(client), { migrationsFolder: "./drizzle" });
+const db = drizzle(client, { schema });
+await migrate(db, { migrationsFolder: "./drizzle" });
 const after = await appliedCount();
 console.log(
   after > before
     ? `Applied ${after - before} migration(s), ${after} in total`
     : `No pending migrations (${after} applied)`,
 );
+// Needs the app's code (recipeToText), so it can't be part of an SQL migration
+console.log(`Backfilled ${await backfillRecipeVersions(db)} recipe version(s)`);
 client.close();

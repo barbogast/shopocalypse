@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { type AnySQLiteColumn, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { type AnySQLiteColumn, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { ListNote } from "../shopping-list";
 import type { Amount, UnitKey } from "../units";
 
@@ -51,6 +51,18 @@ export const recipes = sqliteTable("recipes", {
   // Picked by the meal schedule's auto-fill; off for occasional dishes, which are then only added by hand
   autoFill: integer("auto_fill", { mode: "boolean" }).notNull().default(true),
 });
+
+// Earlier states of a recipe, written out in the import format (recipeToText). Edits within
+// 30 minutes of the latest version update it instead of adding one
+export const recipeVersions = sqliteTable("recipe_versions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  recipeId: integer("recipe_id")
+    .notNull()
+    .references(() => recipes.id),
+  // ISO timestamp of the version's last edit
+  savedAt: text("saved_at").notNull(),
+  text: text("text").notNull(),
+}, (t) => [index("recipe_versions_recipe").on(t.recipeId, t.savedAt)]);
 
 export const recipeIngredients = sqliteTable("recipe_ingredients", {
   recipeId: integer("recipe_id")
