@@ -7,7 +7,8 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "turso",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "file:shopocalypse.db",
-    authToken: process.env.DATABASE_AUTH_TOKEN,
+    url: process.env.DATABASE_URL || "file:shopocalypse.db",
+    // drizzle-kit loads .env itself and rejects an empty token, which .env.example leaves blank
+    authToken: process.env.DATABASE_AUTH_TOKEN || undefined,
   },
 });
