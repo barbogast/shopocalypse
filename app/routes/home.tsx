@@ -15,7 +15,7 @@ import {
   Title,
 } from "@mantine/core";
 import { IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
-import { asc, desc, eq, gt, inArray, lt, max, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lt, max, notInArray } from "drizzle-orm";
 import { useEffect, useState } from "react";
 import { Form, Link } from "react-router";
 import { FormError } from "~/components/form-error";
@@ -163,7 +163,7 @@ export async function action({ request }: Route.ActionArgs) {
       const rotation = await db
         .select({ id: recipes.id })
         .from(recipes)
-        .where(eq(recipes.archived, false))
+        .where(and(eq(recipes.archived, false), eq(recipes.autoFill, true)))
         .then((all) =>
           all.sort((a, b) => {
             const aPos = queuePos.get(a.id) ?? -1;
@@ -175,7 +175,7 @@ export async function action({ request }: Route.ActionArgs) {
           })
         );
 
-      if (rotation.length === 0) return null;
+      if (rotation.length === 0) return { autoFillError: "No recipes are included in auto-fill." };
 
       const [{ nextPos }] = await db
         .select({ nextPos: max(mealSchedule.position) })

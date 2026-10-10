@@ -100,6 +100,9 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
                 {recipe.archived && (
                   <Badge size="xs" variant="outline" color="gray" ml="xs">archived</Badge>
                 )}
+                {!recipe.archived && !recipe.autoFill && (
+                  <Badge size="xs" variant="outline" color="gray" ml="xs">no auto-fill</Badge>
+                )}
               </Table.Td>
               <Table.Td c="dimmed" style={{ width: 80 }}>
                 serves {recipe.servingSize}

@@ -48,6 +48,8 @@ export const recipes = sqliteTable("recipes", {
   // ISO timestamp. Recipes from before it was stored got made-up ones that keep their id order
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
+  // Picked by the meal schedule's auto-fill; off for occasional dishes, which are then only added by hand
+  autoFill: integer("auto_fill", { mode: "boolean" }).notNull().default(true),
 });
 
 export const recipeIngredients = sqliteTable("recipe_ingredients", {

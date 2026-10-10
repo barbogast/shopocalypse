@@ -83,9 +83,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       const instructions = optionalText(form, "instructions");
       const comments = optionalText(form, "comments");
       const weblink = optionalUrl(form, "weblink");
+      const autoFill = form.get("autoFill") === "on";
       if (!name || !servingSize) return { error: "Name and a whole-number serving size are required." };
       if (weblink === undefined) return { error: "The weblink must be a web address, like https://example.com/recipe." };
-      await db.update(recipes).set({ name, servingSize, instructions, comments, weblink }).where(eq(recipes.id, id));
+      await db.update(recipes).set({ name, servingSize, instructions, comments, weblink, autoFill }).where(eq(recipes.id, id));
       return { saved: true };
     }
 
@@ -252,6 +253,8 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           <TextInput name="name" label="Name" defaultValue={recipe.name} required />
           <NumberInput name="servingSize" label="Serving size" defaultValue={recipe.servingSize} min={1} allowDecimal={false} required />
           <TextInput name="weblink" label="Weblink" placeholder="https://…" inputMode="url" defaultValue={recipe.weblink ?? ""} />
+          <Checkbox name="autoFill" label="Include in auto-fill" defaultChecked={recipe.autoFill}
+            description="Off for occasional dishes: they're then only scheduled by hand" />
           <FormError error={actionData && "error" in actionData ? actionData.error : null} />
           <Group>
             <SaveButton saved={saved} />
