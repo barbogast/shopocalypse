@@ -19,7 +19,7 @@ import {
   Title,
 } from "@mantine/core";
 import { IconCheck, IconChefHat, IconChevronDown, IconChevronRight, IconCopy, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { Form, useActionData, useFetcher, useFetchers } from "react-router";
@@ -31,19 +31,18 @@ import { Servings } from "~/components/servings";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { mealServings, withIngredients } from "~/db/recipes.server";
-import { getActiveList } from "~/db/shopping.server";
+import { changeItemsForMeals, getActiveList, listIngredients, listMeals } from "~/db/shopping.server";
 import {
   itemCategories,
   items,
   mealSchedule,
-  recipeIngredients,
   recipes,
   shoppingListItems,
   shoppingListRecipes,
   shoppingLists,
   stores,
 } from "~/db/schema";
-import { int } from "~/forms";
+import { int, text } from "~/forms";
 import { listAmounts, listAsText } from "~/shopping-list";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { combineAmounts, DEFAULT_UNIT, formatAmounts, nameForAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
@@ -134,6 +133,7 @@ export async function loader() {
 
   const listRecipeRows = await db
     .select({
+      listRecipeId: shoppingListRecipes.id,
       id: recipes.id,
       name: recipes.name,
       servingSize: recipes.servingSize,
@@ -149,7 +149,13 @@ export async function loader() {
 
   const listRecipes = countRecipes(await withIngredients(listRecipeRows));
 
-  return { activeList, listRecipes, listItems, scheduled, allItems };
+  const allRecipes = await db
+    .select({ id: recipes.id, name: recipes.name, servingSize: recipes.servingSize })
+    .from(recipes)
+    .where(eq(recipes.archived, false))
+    .orderBy(sql`${recipes.name} collate nocase`);
+
+  return { activeList, listRecipes, listItems, scheduled, allItems, allRecipes };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -180,26 +186,13 @@ export async function action({ request }: Route.ActionArgs) {
                 .all()
             : [];
 
-        const ingredients = await tx
-          .select({
-            recipeId: recipeIngredients.recipeId,
-            itemId: recipeIngredients.itemId,
-            quantity: recipeIngredients.quantity,
-            unit: recipeIngredients.unit,
-            note: recipeIngredients.note,
-            noteOnList: recipeIngredients.noteOnList,
-            alwaysAvailable: items.alwaysAvailable,
-          })
-          .from(recipeIngredients)
-          .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-          .where(inArray(recipeIngredients.recipeId, scheduled.map((m) => m.recipeId)))
-          .all();
+        const ingredients = await listIngredients(tx, scheduled.map((m) => m.recipeId));
         // Stock tracking is deferred (no units yet), so nothing is subtracted
         const toAdd = listAmounts(scheduled, ingredients, includeInStock);
 
         const list = await tx
           .insert(shoppingLists)
-          .values({ createdAt: new Date().toISOString(), status: "active" })
+          .values({ createdAt: new Date().toISOString(), status: "active", includeInStock })
           .returning()
           .get();
 
@@ -251,6 +244,43 @@ export async function action({ request }: Route.ActionArgs) {
             .values({ shoppingListId: activeList.id, itemId, amounts: combineAmounts([parsed.amount]), source: "manual" })
             .run();
         }
+      });
+      break;
+    }
+
+    case "add-recipe": {
+      const activeList = await getActiveList();
+      if (!activeList) return null;
+
+      const recipeId = int(form, "recipeId");
+      // Empty means the recipe's serving size
+      const servings = int(form, "servings");
+      if (!recipeId) return { addRecipeError: "Pick a recipe first." };
+      if (text(form, "servings") && !servings) return { addRecipeError: "Servings must be a whole number of at least 1." };
+      const recipe = await db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
+      if (!recipe || recipe.archived) return { addRecipeError: "That recipe is no longer available." };
+
+      await db.transaction(async (tx) => {
+        const before = await listMeals(tx, activeList.id);
+        const added = { recipeId, servings: servings ?? recipe.servingSize, servingSize: recipe.servingSize };
+        await tx.insert(shoppingListRecipes).values({ shoppingListId: activeList.id, recipeId, servings }).run();
+        await changeItemsForMeals(tx, activeList, before, [...before, added]);
+      });
+      // Tells the page to clear its recipe picker
+      return { recipeAdded: true };
+    }
+
+    // Takes one of the list's meals off, along with what only it needed
+    case "remove-recipe": {
+      const activeList = await getActiveList();
+      const id = int(form, "id");
+      if (!activeList || !id) return null;
+
+      await db.transaction(async (tx) => {
+        const before = await listMeals(tx, activeList.id);
+        if (!before.some((m) => m.id === id)) return;
+        await tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.id, id)).run();
+        await changeItemsForMeals(tx, activeList, before, before.filter((m) => m.id !== id));
       });
       break;
     }
@@ -366,12 +396,10 @@ type ListItem = ActiveListData["listItems"][number];
 
 // The list's meals, folded away behind a toggle to keep the page short;
 // tapping a recipe opens its details without leaving the list
-function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
+function ListMeals({ recipes, allRecipes }: { recipes: ListRecipe[]; allRecipes: ActiveListData["allRecipes"] }) {
   const [shown, setShown] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const open = recipes.find((r) => r.key === openKey);
-
-  if (recipes.length === 0) return <Text c="dimmed" size="sm" mb="lg">No meals</Text>;
 
   const mealCount = recipes.reduce((sum, r) => sum + r.count, 0);
 
@@ -387,20 +415,37 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
           onClick={() => setShown((s) => !s)}
           aria-expanded={shown}
         >
-          {mealCount === 1 ? "1 meal" : `${mealCount} meals`}
+          {mealCount === 0 ? "No meals" : mealCount === 1 ? "1 meal" : `${mealCount} meals`}
         </Button>
         <Collapse expanded={shown}>
-          <List size="sm" c="dimmed">
-            {recipes.map((r) => (
-              <List.Item key={r.key}>
-                <Anchor component="button" type="button" size="sm" onClick={() => setOpenKey(r.key)}>
-                  {r.name}
-                </Anchor>
-                {r.servings !== r.servingSize && <Servings servings={r.servings} />}
-                {r.count > 1 && ` ×${r.count}`}
-              </List.Item>
-            ))}
-          </List>
+          <Stack gap="sm">
+            {recipes.length > 0 && (
+              <List size="sm" c="dimmed">
+                {recipes.map((r) => (
+                  <List.Item key={r.key}>
+                    <Group gap={4} wrap="nowrap">
+                      <span>
+                        <Anchor component="button" type="button" size="sm" onClick={() => setOpenKey(r.key)}>
+                          {r.name}
+                        </Anchor>
+                        {r.servings !== r.servingSize && <Servings servings={r.servings} />}
+                        {r.count > 1 && ` ×${r.count}`}
+                      </span>
+                      {/* Takes off one of a repeated meal at a time */}
+                      <Form method="post">
+                        <input type="hidden" name="intent" value="remove-recipe" />
+                        <input type="hidden" name="id" value={r.listRecipeId} />
+                        <SubmitButton size="compact-xs" variant="subtle" color="red" px={4} aria-label={`Remove ${r.name}`}>
+                          <IconTrash size={12} />
+                        </SubmitButton>
+                      </Form>
+                    </Group>
+                  </List.Item>
+                ))}
+              </List>
+            )}
+            {allRecipes.length > 0 && <AddRecipeForm recipes={allRecipes} />}
+          </Stack>
         </Collapse>
       </Stack>
 
@@ -410,6 +455,48 @@ function ListMeals({ recipes }: { recipes: ListRecipe[] }) {
         onClose={() => setOpenKey(null)}
       />
     </>
+  );
+}
+
+// Adds a meal to the list, and what it needs to the items
+function AddRecipeForm({ recipes }: { recipes: ActiveListData["allRecipes"] }) {
+  const [recipeId, setRecipeId] = useState<string | null>(null);
+  const actionData = useActionData<typeof action>();
+  const servingSize = recipes.find((r) => String(r.id) === recipeId)?.servingSize;
+
+  // Clear the picker once the meal is on the list
+  useEffect(() => {
+    if (actionData && "recipeAdded" in actionData) setRecipeId(null);
+  }, [actionData]);
+
+  return (
+    <Form method="post">
+      <input type="hidden" name="intent" value="add-recipe" />
+      <Group align="flex-end" gap="xs">
+        <Select
+          name="recipeId"
+          label="Add meal"
+          data={recipes.map((r) => ({ value: String(r.id), label: r.name }))}
+          value={recipeId}
+          onChange={setRecipeId}
+          searchable
+          placeholder="Pick a recipe…"
+          style={{ flex: 1, minWidth: 140 }}
+        />
+        {/* Empty uses the recipe's serving size */}
+        <NumberInput
+          key={recipeId}
+          name="servings"
+          label="Servings"
+          min={1}
+          allowDecimal={false}
+          placeholder={servingSize ? String(servingSize) : "—"}
+          style={{ width: 80 }}
+        />
+        <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
+      </Group>
+      <FormError error={actionData && "addRecipeError" in actionData ? actionData.addRecipeError : null} mt="xs" />
+    </Form>
   );
 }
 
@@ -527,7 +614,7 @@ export default function Shopping({ loaderData }: Route.ComponentProps) {
   return <ListView {...loaderData} />;
 }
 
-function ListView({ activeList, listRecipes, listItems: loadedItems, allItems }: ActiveListData) {
+function ListView({ activeList, listRecipes, listItems: loadedItems, allItems, allRecipes }: ActiveListData) {
   const listItems = withPendingChanges(loadedItems, useFetchers());
 
   const groups = groupByStoreAndShelf(listItems);
@@ -566,7 +653,7 @@ function ListView({ activeList, listRecipes, listItems: loadedItems, allItems }:
         </Group>
       </Group>
       <Text c="dimmed" size="sm">Created <LocalDateTime iso={activeList.createdAt} /></Text>
-      <ListMeals recipes={listRecipes} />
+      <ListMeals recipes={listRecipes} allRecipes={allRecipes} />
 
       {listItems.length === 0 && (
         <Text c="dimmed" mb="lg">No items on the list.</Text>

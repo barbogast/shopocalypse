@@ -141,6 +141,13 @@
       "when": 1791647188764,
       "tag": "0019_recipe_auto_fill",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1791648062998,
+      "tag": "0020_list_include_in_stock",
+      "breakpoints": true
     }
   ]
 }

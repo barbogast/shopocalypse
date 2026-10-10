@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addNote, listAmounts, listAsText } from "./shopping-list";
+import { addNote, changeListMeals, listAmounts, listAsText } from "./shopping-list";
 
 const pasta = { recipeId: 1, itemId: 10, quantity: 500, unit: "g", alwaysAvailable: false, note: null, noteOnList: false } as const;
 const onion = { recipeId: 1, itemId: 11, quantity: 1, unit: "pcs", alwaysAvailable: false, note: null, noteOnList: false } as const;
@@ -76,6 +76,66 @@ describe("listAmounts", () => {
         notes: [{ note: "Bio", amounts: [{ quantity: 1.5, unit: "pcs" }] }],
       });
     });
+  });
+});
+
+describe("changeListMeals", () => {
+  const pastaMeal = { recipeId: 1, servings: 4, servingSize: 4 };
+  const eggMeal = { recipeId: 2, servings: 2, servingSize: 2 };
+  const row = (id: number, itemId: number, amounts: { quantity: number; unit: "g" | "pcs" }[], source: "meal_plan" | "manual" = "meal_plan") =>
+    ({ id, itemId, amounts, source });
+
+  it("adds what a new meal needs to listed items, and lists the rest", () => {
+    const listed = [row(1, 10, [{ quantity: 500, unit: "g" }]), row(2, 11, [{ quantity: 1, unit: "pcs" }])];
+    expect(changeListMeals(listed, [pastaMeal], [pastaMeal, eggMeal], ingredients, false)).toEqual([
+      { kind: "update", id: 2, amounts: [{ quantity: 2, unit: "pcs" }], notes: [], buyAgain: true }, // 1 + 0.5, rounded up
+      { kind: "insert", itemId: 13, amounts: [{ quantity: 3, unit: "pcs" }], notes: [] },
+    ]);
+  });
+
+  it("takes off what only a removed meal needed, redoing the rounding", () => {
+    const listed = [row(1, 10, [{ quantity: 500, unit: "g" }]), row(2, 11, [{ quantity: 2, unit: "pcs" }]), row(3, 13, [{ quantity: 3, unit: "pcs" }])];
+    expect(changeListMeals(listed, [pastaMeal, eggMeal], [eggMeal], ingredients, false)).toEqual([
+      { kind: "delete", id: 1 },
+      { kind: "update", id: 2, amounts: [{ quantity: 1, unit: "pcs" }], notes: [], buyAgain: false }, // 0.5, rounded up
+    ]);
+  });
+
+  it("keeps amounts added by hand", () => {
+    const listed = [row(1, 10, [{ quantity: 700, unit: "g" }]), row(2, 11, [{ quantity: 3, unit: "pcs" }], "manual")];
+    expect(changeListMeals(listed, [pastaMeal], [], ingredients, false)).toEqual([
+      { kind: "update", id: 1, amounts: [{ quantity: 200, unit: "g" }], notes: [], buyAgain: false },
+      { kind: "update", id: 2, amounts: [{ quantity: 2, unit: "pcs" }], notes: [], buyAgain: false },
+    ]);
+  });
+
+  it("keeps an item added by hand when nothing's left of it", () => {
+    const listed = [row(2, 11, [{ quantity: 1, unit: "pcs" }], "manual")];
+    expect(changeListMeals(listed, [pastaMeal], [], [onion], false)).toEqual([
+      { kind: "update", id: 2, amounts: [], notes: [], buyAgain: false },
+    ]);
+  });
+
+  it("brings back a removed item only with what the added meal needs", () => {
+    const listed = [row(1, 10, [{ quantity: 500, unit: "g" }])];
+    expect(changeListMeals(listed, [pastaMeal], [pastaMeal, eggMeal], ingredients, false)).toContainEqual(
+      { kind: "insert", itemId: 11, amounts: [{ quantity: 1, unit: "pcs" }], notes: [] }, // 2 needed, 1 was already
+    );
+  });
+
+  it("follows the list's choice on items in stock", () => {
+    expect(changeListMeals([], [], [pastaMeal], ingredients, false).some((c) => c.kind === "insert" && c.itemId === 12)).toBe(false);
+    expect(changeListMeals([], [], [pastaMeal], ingredients, true)).toContainEqual({ kind: "insert", itemId: 12, amounts: [], notes: [] });
+    expect(changeListMeals([{ id: 4, itemId: 12, amounts: [], source: "meal_plan" }], [pastaMeal], [], [salt], true))
+      .toEqual([{ kind: "delete", id: 4 }]);
+  });
+
+  it("replaces the notes with the remaining meals' ones", () => {
+    const cream = { recipeId: 1, itemId: 20, quantity: 200, unit: "ml", alwaysAvailable: false, note: "mind. 30% Fett", noteOnList: true } as const;
+    const listed = [{ id: 5, itemId: 20, amounts: [{ quantity: 400, unit: "ml" as const }], source: "meal_plan" as const }];
+    expect(changeListMeals(listed, [pastaMeal, pastaMeal], [pastaMeal], [cream], false)).toEqual([{
+      kind: "update", id: 5, amounts: [{ quantity: 200, unit: "ml" }], notes: [{ note: "mind. 30% Fett", amounts: [{ quantity: 200, unit: "ml" }] }], buyAgain: false,
+    }]);
   });
 });
 

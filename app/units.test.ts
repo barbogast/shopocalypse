@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { combineAmounts, formatAmount, formatAmounts, mergeAmounts, nameForAmounts, parseAmount, roundUpToBuy, scaleAmount } from "./units";
+import { combineAmounts, formatAmount, formatAmounts, mergeAmounts, nameForAmounts, parseAmount, roundUpToBuy, scaleAmount, subtractAmounts } from "./units";
 
 function form(fields: Record<string, string>) {
   const f = new FormData();
@@ -39,6 +39,18 @@ describe("combineAmounts", () => {
     expect(combineAmounts([{ quantity: null, unit: null }, { quantity: 2, unit: "tbsp" }])).toEqual([
       { quantity: 2, unit: "tbsp" },
     ]);
+  });
+});
+
+describe("subtractAmounts", () => {
+  it("takes amounts away per kind, across units", () => {
+    expect(subtractAmounts([{ quantity: 1.25, unit: "kg" }, { quantity: 2, unit: "can" }], [{ quantity: 500, unit: "g" }]))
+      .toEqual([{ quantity: 750, unit: "g" }, { quantity: 2, unit: "can" }]);
+  });
+
+  it("leaves out what comes to nothing or less", () => {
+    expect(subtractAmounts([{ quantity: 1, unit: "pcs" }], [{ quantity: 2, unit: "pcs" }, { quantity: 1, unit: "tbsp" }])).toEqual([]);
+    expect(subtractAmounts([{ quantity: 0.3, unit: "l" }], [{ quantity: 100, unit: "ml" }, { quantity: 200, unit: "ml" }])).toEqual([]);
   });
 });
 

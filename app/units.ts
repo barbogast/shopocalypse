@@ -74,6 +74,13 @@ export function combineAmounts(amounts: Amount[]): Amount[] {
   });
 }
 
+// Takes amounts away from others, per kind as in combineAmounts. Whatever comes to nothing or
+// less is left out, so the result only holds what's still needed
+export function subtractAmounts(amounts: Amount[], taken: Amount[]): Amount[] {
+  const negated = taken.map((a) => ({ ...a, quantity: a.quantity == null ? null : -a.quantity }));
+  return combineAmounts([...amounts, ...negated]).filter((a) => a.quantity! > 1e-9);
+}
+
 // Adds two amounts into one, for a recipe that lists the same item twice; null when their units don't add up
 export function mergeAmounts(a: Amount, b: Amount): Amount | null {
   const [combined, ...rest] = combineAmounts([a, b]);

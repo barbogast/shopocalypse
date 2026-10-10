@@ -1,0 +1,1 @@
+ALTER TABLE `shopping_lists` ADD `include_in_stock` integer DEFAULT false NOT NULL;

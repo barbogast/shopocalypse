@@ -99,6 +99,8 @@ export const shoppingLists = sqliteTable("shopping_lists", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   createdAt: text("created_at").notNull(),
   status: text("status", { enum: ["active", "completed"] }).notNull().default("active"),
+  // "Include items in stock" when preparing; meals added or removed later follow it
+  includeInStock: integer("include_in_stock", { mode: "boolean" }).notNull().default(false),
 }, (t) => [
   // At most one active list
   uniqueIndex("one_active_list").on(t.status).where(sql`status = 'active'`),

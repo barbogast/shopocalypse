@@ -1,4 +1,4 @@
-import { type Amount, combineAmounts, formatAmount, formatAmounts, nameForAmounts, roundUpToBuy, scaleAmount } from "./units";
+import { type Amount, combineAmounts, formatAmount, formatAmounts, nameForAmounts, roundUpToBuy, scaleAmount, subtractAmounts } from "./units";
 
 type Meal = { recipeId: number; servings: number; servingSize: number };
 type Ingredient = Amount & {
@@ -29,6 +29,48 @@ export function listAmounts(meals: Meal[], ingredients: Ingredient[], includeInS
     }
   }
   return new Map([...needed].map(([itemId, { amounts, notes }]) => [itemId, { amounts: roundUpToBuy(combineAmounts(amounts)), notes }]));
+}
+
+type ListedItem = { id: number; itemId: number; amounts: Amount[]; source: "meal_plan" | "stock_deficit" | "manual" };
+export type ListChange =
+  | { kind: "insert"; itemId: number; amounts: Amount[]; notes: ListNote[] }
+  | { kind: "update"; id: number; amounts: Amount[]; notes: ListNote[]; buyAgain: boolean }
+  | { kind: "delete"; id: number };
+
+// How a list's items change when its meals go from `before` to `after`. Each item gets the
+// difference between what the two sets of meals need, so amounts added by hand stay and the
+// rounding up is redone for the meals that remain. Notes only come from meals, so they're
+// replaced. An item the meals no longer need goes once nothing is left of it, unless it was
+// added by hand; one that now needs more has to be bought again. An item that was taken off
+// the list comes back only with what the added meals need on top.
+export function changeListMeals(
+  listed: ListedItem[],
+  before: Meal[],
+  after: Meal[],
+  ingredients: Ingredient[],
+  includeInStock: boolean,
+): ListChange[] {
+  const old = listAmounts(before, ingredients, includeInStock);
+  const now = listAmounts(after, ingredients, includeInStock);
+  const changes: ListChange[] = [];
+  for (const itemId of new Set([...old.keys(), ...now.keys()])) {
+    const oldAmounts = old.get(itemId)?.amounts ?? [];
+    const needed = now.get(itemId);
+    const more = subtractAmounts(needed?.amounts ?? [], oldAmounts);
+    const less = subtractAmounts(oldAmounts, needed?.amounts ?? []);
+    const notes = needed?.notes ?? [];
+    const unchanged = more.length === 0 && less.length === 0 && JSON.stringify(notes) === JSON.stringify(old.get(itemId)?.notes ?? []);
+    if (unchanged && old.has(itemId) && needed) continue;
+    const row = listed.find((i) => i.itemId === itemId);
+    if (!row) {
+      if (needed && (more.length > 0 || !old.has(itemId))) changes.push({ kind: "insert", itemId, amounts: more, notes: needed.notes });
+      continue;
+    }
+    const amounts = subtractAmounts([...row.amounts, ...more], less);
+    if (!needed && amounts.length === 0 && row.source !== "manual") changes.push({ kind: "delete", id: row.id });
+    else changes.push({ kind: "update", id: row.id, amounts, notes, buyAgain: more.length > 0 });
+  }
+  return changes;
 }
 
 // Adds notes to a list of them, adding up the amounts of ones with the same note

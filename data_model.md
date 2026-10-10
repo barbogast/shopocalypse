@@ -71,6 +71,7 @@ Used to determine "least recently cooked" when auto-filling the schedule.
 - id
 - created_at
 - status: active | completed
+- include_in_stock (boolean) — the "Include items in stock" choice when preparing; meals added or removed later follow it. Lists from before it was stored count as off
 
 ### ShoppingListRecipe _(meals a list was prepared for)_
 
@@ -79,7 +80,7 @@ Used to determine "least recently cooked" when auto-filling the schedule.
 - recipe_id
 - servings (optional) — servings shopped for; empty means the recipe's serving size
 
-A recipe appears once per scheduled meal, so it can be listed more than once.
+A recipe appears once per scheduled meal, so it can be listed more than once. Meals can be added (any recipe) or removed while the list is active: each item then gets the difference between what the old and new meals need, so amounts added by hand stay and rounding up is redone. An item goes when nothing is left of it, unless it was added by hand; one that needs more is unticked
 
 ### ShoppingListItem
 

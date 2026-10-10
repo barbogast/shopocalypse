@@ -18,6 +18,7 @@ A personal tool that helps our family to know which meal to cook and which groce
   1. for a given amount of next meals, summarize ingredients, subtract stock _(deferred)_ and add to list
   2. check which items are below the desired amount _(deferred)_
   3. allow to manually add items
+  4. add or remove single meals (any recipe) on the active list; their ingredients are added or taken off, keeping what was added by hand
 - go shopping: sort shopping list by shop / catogory and tick off items (allow to buy less than the specified amount _(deferred: ticking is yes/no, nothing uses the bought quantity until stock is back)_)
 - finish shopping:
   1. add items from ticked-off shopping list to stock _(deferred)_
