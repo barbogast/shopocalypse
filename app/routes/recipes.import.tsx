@@ -1,6 +1,6 @@
 import { Alert, Anchor, Badge, Button, Card, Checkbox, Code, Container, Group, List, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
-import { IconAlertCircle, IconCheck, IconFileImport } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
+import { IconAlertCircle, IconCheck, IconFileImport, IconSparkles } from "@tabler/icons-react";
+import { useEffect, useMemo, useState } from "react";
 import { eq } from "drizzle-orm";
 import { Form, Link, useFetcher } from "react-router";
 import { FormError } from "~/components/form-error";
@@ -10,11 +10,13 @@ import { SubmitButton } from "~/components/submit-button";
 import { Weblink } from "~/components/weblink";
 import { db } from "~/db/client";
 import { setPlural } from "~/db/items.server";
+import { AcceptedSchema, applySuggestions } from "~/item-suggest.server";
+import type { action as suggestAction } from "~/routes/items.suggest";
 import { importRecipe } from "~/db/recipes.server";
-import { items, recipes } from "~/db/schema";
+import { itemCategories, items, recipes, stores } from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
 import { itemKey, itemKeys, likelySingular, type ParsedIngredient, parseRecipeText } from "~/recipe-import";
-import { formatAmount, UNITS } from "~/units";
+import { formatAmount, UNITS, unitName, type UnitKey } from "~/units";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes.import";
 
@@ -37,7 +39,10 @@ export function meta({}: Route.MetaArgs) {
 export async function loader() {
   const allItems = await db.select({ id: items.id, name: items.name, plural: items.plural }).from(items);
   const recipeNames = await db.select({ name: recipes.name }).from(recipes).where(eq(recipes.archived, false));
-  return { allItems, recipeNames: recipeNames.map((r) => r.name) };
+  // Names for the suggested stores and shelves of new items
+  const allStores = await db.select({ id: stores.id, name: stores.name }).from(stores);
+  const allShelves = await db.select({ id: itemCategories.id, name: itemCategories.name }).from(itemCategories);
+  return { allItems, recipeNames: recipeNames.map((r) => r.name), allStores, allShelves };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -49,6 +54,18 @@ export async function action({ request }: Route.ActionArgs) {
     const plural = text(form, "plural");
     if (!itemId || !plural) return { error: "Pick an item and a plural.", imported: null };
     return { ...(await setPlural(itemId, plural)), imported: null };
+  }
+
+  // From the suggestions for the new items, through a fetcher
+  if (form.get("intent") === "apply-suggestions") {
+    let accepted;
+    try {
+      accepted = AcceptedSchema.safeParse(JSON.parse(text(form, "accepted")));
+    } catch {
+      accepted = null;
+    }
+    if (!accepted?.success) return { error: "Those suggestions couldn't be read.", imported: null };
+    return { error: null, imported: null, shelved: await applySuggestions(accepted.data) };
   }
 
   // Parsed again here rather than trusting the preview
@@ -153,28 +170,129 @@ function PluralSuggestion({ name, singular }: { name: string; singular: { id: nu
 // Lists the new items on top, and editing one comes back there, since this page is gone once left
 const NEWEST_ITEMS = "/items?by=newest";
 
+type NewItem = { id: number; name: string; storeId: number | null; defaultUnit: UnitKey | null };
+type Names = { stores: { id: number; name: string }[]; shelves: { id: number; name: string }[]; items: { id: number; name: string }[] };
+
+// Asks for a shelf, unit, plural and parent for all the new items at once, and saves the ticked ones.
+// Like the item form, it only fills in what's still empty.
+function SuggestForNewItems({ newItems, names, onShelved }: {
+  newItems: NewItem[];
+  names: Names;
+  onShelved: (ids: number[]) => void;
+}) {
+  const suggest = useFetcher<typeof suggestAction>();
+  const apply = useFetcher<typeof action>();
+  const [unticked, setUnticked] = useState(() => new Set<number>());
+  const applied = apply.data && "shelved" in apply.data ? apply.data.shelved : null;
+
+  useEffect(() => {
+    if (applied) onShelved(applied);
+  }, [applied]);
+
+  const nameOf = (list: { id: number; name: string }[], id: number | null) => list.find((x) => x.id === id)?.name;
+  const suggestions = suggest.data && "suggestions" in suggest.data ? suggest.data.suggestions : null;
+  // What each suggestion would fill in; items it has nothing new for are left out
+  const rows = (suggestions ?? []).flatMap((s, i) => {
+    const item = newItems[i];
+    const store = item.storeId == null ? nameOf(names.stores, s.storeId) : undefined;
+    const shelf = item.storeId == null || item.storeId === s.storeId ? nameOf(names.shelves, s.categoryId) : undefined;
+    const changes = [
+      store && shelf ? `${store} › ${shelf}` : store ?? shelf,
+      item.defaultUnit == null && s.defaultUnit && unitName(s.defaultUnit),
+      s.plural && `plural ${s.plural}`,
+      s.parentId != null && `variant of ${nameOf(names.items, s.parentId)}`,
+    ].filter(Boolean);
+    return changes.length ? [{ item, suggestion: s, changes }] : [];
+  });
+  const accepted = rows.filter((r) => !unticked.has(r.item.id)).map((r) => ({ itemId: r.item.id, ...r.suggestion }));
+
+  if (applied) {
+    return <Text size="sm" c="dimmed" mb="lg">Saved the suggestions.</Text>;
+  }
+  return (
+    <Card withBorder radius="md" p="md" mb="lg">
+      <Group justify="space-between" mb={suggestions ? "sm" : 0}>
+        <Text size="sm">Let Claude suggest a shelf, unit, plural and parent for the new items.</Text>
+        <suggest.Form method="post" action="/items/suggest">
+          {newItems.map((item) => (
+            <span key={item.id}>
+              <input type="hidden" name="name" value={item.name} />
+              <input type="hidden" name="itemId" value={item.id} />
+            </span>
+          ))}
+          <Button type="submit" size="xs" variant="light" leftSection={<IconSparkles size={14} />} loading={suggest.state !== "idle"}>
+            Suggest
+          </Button>
+        </suggest.Form>
+      </Group>
+      {suggest.data && "error" in suggest.data && <Text size="sm" c="red">{suggest.data.error}</Text>}
+      {suggestions && rows.length === 0 && <Text size="sm" c="dimmed">No suggestions for these items.</Text>}
+      {rows.length > 0 && (
+        <apply.Form method="post">
+          <input type="hidden" name="intent" value="apply-suggestions" />
+          <input type="hidden" name="accepted" value={JSON.stringify(accepted)} />
+          <Table mb="sm">
+            <Table.Tbody>
+              {rows.map(({ item, changes }) => (
+                <Table.Tr key={item.id}>
+                  <Table.Td style={{ width: 30 }}>
+                    <Checkbox
+                      aria-label={`Use the suggestion for ${item.name}`}
+                      checked={!unticked.has(item.id)}
+                      onChange={(e) => {
+                        const checked = e.currentTarget.checked;
+                        setUnticked((prev) => {
+                          const next = new Set(prev);
+                          if (checked) next.delete(item.id);
+                          else next.add(item.id);
+                          return next;
+                        });
+                      }}
+                    />
+                  </Table.Td>
+                  <Table.Td>{item.name}</Table.Td>
+                  <Table.Td c="dimmed">{changes.join(" · ")}</Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+          {apply.data?.error && <Text size="sm" c="red" mb="xs">{apply.data.error}</Text>}
+          <Button type="submit" size="xs" disabled={accepted.length === 0} loading={apply.state !== "idle"}>
+            Apply {accepted.length} of {rows.length}
+          </Button>
+        </apply.Form>
+      )}
+    </Card>
+  );
+}
+
 // Shown instead of the form once a recipe is imported
 // Navigating to this same route keeps the component mounted, so the caller
 // clears its text through onImportAnother
-function Imported({ id, name, newItems, storeName, onImportAnother }: {
+function Imported({ id, name, newItems, storeName, names, onImportAnother }: {
   id: number;
   name: string;
-  newItems: { id: number; name: string }[];
+  newItems: NewItem[];
   storeName: string | null;
+  names: Names;
   onImportAnother: () => void;
 }) {
+  // Items given a shelf by accepted suggestions
+  const [shelved, setShelved] = useState<number[]>([]);
+  const unsorted = newItems.filter((i) => !shelved.includes(i.id));
+
   return (
     <Container size="sm" py="xl">
       <Alert color="green" variant="light" icon={<IconCheck size={16} />} title={`Imported "${name}"`} mb="lg">
-        {newItems.length > 0 && (
+        {unsorted.length > 0 && (
           <>
             <Text size="sm" mb="xs">
-              {newItems.length === 1 ? "This new item has" : `These ${newItems.length} new items have`}{" "}
+              {unsorted.length === 1 ? "This new item has" : `These ${unsorted.length} new items have`}{" "}
               {storeName ? `no shelf in ${storeName} yet` : "no store or shelf yet"},
-              so the shopping list can't sort {newItems.length === 1 ? "it" : "them"}:
+              so the shopping list can't sort {unsorted.length === 1 ? "it" : "them"}:
             </Text>
             <List size="sm">
-              {newItems.map((item) => (
+              {unsorted.map((item) => (
                 <List.Item key={item.id}>
                   <Anchor component={Link} to={editItemPath(item.id, NEWEST_ITEMS)} size="sm">{item.name}</Anchor>
                 </List.Item>
@@ -183,6 +301,7 @@ function Imported({ id, name, newItems, storeName, onImportAnother }: {
           </>
         )}
       </Alert>
+      {newItems.length > 0 && <SuggestForNewItems newItems={newItems} names={names} onShelved={setShelved} />}
       <Group>
         <Button component={Link} to={`/recipes/${id}`}>Open recipe</Button>
         <Button component={Link} to="/recipes/import" onClick={onImportAnother} variant="light" leftSection={<IconFileImport size={16} />}>
@@ -198,7 +317,7 @@ function Imported({ id, name, newItems, storeName, onImportAnother }: {
 const noteKey = (ing: ParsedIngredient) => `${itemKey(ing.name)}\n${ing.note}`;
 
 export default function ImportRecipe({ loaderData, actionData }: Route.ComponentProps) {
-  const { allItems, recipeNames } = loaderData;
+  const { allItems, recipeNames, allStores, allShelves } = loaderData;
   const [input, setInput] = useState("");
   const [notesOnList, setNotesOnList] = useState(() => new Set<string>());
   const toggleNoteOnList = (ing: ParsedIngredient, checked: boolean) =>
@@ -217,7 +336,8 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
       setInput("");
       setNotesOnList(new Set());
     };
-    return <Imported {...actionData.imported} onImportAnother={importAnother} />;
+    const names = { stores: allStores, shelves: allShelves, items: allItems };
+    return <Imported {...actionData.imported} names={names} onImportAnother={importAnother} />;
   }
 
   const newItemCount = recipe.ingredients.filter((ing) => !knownItems.has(itemKey(ing.name))).length;

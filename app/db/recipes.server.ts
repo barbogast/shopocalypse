@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { itemKey, itemKeys, type ParsedIngredient, type ParsedRecipe } from "~/recipe-import";
-import { scaleAmount } from "~/units";
+import { scaleAmount, type UnitKey } from "~/units";
 import { db } from "./client";
 import { recordRecipeVersion } from "./recipe-versions";
 import { items, mealHistory, mealSchedule, recipeIngredients, recipes, recipeVersions, shoppingListRecipes, stores } from "./schema";
@@ -118,13 +118,13 @@ export async function importRecipe({ ingredients, ...recipe }: Omit<ParsedRecipe
     const store = await tx.select({ id: stores.id, name: stores.name }).from(stores)
       .where(eq(stores.name, IMPORT_STORE_NAME)).orderBy(asc(stores.id)).get();
 
-    const newItems: { id: number; name: string }[] = [];
+    const newItems: { id: number; name: string; storeId: number | null; defaultUnit: UnitKey | null }[] = [];
     for (const ing of ingredients) {
       if (idsByKey.has(itemKey(ing.name))) continue;
       const [item] = await tx
         .insert(items)
         .values({ name: ing.name, storeId: store?.id ?? null, defaultUnit: ing.unit })
-        .returning({ id: items.id, name: items.name });
+        .returning({ id: items.id, name: items.name, storeId: items.storeId, defaultUnit: items.defaultUnit });
       idsByKey.set(itemKey(item.name), item.id);
       newItems.push(item);
     }

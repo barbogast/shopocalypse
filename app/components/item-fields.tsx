@@ -1,17 +1,30 @@
-import { Checkbox, Select, TextInput } from "@mantine/core";
-import { useState } from "react";
+import { Button, Checkbox, Group, Select, Text, TextInput } from "@mantine/core";
+import { IconSparkles } from "@tabler/icons-react";
+import { type MouseEvent, useEffect, useRef, useState } from "react";
+import { useFetcher } from "react-router";
 import { StoreShelfFields } from "~/components/store-shelf-fields";
 import type { itemCategories, stores } from "~/db/schema";
+import type { action as suggestAction } from "~/routes/items.suggest";
 import { UNIT_OPTIONS } from "~/units";
 
 type Store = typeof stores.$inferSelect;
 type Shelf = typeof itemCategories.$inferSelect;
+
+type Values = {
+  plural?: string | null;
+  parentId?: number | null;
+  storeId?: number | null;
+  categoryId?: number | null;
+  defaultUnit?: string | null;
+  alwaysAvailable?: boolean;
+};
 
 // The item form's fields, read on the server by parseItemForm
 export function ItemFields({
   stores,
   shelves,
   parents,
+  itemId,
   defaults = {},
   autoFocus = false,
 }: {
@@ -19,40 +32,56 @@ export function ItemFields({
   shelves: Shelf[];
   // Items it can be a variant of; leave out when it can't be one (it has variants itself)
   parents?: { id: number; name: string; storeId: number | null; categoryId: number | null }[];
-  defaults?: {
-    name?: string;
-    plural?: string | null;
-    parentId?: number | null;
-    storeId?: number | null;
-    categoryId?: number | null;
-    defaultUnit?: string | null;
-    alwaysAvailable?: boolean;
-  };
+  // The item being edited, left out of the examples its suggestion is based on
+  itemId?: number;
+  defaults?: Values & { name?: string };
   autoFocus?: boolean;
 }) {
-  const [parentId, setParentId] = useState(defaults.parentId ? String(defaults.parentId) : null);
+  // The fields below the name start from these; a suggestion replaces them and remounts the fields
+  const [base, setBase] = useState<Values>(defaults);
+  const [version, setVersion] = useState(0);
+  const [parentId, setParentId] = useState(base.parentId ? String(base.parentId) : null);
   // Picking another parent prefills its store and shelf
-  const newParent = parentId !== (defaults.parentId ? String(defaults.parentId) : null)
+  const newParent = parentId !== (base.parentId ? String(base.parentId) : null)
     ? parents?.find((p) => String(p.id) === parentId)
     : undefined;
-  const location = newParent ?? defaults;
+  const location = newParent ?? base;
+
+  const suggest = useSuggestion(parents, stores, (filled) => {
+    setBase(filled);
+    setParentId(filled.parentId ? String(filled.parentId) : null);
+    setVersion((v) => v + 1);
+  });
 
   return (
     <>
-      {/* data-autofocus: focused when shown in a Mantine modal */}
+      <Group align="flex-end" gap="xs" wrap="nowrap">
+        {/* data-autofocus: focused when shown in a Mantine modal */}
+        <TextInput
+          name="name"
+          label="Name"
+          defaultValue={defaults.name}
+          required
+          autoFocus={autoFocus}
+          data-autofocus={autoFocus || undefined}
+          style={{ flex: 1 }}
+        />
+        <Button
+          variant="light"
+          leftSection={<IconSparkles size={16} />}
+          loading={suggest.loading}
+          onClick={(e) => suggest.run(e, itemId)}
+        >
+          Suggest
+        </Button>
+      </Group>
+      {suggest.message && <Text size="sm" c={suggest.message.error ? "red" : "dimmed"} mt={-8}>{suggest.message.text}</Text>}
       <TextInput
-        name="name"
-        label="Name"
-        defaultValue={defaults.name}
-        required
-        autoFocus={autoFocus}
-        data-autofocus={autoFocus || undefined}
-      />
-      <TextInput
+        key={`plural-${version}`}
         name="plural"
         label="Plural"
         description="Recipe imports match it too"
-        defaultValue={defaults.plural ?? undefined}
+        defaultValue={base.plural ?? undefined}
       />
       {parents && (
         <Select
@@ -68,26 +97,94 @@ export function ItemFields({
         />
       )}
       <StoreShelfFields
-        key={parentId ?? "none"}
+        key={`${version}-${parentId ?? "none"}`}
         stores={stores}
         shelves={shelves}
         defaultStoreId={location.storeId}
         defaultShelfId={location.categoryId}
       />
       <Select
+        key={`unit-${version}`}
         name="defaultUnit"
         label="Default unit"
         data={UNIT_OPTIONS}
-        defaultValue={defaults.defaultUnit}
+        defaultValue={base.defaultUnit}
         clearable
         placeholder="None"
       />
       <Checkbox
+        key={`available-${version}`}
         name="alwaysAvailable"
         label="Always available"
         description="Assumed to be in stock, so it's left off new shopping lists"
-        defaultChecked={defaults.alwaysAvailable}
+        defaultChecked={base.alwaysAvailable}
       />
     </>
   );
+}
+
+// Asks for a suggestion for the name typed in the form, then fills the fields that are still empty,
+// keeping everything already entered
+function useSuggestion(
+  parents: { id: number }[] | undefined,
+  stores: Store[],
+  apply: (filled: Values) => void,
+) {
+  const fetcher = useFetcher<typeof suggestAction>();
+  // The form's values when Suggest was clicked
+  const current = useRef<Values>({});
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+
+  const run = (e: MouseEvent<HTMLButtonElement>, itemId?: number) => {
+    const form = new FormData(e.currentTarget.form ?? undefined);
+    const name = String(form.get("name") ?? "").trim();
+    if (!name) {
+      setMessage({ text: "Enter a name first.", error: true });
+      return;
+    }
+    const id = (field: string) => Number(form.get(field)) || null;
+    current.current = {
+      plural: String(form.get("plural") ?? "").trim() || null,
+      parentId: id("parentId"),
+      storeId: id("storeId"),
+      categoryId: id("categoryId"),
+      defaultUnit: String(form.get("defaultUnit") ?? "") || null,
+      alwaysAvailable: form.get("alwaysAvailable") === "on",
+    };
+    setMessage(null);
+    fetcher.submit({ name, ...(itemId && { itemId }) }, { method: "post", action: "/items/suggest" });
+  };
+
+  useEffect(() => {
+    const data = fetcher.data;
+    if (!data) return;
+    if ("error" in data) {
+      setMessage({ text: data.error, error: true });
+      return;
+    }
+    const suggestion = data.suggestions[0];
+    const was = current.current;
+    const filled: string[] = [];
+    const pick = <T,>(value: T | null | undefined, suggested: T | null, label: string) => {
+      if (value != null || suggested == null) return value ?? null;
+      filled.push(label);
+      return suggested;
+    };
+    const parentOk = parents?.some((p) => p.id === suggestion.parentId) ? suggestion.parentId : null;
+    const storeOk = stores.some((s) => s.id === suggestion.storeId) ? suggestion.storeId : null;
+    const next: Values = {
+      plural: pick(was.plural, suggestion.plural, "plural"),
+      parentId: pick(was.parentId, parentOk, "variant of"),
+      storeId: pick(was.storeId, storeOk, "store"),
+      categoryId: was.categoryId ?? null,
+      defaultUnit: pick(was.defaultUnit, suggestion.defaultUnit, "unit"),
+      alwaysAvailable: was.alwaysAvailable,
+    };
+    // A suggested shelf is in the suggested store, so it only fills in where that's the store now
+    if (next.storeId === suggestion.storeId) next.categoryId = pick(was.categoryId, suggestion.categoryId, "shelf");
+    apply(next);
+    setMessage({ text: filled.length ? `Filled in ${filled.join(", ")}` : "No suggestions for the empty fields.", error: false });
+  }, [fetcher.data]);
+
+  return { run, loading: fetcher.state !== "idle", message };
 }

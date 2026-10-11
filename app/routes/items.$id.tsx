@@ -67,7 +67,7 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
       <Form method="post">
         <input type="hidden" name="returnTo" value={returnTo} />
         <Stack>
-          <ItemFields stores={allStores} shelves={allShelves} parents={parents} defaults={item} />
+          <ItemFields stores={allStores} shelves={allShelves} parents={parents} itemId={item.id} defaults={item} />
           <FormError error={actionData && "error" in actionData ? actionData.error : null} />
           <Group>
             <SubmitButton>Save</SubmitButton>

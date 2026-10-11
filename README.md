@@ -16,7 +16,9 @@ yarn test
 ```
 
 Locally the database is the file `shopocalypse.db` and there's no password.
-Environment variables are listed in `.env.example`.
+Environment variables are listed in `.env.example`. `yarn dev` doesn't read
+`.env`; to try the item suggestions locally, export `ANTHROPIC_API_KEY` in the
+shell first.
 
 `yarn db:download` replaces `shopocalypse.db` with a copy of production, using
 `PROD_DATABASE_URL` and `PROD_DATABASE_AUTH_TOKEN` from `.env` (not committed).
@@ -56,7 +58,8 @@ database. Each query is a round trip to Turso, so keep both in the same region.
 3. Import the repository in Vercel. The React Router framework preset is
    detected. Under *Settings → Environment Variables* set `DATABASE_URL`,
    `DATABASE_AUTH_TOKEN` and `APP_PASSWORD`. Deploys without `APP_PASSWORD` answer
-   every request with an error rather than run unprotected.
+   every request with an error rather than run unprotected. Set
+   `ANTHROPIC_API_KEY` too for the item suggestions.
 
 ### Schema changes
 

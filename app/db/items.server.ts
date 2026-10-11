@@ -74,7 +74,7 @@ export async function updateItem(id: number, values: ItemValues) {
 }
 
 // Why one of the words can't be an item's name or plural, or null when no other item uses them
-async function nameClash(words: (string | null)[], itemId?: number) {
+export async function nameClash(words: (string | null)[], itemId?: number) {
   const others = (await db.select({ id: items.id, name: items.name, plural: items.plural }).from(items).all())
     .filter((i) => i.id !== itemId);
   for (const word of words) {
