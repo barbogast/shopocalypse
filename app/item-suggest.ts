@@ -19,6 +19,8 @@ export type Catalog = {
 };
 
 export type Suggestion = {
+  // The name to use instead, when the one given is a plural ("Apfel" for "Äpfel"); the plural is then the name given
+  singular: string | null;
   storeId: number | null;
   categoryId: number | null;
   defaultUnit: UnitKey | null;
@@ -28,6 +30,7 @@ export type Suggestion = {
 
 // The fields as the model returns them, before checking
 export type RawSuggestion = {
+  singular: string | null;
   storeId: number | null;
   categoryId: number | null;
   defaultUnit: string | null;
@@ -36,7 +39,7 @@ export type RawSuggestion = {
 };
 
 // Drops whatever the item form would refuse: unknown ids, a shelf outside the store, a variant as parent,
-// a plural that's the name itself or another item's name or plural. The catalog leaves out the item itself.
+// a singular or plural that's the name itself or another item's name or plural. The catalog leaves out the item itself.
 export function sanitizeSuggestion(raw: RawSuggestion, name: string, catalog: Catalog): Suggestion {
   const storeId = catalog.stores.some((s) => s.id === raw.storeId) ? raw.storeId : null;
   const shelf = catalog.shelves.find((s) => s.id === raw.categoryId);
@@ -45,11 +48,15 @@ export function sanitizeSuggestion(raw: RawSuggestion, name: string, catalog: Ca
   const parent = catalog.items.find((i) => i.id === raw.parentId);
   const parentId = parent && parent.parentId == null ? parent.id : null;
 
-  const plural = raw.plural?.trim() || null;
   const taken = new Set(catalog.items.flatMap(itemKeys));
-  const keepPlural = plural && itemKey(plural) !== itemKey(name) && !taken.has(itemKey(plural));
+  const rawSingular = raw.singular?.trim() || null;
+  const singular = rawSingular && itemKey(rawSingular) !== itemKey(name) && !taken.has(itemKey(rawSingular)) ? rawSingular : null;
+  // Renamed to the singular, the name given becomes the plural
+  const plural = singular ? name : raw.plural?.trim() || null;
+  const keepPlural = plural && itemKey(plural) !== itemKey(singular ?? name) && !taken.has(itemKey(plural));
 
   return {
+    singular,
     storeId,
     categoryId,
     defaultUnit: isUnitKey(raw.defaultUnit) ? raw.defaultUnit : null,

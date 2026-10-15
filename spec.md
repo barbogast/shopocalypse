@@ -30,7 +30,7 @@ A personal tool that helps our family to know which meal to cook and which groce
 - Quantities have units (g, l, pieces, spoons, cans, bottles, …); the same item can use different units in different recipes, and some ingredients have no quantity (spices). Stock does not have units yet
 - Each recipe has a serving size; the servings of a scheduled meal can be changed, and the shopping list and cooking view scale ingredient quantities accordingly
 - Ticking off shopping items needs to work offline
-- New items can get a suggested store, shelf, default unit, plural and parent item from Claude, based on how the existing items are filed: a Suggest button in the item form fills in the fields that are still empty, and after a recipe import the new items' suggestions are listed for review before they're saved
+- New items can get a suggested store, shelf, default unit, plural and parent item from Claude, based on how the existing items are filed: a Suggest button in the item form fills in the fields that are still empty and renames a plural name to its singular (keeping the name given as the plural), and after a recipe import the new items' suggestions are listed for review before they're saved
 - Single user system
 - Stock tracking is deferred: it needs its own unit design first. The `stock` table is kept, but there is no UI or logic for it
 

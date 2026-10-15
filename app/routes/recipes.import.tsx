@@ -174,7 +174,7 @@ type NewItem = { id: number; name: string; storeId: number | null; defaultUnit: 
 type Names = { stores: { id: number; name: string }[]; shelves: { id: number; name: string }[]; items: { id: number; name: string }[] };
 
 // Asks for a shelf, unit, plural and parent for all the new items at once, and saves the ticked ones.
-// Like the item form, it only fills in what's still empty.
+// Like the item form, it renames plural names to their singular and otherwise only fills in what's still empty.
 function SuggestForNewItems({ newItems, names, onShelved }: {
   newItems: NewItem[];
   names: Names;
@@ -197,6 +197,7 @@ function SuggestForNewItems({ newItems, names, onShelved }: {
     const store = item.storeId == null ? nameOf(names.stores, s.storeId) : undefined;
     const shelf = item.storeId == null || item.storeId === s.storeId ? nameOf(names.shelves, s.categoryId) : undefined;
     const changes = [
+      s.singular && `rename to ${s.singular}`,
       store && shelf ? `${store} › ${shelf}` : store ?? shelf,
       item.defaultUnit == null && s.defaultUnit && unitName(s.defaultUnit),
       s.plural && `plural ${s.plural}`,
@@ -212,7 +213,7 @@ function SuggestForNewItems({ newItems, names, onShelved }: {
   return (
     <Card withBorder radius="md" p="md" mb="lg">
       <Group justify="space-between" mb={suggestions ? "sm" : 0}>
-        <Text size="sm">Let Claude suggest a shelf, unit, plural and parent for the new items.</Text>
+        <Text size="sm">Let Claude suggest a shelf, unit, plural and parent for the new items, and fix plural names.</Text>
         <suggest.Form method="post" action="/items/suggest">
           {newItems.map((item) => (
             <span key={item.id}>

@@ -11,6 +11,7 @@ type Store = typeof stores.$inferSelect;
 type Shelf = typeof itemCategories.$inferSelect;
 
 type Values = {
+  name?: string;
   plural?: string | null;
   parentId?: number | null;
   storeId?: number | null;
@@ -34,10 +35,10 @@ export function ItemFields({
   parents?: { id: number; name: string; storeId: number | null; categoryId: number | null }[];
   // The item being edited, left out of the examples its suggestion is based on
   itemId?: number;
-  defaults?: Values & { name?: string };
+  defaults?: Values;
   autoFocus?: boolean;
 }) {
-  // The fields below the name start from these; a suggestion replaces them and remounts the fields
+  // The fields start from these; a suggestion replaces them and remounts the fields
   const [base, setBase] = useState<Values>(defaults);
   const [version, setVersion] = useState(0);
   const [parentId, setParentId] = useState(base.parentId ? String(base.parentId) : null);
@@ -58,9 +59,10 @@ export function ItemFields({
       <Group align="flex-end" gap="xs" wrap="nowrap">
         {/* data-autofocus: focused when shown in a Mantine modal */}
         <TextInput
+          key={`name-${version}`}
           name="name"
           label="Name"
-          defaultValue={defaults.name}
+          defaultValue={base.name}
           required
           autoFocus={autoFocus}
           data-autofocus={autoFocus || undefined}
@@ -144,6 +146,7 @@ function useSuggestion(
     }
     const id = (field: string) => Number(form.get(field)) || null;
     current.current = {
+      name,
       plural: String(form.get("plural") ?? "").trim() || null,
       parentId: id("parentId"),
       storeId: id("storeId"),
@@ -173,6 +176,8 @@ function useSuggestion(
     const parentOk = parents?.some((p) => p.id === suggestion.parentId) ? suggestion.parentId : null;
     const storeOk = stores.some((s) => s.id === suggestion.storeId) ? suggestion.storeId : null;
     const next: Values = {
+      // A plural name is always replaced by its singular, and the plural field takes the name if it's empty
+      name: suggestion.singular ?? was.name,
       plural: pick(was.plural, suggestion.plural, "plural"),
       parentId: pick(was.parentId, parentOk, "variant of"),
       storeId: pick(was.storeId, storeOk, "store"),
@@ -183,7 +188,11 @@ function useSuggestion(
     // A suggested shelf is in the suggested store, so it only fills in where that's the store now
     if (next.storeId === suggestion.storeId) next.categoryId = pick(was.categoryId, suggestion.categoryId, "shelf");
     apply(next);
-    setMessage({ text: filled.length ? `Filled in ${filled.join(", ")}` : "No suggestions for the empty fields.", error: false });
+    const changes = [
+      suggestion.singular && `Renamed to ${suggestion.singular}`,
+      filled.length > 0 && `filled in ${filled.join(", ")}`,
+    ].filter(Boolean).join(", ");
+    setMessage({ text: changes ? changes[0].toUpperCase() + changes.slice(1) : "No suggestions for the empty fields.", error: false });
   }, [fetcher.data]);
 
   return { run, loading: fetcher.state !== "idle", message };

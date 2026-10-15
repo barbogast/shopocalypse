@@ -13,13 +13,15 @@ const MODEL = "claude-opus-5-5";
 const SYSTEM = `You file new grocery items for a German-speaking family's shopping app.
 The catalog below lists the stores, their shelves in walking order, and the items already on each shelf.
 For each new item name, suggest:
+- singular: names are kept in the singular, with the plural alongside. If the name given is a German plural ("Äpfel"), give its singular ("Apfel"); otherwise null. Also null when singular and plural are the same ("Radieschen") and for words normally only used in the plural ("Nudeln", "Linsen", "Haferflocken").
 - storeId and categoryId (shelf): where this household would buy it. Follow how the catalog files similar items, not general knowledge. The shelf must belong to the store. Use null when nothing fits.
 - defaultUnit: the unit the item is usually counted or weighed in, as one of the unit keys. Follow similar items in the catalog.
-- plural: the German plural of the name, only if it differs from the name (null for uncountables like "Mehl" or names already in the plural).
+- plural: the German plural of the (singular) name, only if it differs from it (null for uncountables like "Mehl" and words only used in the plural).
 - parentId: the item id of an existing item this is clearly a variant of ("Berglinsen" is a variant of "Linsen"), otherwise null. Only items that aren't variants themselves can be parents.
 Answer for every name, in the order given, repeating each name exactly.`;
 
 const RawSuggestionSchema = z.object({
+  singular: z.string().nullable(),
   storeId: z.number().int().nullable(),
   categoryId: z.number().int().nullable(),
   defaultUnit: z.string().nullable(),
@@ -93,13 +95,13 @@ export async function suggestItems(names: string[], itemIds: number[] = []): Pro
     const raw = answers.find((a) => itemKey(a.name) === itemKey(name)) ?? answers[index];
     return raw
       ? sanitizeSuggestion(raw, name, catalog)
-      : { storeId: null, categoryId: null, defaultUnit: null, plural: null, parentId: null };
+      : { singular: null, storeId: null, categoryId: null, defaultUnit: null, plural: null, parentId: null };
   });
   return { suggestions };
 }
 
-// Saves accepted suggestions, filling only each item's empty fields; values are checked again against the
-// current catalog first. Returns the ids of the items that now have a shelf.
+// Saves accepted suggestions: renames items given a singular, and fills only each item's empty fields.
+// Values are checked again against the current catalog first. Returns the ids of the items that now have a shelf.
 export async function applySuggestions(accepted: z.infer<typeof AcceptedSchema>) {
   const shelved: number[] = [];
   for (const { itemId, ...raw } of accepted) {
@@ -109,9 +111,10 @@ export async function applySuggestions(accepted: z.infer<typeof AcceptedSchema>)
     const storeId = item.storeId ?? s.storeId;
     // The suggested shelf is in the suggested store, so it only fits where that's the item's store
     const categoryId = item.categoryId ?? (storeId === s.storeId ? s.categoryId : null);
-    const plural = item.plural ?? (s.plural && !(await nameClash([s.plural], itemId)) ? s.plural : null);
+    const name = s.singular && !(await nameClash([s.singular], itemId)) ? s.singular : item.name;
+    const plural = item.plural ?? (s.plural && itemKey(s.plural) !== itemKey(name) && !(await nameClash([s.plural], itemId)) ? s.plural : null);
     await updateItem(itemId, {
-      name: item.name,
+      name,
       plural,
       parentId: item.parentId ?? s.parentId,
       storeId,

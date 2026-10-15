@@ -11,7 +11,7 @@ const catalog: Catalog = {
   ],
 };
 
-const raw = { storeId: 1, categoryId: 10, defaultUnit: "pcs", plural: "Zwiebeln", parentId: null };
+const raw = { singular: null, storeId: 1, categoryId: 10, defaultUnit: "pcs", plural: "Zwiebeln", parentId: null };
 
 describe("sanitizeSuggestion", () => {
   it("keeps a valid suggestion", () => {
@@ -37,6 +37,17 @@ describe("sanitizeSuggestion", () => {
     expect(sanitizeSuggestion({ ...raw, plural: " zwiebel " }, "Zwiebel", catalog).plural).toBeNull();
     expect(sanitizeSuggestion({ ...raw, plural: "Karotten" }, "Möhre", catalog).plural).toBeNull();
     expect(sanitizeSuggestion({ ...raw, plural: "Linsen" }, "Linse", catalog).plural).toBeNull();
+  });
+});
+
+describe("sanitizeSuggestion for plural names", () => {
+  it("renames to the singular and keeps the name given as the plural", () => {
+    expect(sanitizeSuggestion({ ...raw, singular: "Apfel", plural: null }, "Äpfel", catalog)).toMatchObject({ singular: "Apfel", plural: "Äpfel" });
+  });
+
+  it("drops a singular that's the name itself or another item's name or plural", () => {
+    expect(sanitizeSuggestion({ ...raw, singular: "radieschen" }, "Radieschen", catalog)).toMatchObject({ singular: null, plural: "Zwiebeln" });
+    expect(sanitizeSuggestion({ ...raw, singular: "Karotten" }, "Möhren", catalog).singular).toBeNull();
   });
 });
 
