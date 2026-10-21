@@ -25,7 +25,7 @@ import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
-import { mealHistory, mealSchedule, recipes } from "~/db/schema";
+import * as schema from "~/db/schema";
 import { int, text } from "~/forms";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/home";
@@ -37,31 +37,31 @@ export function meta({}: Route.MetaArgs) {
 export async function loader() {
   const scheduled = await db
     .select({
-      position: mealSchedule.position,
-      id: recipes.id,
-      name: recipes.name,
-      servings: mealServings(mealSchedule.servings),
-      servingSize: recipes.servingSize,
-      instructions: recipes.instructions,
-      comments: recipes.comments,
-      weblink: recipes.weblink,
+      position: schema.mealSchedule.position,
+      id: schema.recipes.id,
+      name: schema.recipes.name,
+      servings: mealServings(schema.mealSchedule.servings),
+      servingSize: schema.recipes.servingSize,
+      instructions: schema.recipes.instructions,
+      comments: schema.recipes.comments,
+      weblink: schema.recipes.weblink,
     })
-    .from(mealSchedule)
-    .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
-    .orderBy(asc(mealSchedule.position))
+    .from(schema.mealSchedule)
+    .innerJoin(schema.recipes, eq(schema.mealSchedule.recipeId, schema.recipes.id))
+    .orderBy(asc(schema.mealSchedule.position))
     .then(withIngredients);
 
   const allRecipes = await db
-    .select({ id: recipes.id, name: recipes.name })
-    .from(recipes)
-    .where(eq(recipes.archived, false))
-    .orderBy(recipes.name);
+    .select({ id: schema.recipes.id, name: schema.recipes.name })
+    .from(schema.recipes)
+    .where(eq(schema.recipes.archived, false))
+    .orderBy(schema.recipes.name);
 
   const recentlyCooked = await db
-    .select({ id: mealHistory.id, recipeId: recipes.id, name: recipes.name, cookedAt: mealHistory.cookedAt })
-    .from(mealHistory)
-    .innerJoin(recipes, eq(mealHistory.recipeId, recipes.id))
-    .orderBy(desc(mealHistory.cookedAt), desc(mealHistory.id))
+    .select({ id: schema.mealHistory.id, recipeId: schema.recipes.id, name: schema.recipes.name, cookedAt: schema.mealHistory.cookedAt })
+    .from(schema.mealHistory)
+    .innerJoin(schema.recipes, eq(schema.mealHistory.recipeId, schema.recipes.id))
+    .orderBy(desc(schema.mealHistory.cookedAt), desc(schema.mealHistory.id))
     .limit(10)
     .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
 
@@ -86,22 +86,22 @@ export async function action({ request }: Route.ActionArgs) {
       const up = form.get("direction") === "up";
       // Swap meals with the neighbouring entry (positions may have gaps)
       await db.transaction(async (tx) => {
-        const current = await tx.select().from(mealSchedule).where(eq(mealSchedule.position, position)).get();
+        const current = await tx.select().from(schema.mealSchedule).where(eq(schema.mealSchedule.position, position)).get();
         const neighbour = await tx
           .select()
-          .from(mealSchedule)
-          .where(up ? lt(mealSchedule.position, position) : gt(mealSchedule.position, position))
-          .orderBy(up ? desc(mealSchedule.position) : asc(mealSchedule.position))
+          .from(schema.mealSchedule)
+          .where(up ? lt(schema.mealSchedule.position, position) : gt(schema.mealSchedule.position, position))
+          .orderBy(up ? desc(schema.mealSchedule.position) : asc(schema.mealSchedule.position))
           .limit(1)
           .get();
         if (!current || !neighbour) return;
-        await tx.update(mealSchedule)
+        await tx.update(schema.mealSchedule)
           .set({ recipeId: neighbour.recipeId, servings: neighbour.servings })
-          .where(eq(mealSchedule.position, current.position))
+          .where(eq(schema.mealSchedule.position, current.position))
           .run();
-        await tx.update(mealSchedule)
+        await tx.update(schema.mealSchedule)
           .set({ recipeId: current.recipeId, servings: current.servings })
-          .where(eq(mealSchedule.position, neighbour.position))
+          .where(eq(schema.mealSchedule.position, neighbour.position))
           .run();
       });
       break;
@@ -109,20 +109,20 @@ export async function action({ request }: Route.ActionArgs) {
 
     case "servings": {
       if (!(position && newServings)) break;
-      await db.update(mealSchedule).set({ servings: newServings }).where(eq(mealSchedule.position, position));
+      await db.update(schema.mealSchedule).set({ servings: newServings }).where(eq(schema.mealSchedule.position, position));
       break;
     }
 
     case "remove": {
       if (!position) break;
-      await db.delete(mealSchedule).where(eq(mealSchedule.position, position));
+      await db.delete(schema.mealSchedule).where(eq(schema.mealSchedule.position, position));
       break;
     }
 
     // Also changes the auto-fill rotation, which goes by last-cooked date
     case "remove-history": {
       const historyId = int(form, "id");
-      if (historyId) await db.delete(mealHistory).where(eq(mealHistory.id, historyId));
+      if (historyId) await db.delete(schema.mealHistory).where(eq(schema.mealHistory.id, historyId));
       break;
     }
 
@@ -130,12 +130,12 @@ export async function action({ request }: Route.ActionArgs) {
       const recipeId = int(form, "recipeId");
       // Nothing picked, or a recipe that's gone or archived since the page loaded
       if (!recipeId) return { addError: "Pick a recipe first." };
-      const recipe = await db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
+      const recipe = await db.select().from(schema.recipes).where(eq(schema.recipes.id, recipeId)).get();
       if (!recipe || recipe.archived) return { addError: "That recipe is no longer available." };
       const [{ nextPos }] = await db
-        .select({ nextPos: max(mealSchedule.position) })
-        .from(mealSchedule);
-      await db.insert(mealSchedule).values({ position: (nextPos ?? 0) + 1, recipeId, servings: newServings });
+        .select({ nextPos: max(schema.mealSchedule.position) })
+        .from(schema.mealSchedule);
+      await db.insert(schema.mealSchedule).values({ position: (nextPos ?? 0) + 1, recipeId, servings: newServings });
       // Tells the page to clear its recipe picker
       return { added: true };
     }
@@ -145,25 +145,25 @@ export async function action({ request }: Route.ActionArgs) {
       if (!count || count > MAX_AUTO_FILL) return { autoFillError: `Pick a number from 1 to ${MAX_AUTO_FILL}.` };
 
       const queue = await db
-        .select({ recipeId: mealSchedule.recipeId })
-        .from(mealSchedule)
-        .orderBy(asc(mealSchedule.position));
+        .select({ recipeId: schema.mealSchedule.recipeId })
+        .from(schema.mealSchedule)
+        .orderBy(asc(schema.mealSchedule.position));
       // Last position in the queue per recipe (later entries overwrite earlier ones)
       const queuePos = new Map(queue.map((r, i) => [r.recipeId, i]));
 
       // Find the last-cooked date per recipe
       const lastCooked = await db
-        .select({ recipeId: mealHistory.recipeId, lastDate: max(mealHistory.cookedAt) })
-        .from(mealHistory)
-        .groupBy(mealHistory.recipeId);
+        .select({ recipeId: schema.mealHistory.recipeId, lastDate: max(schema.mealHistory.cookedAt) })
+        .from(schema.mealHistory)
+        .groupBy(schema.mealHistory.recipeId);
       const lastCookedMap = new Map(lastCooked.map((r) => [r.recipeId, r.lastDate]));
 
       // Rotation order: unscheduled recipes by least recently cooked (never cooked
       // first), then scheduled ones in the order they come up in the queue.
       const rotation = await db
-        .select({ id: recipes.id })
-        .from(recipes)
-        .where(and(eq(recipes.archived, false), eq(recipes.autoFill, true)))
+        .select({ id: schema.recipes.id })
+        .from(schema.recipes)
+        .where(and(eq(schema.recipes.archived, false), eq(schema.recipes.autoFill, true)))
         .then((all) =>
           all.sort((a, b) => {
             const aPos = queuePos.get(a.id) ?? -1;
@@ -178,11 +178,11 @@ export async function action({ request }: Route.ActionArgs) {
       if (rotation.length === 0) return { autoFillError: "No recipes are included in auto-fill." };
 
       const [{ nextPos }] = await db
-        .select({ nextPos: max(mealSchedule.position) })
-        .from(mealSchedule);
+        .select({ nextPos: max(schema.mealSchedule.position) })
+        .from(schema.mealSchedule);
       const start = (nextPos ?? 0) + 1;
       // Loop through the rotation if more meals are requested than there are recipes
-      await db.insert(mealSchedule).values(
+      await db.insert(schema.mealSchedule).values(
         Array.from({ length: count }, (_, i) => ({
           position: start + i,
           recipeId: rotation[i % rotation.length].id,

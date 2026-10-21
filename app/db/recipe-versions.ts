@@ -2,8 +2,7 @@
 import { asc, desc, eq, inArray, notExists } from "drizzle-orm";
 import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 import { recipeToText } from "../recipe-import.ts";
-import type * as schema from "./schema.ts";
-import { items, recipeIngredients, recipes, recipeVersions } from "./schema.ts";
+import * as schema from "./schema.ts";
 
 // The app's db, a transaction, or a script's own connection
 type Db = BaseSQLiteDatabase<"async", any, typeof schema>;
@@ -15,43 +14,43 @@ const SESSION_MS = 30 * 60 * 1000;
 async function ingredientsOf(db: Db, recipeIds: number[]) {
   return db
     .select({
-      recipeId: recipeIngredients.recipeId,
-      name: items.name,
-      plural: items.plural,
-      quantity: recipeIngredients.quantity,
-      unit: recipeIngredients.unit,
-      note: recipeIngredients.note,
+      recipeId: schema.recipeIngredients.recipeId,
+      name: schema.items.name,
+      plural: schema.items.plural,
+      quantity: schema.recipeIngredients.quantity,
+      unit: schema.recipeIngredients.unit,
+      note: schema.recipeIngredients.note,
     })
-    .from(recipeIngredients)
-    .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-    .where(inArray(recipeIngredients.recipeId, recipeIds))
-    .orderBy(asc(recipeIngredients.position))
+    .from(schema.recipeIngredients)
+    .innerJoin(schema.items, eq(schema.recipeIngredients.itemId, schema.items.id))
+    .where(inArray(schema.recipeIngredients.recipeId, recipeIds))
+    .orderBy(asc(schema.recipeIngredients.position))
     .all();
 }
 
 // Call after changing a recipe's name, servings, weblink, ingredients, instructions or comments
 export async function recordRecipeVersion(db: Db, recipeId: number, now = new Date()) {
-  const recipe = await db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
+  const recipe = await db.select().from(schema.recipes).where(eq(schema.recipes.id, recipeId)).get();
   if (!recipe) return;
   const text = recipeToText({ ...recipe, ingredients: await ingredientsOf(db, [recipeId]) });
 
   const [latest, previous] = await db
     .select()
-    .from(recipeVersions)
-    .where(eq(recipeVersions.recipeId, recipeId))
-    .orderBy(desc(recipeVersions.savedAt), desc(recipeVersions.id))
+    .from(schema.recipeVersions)
+    .where(eq(schema.recipeVersions.recipeId, recipeId))
+    .orderBy(desc(schema.recipeVersions.savedAt), desc(schema.recipeVersions.id))
     .limit(2)
     .all();
   if (latest?.text === text) return;
 
   const savedAt = now.toISOString();
   if (!latest || now.getTime() - Date.parse(latest.savedAt) >= SESSION_MS) {
-    await db.insert(recipeVersions).values({ recipeId, savedAt, text }).run();
+    await db.insert(schema.recipeVersions).values({ recipeId, savedAt, text }).run();
   } else if (previous?.text === text) {
     // The session's edits were undone: nothing changed since the version before
-    await db.delete(recipeVersions).where(eq(recipeVersions.id, latest.id)).run();
+    await db.delete(schema.recipeVersions).where(eq(schema.recipeVersions.id, latest.id)).run();
   } else {
-    await db.update(recipeVersions).set({ text, savedAt }).where(eq(recipeVersions.id, latest.id)).run();
+    await db.update(schema.recipeVersions).set({ text, savedAt }).where(eq(schema.recipeVersions.id, latest.id)).run();
   }
 }
 
@@ -60,13 +59,13 @@ export async function recordRecipeVersion(db: Db, recipeId: number, now = new Da
 export async function backfillRecipeVersions(db: Db) {
   const missing = await db
     .select()
-    .from(recipes)
-    .where(notExists(db.select().from(recipeVersions).where(eq(recipeVersions.recipeId, recipes.id))))
+    .from(schema.recipes)
+    .where(notExists(db.select().from(schema.recipeVersions).where(eq(schema.recipeVersions.recipeId, schema.recipes.id))))
     .all();
   if (!missing.length) return 0;
 
   const ingredients = await ingredientsOf(db, missing.map((r) => r.id));
-  await db.insert(recipeVersions).values(missing.map((recipe) => ({
+  await db.insert(schema.recipeVersions).values(missing.map((recipe) => ({
     recipeId: recipe.id,
     savedAt: recipe.createdAt,
     text: recipeToText({ ...recipe, ingredients: ingredients.filter((i) => i.recipeId === recipe.id) }),

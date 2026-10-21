@@ -24,7 +24,7 @@ import { Form, Link, useFetcher, useLocation, useSearchParams } from "react-rout
 import { MoveButtons } from "~/components/move-buttons";
 import { db } from "~/db/client";
 import { addShelf, deleteItem, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
-import { itemCategories, items, recipeIngredients, recipes, stores } from "~/db/schema";
+import * as schema from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { unitName } from "~/units";
@@ -39,54 +39,54 @@ export async function loader({ request }: Route.LoaderArgs) {
   const by = new URL(request.url).searchParams.get("by");
   const byShelf = by === "shelf";
   const newest = by === "newest";
-  const parents = alias(items, "parents");
+  const parents = alias(schema.items, "parents");
   const allItems = await db
     .select({
-      id: items.id,
-      name: items.name,
+      id: schema.items.id,
+      name: schema.items.name,
       // Grouped by shelf, a variant is only indented under its parent when they share a shelf
       // Newest first, variants aren't next to their parent, so they aren't indented at all
       isVariant: byShelf
-        ? sql<boolean>`${items.parentId} is not null and ${parents.storeId} is ${items.storeId} and ${parents.categoryId} is ${items.categoryId}`.mapWith(Boolean)
+        ? sql<boolean>`${schema.items.parentId} is not null and ${parents.storeId} is ${schema.items.storeId} and ${parents.categoryId} is ${schema.items.categoryId}`.mapWith(Boolean)
         : newest
           ? sql<boolean>`0`.mapWith(Boolean)
-          : sql<boolean>`${items.parentId} is not null`.mapWith(Boolean),
-      defaultUnit: items.defaultUnit,
-      alwaysAvailable: items.alwaysAvailable,
-      shelfName: itemCategories.name,
-      storeName: stores.name,
+          : sql<boolean>`${schema.items.parentId} is not null`.mapWith(Boolean),
+      defaultUnit: schema.items.defaultUnit,
+      alwaysAvailable: schema.items.alwaysAvailable,
+      shelfName: schema.itemCategories.name,
+      storeName: schema.stores.name,
     })
-    .from(items)
-    .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
-    .leftJoin(stores, eq(items.storeId, stores.id))
-    .leftJoin(parents, eq(items.parentId, parents.id))
+    .from(schema.items)
+    .leftJoin(schema.itemCategories, eq(schema.items.categoryId, schema.itemCategories.id))
+    .leftJoin(schema.stores, eq(schema.items.storeId, schema.stores.id))
+    .leftJoin(parents, eq(schema.items.parentId, parents.id))
     // Like the shopping list when grouped by shelf: stores alphabetically, then shelves in walking order,
     // items without a store or shelf last. Variants right after their parent (on the same shelf).
     // Newest first, to find the items a recipe import just created; ids only grow
     .orderBy(
-      ...(newest ? [desc(items.id)] : []),
+      ...(newest ? [desc(schema.items.id)] : []),
       ...(byShelf
         ? [
-            sql`${stores.name} is null`,
-            stores.name,
-            sql`${itemCategories.position} is null`,
-            itemCategories.position,
+            sql`${schema.stores.name} is null`,
+            schema.stores.name,
+            sql`${schema.itemCategories.position} is null`,
+            schema.itemCategories.position,
           ]
         : []),
-      sql`coalesce(${parents.name}, ${items.name}) collate nocase`,
-      sql`${items.parentId} is not null`,
-      sql`${items.name} collate nocase`,
+      sql`coalesce(${parents.name}, ${schema.items.name}) collate nocase`,
+      sql`${schema.items.parentId} is not null`,
+      sql`${schema.items.name} collate nocase`,
     );
 
   const allShelves = await listShelves();
-  const allStores = await db.select().from(stores).orderBy(stores.name);
+  const allStores = await db.select().from(schema.stores).orderBy(schema.stores.name);
 
   // Recipes each item is used in
   const usage = await db
-    .selectDistinct({ itemId: recipeIngredients.itemId, id: recipes.id, name: recipes.name, archived: recipes.archived })
-    .from(recipeIngredients)
-    .innerJoin(recipes, eq(recipeIngredients.recipeId, recipes.id))
-    .orderBy(recipes.name);
+    .selectDistinct({ itemId: schema.recipeIngredients.itemId, id: schema.recipes.id, name: schema.recipes.name, archived: schema.recipes.archived })
+    .from(schema.recipeIngredients)
+    .innerJoin(schema.recipes, eq(schema.recipeIngredients.recipeId, schema.recipes.id))
+    .orderBy(schema.recipes.name);
   const recipesByItem: Record<number, typeof usage> = {};
   for (const row of usage) (recipesByItem[row.itemId] ??= []).push(row);
 
@@ -112,7 +112,7 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     case "rename-shelf": {
-      if (id && name) await db.update(itemCategories).set({ name }).where(eq(itemCategories.id, id));
+      if (id && name) await db.update(schema.itemCategories).set({ name }).where(eq(schema.itemCategories.id, id));
       break;
     }
 
@@ -127,12 +127,12 @@ export async function action({ request }: Route.ActionArgs) {
     }
 
     case "add-store": {
-      if (name) await db.insert(stores).values({ name });
+      if (name) await db.insert(schema.stores).values({ name });
       break;
     }
 
     case "rename-store": {
-      if (id && name) await db.update(stores).set({ name }).where(eq(stores.id, id));
+      if (id && name) await db.update(schema.stores).set({ name }).where(eq(schema.stores.id, id));
       break;
     }
 

@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { Form, Link, useSearchParams } from "react-router";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
-import { mealHistory, recipes } from "~/db/schema";
+import * as schema from "~/db/schema";
 import { int } from "~/forms";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes";
@@ -18,10 +18,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const showArchived = params.has("archived");
   const all = await db
     .select()
-    .from(recipes)
-    .where(showArchived ? undefined : eq(recipes.archived, false))
-    .orderBy(...(params.get("by") === "added" ? [desc(recipes.createdAt), desc(recipes.id)] : [recipes.name]));
-  const cooked = await db.selectDistinct({ recipeId: mealHistory.recipeId }).from(mealHistory);
+    .from(schema.recipes)
+    .where(showArchived ? undefined : eq(schema.recipes.archived, false))
+    .orderBy(...(params.get("by") === "added" ? [desc(schema.recipes.createdAt), desc(schema.recipes.id)] : [schema.recipes.name]));
+  const cooked = await db.selectDistinct({ recipeId: schema.mealHistory.recipeId }).from(schema.mealHistory);
   const cookedIds = new Set(cooked.map((c) => c.recipeId));
   return { recipes: all.map((r) => ({ ...r, cooked: cookedIds.has(r.id) })) };
 }

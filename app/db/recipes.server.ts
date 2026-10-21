@@ -3,7 +3,7 @@ import { itemKey, itemKeys, type ParsedIngredient, type ParsedRecipe } from "~/r
 import { scaleAmount, type UnitKey } from "~/units";
 import { db } from "./client";
 import { recordRecipeVersion } from "./recipe-versions";
-import { items, mealHistory, mealSchedule, recipeIngredients, recipes, recipeVersions, shoppingListRecipes, stores } from "./schema";
+import * as schema from "./schema";
 
 // Cook dates are stored as YYYY-MM-DD; format on the server so client and server render the same string
 export function formatCookedAt(cookedAt: string) {
@@ -17,25 +17,25 @@ export function formatCookedAt(cookedAt: string) {
 // leaves the schedule.
 export async function deleteOrArchiveRecipe(recipeId: number) {
   await db.transaction(async (tx) => {
-    await tx.delete(mealSchedule).where(eq(mealSchedule.recipeId, recipeId)).run();
-    if (await tx.select().from(mealHistory).where(eq(mealHistory.recipeId, recipeId)).limit(1).get()) {
-      await tx.update(recipes).set({ archived: true }).where(eq(recipes.id, recipeId)).run();
+    await tx.delete(schema.mealSchedule).where(eq(schema.mealSchedule.recipeId, recipeId)).run();
+    if (await tx.select().from(schema.mealHistory).where(eq(schema.mealHistory.recipeId, recipeId)).limit(1).get()) {
+      await tx.update(schema.recipes).set({ archived: true }).where(eq(schema.recipes.id, recipeId)).run();
     } else {
-      await tx.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId)).run();
-      await tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.recipeId, recipeId)).run();
-      await tx.delete(recipeVersions).where(eq(recipeVersions.recipeId, recipeId)).run();
-      await tx.delete(recipes).where(eq(recipes.id, recipeId)).run();
+      await tx.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, recipeId)).run();
+      await tx.delete(schema.shoppingListRecipes).where(eq(schema.shoppingListRecipes.recipeId, recipeId)).run();
+      await tx.delete(schema.recipeVersions).where(eq(schema.recipeVersions.recipeId, recipeId)).run();
+      await tx.delete(schema.recipes).where(eq(schema.recipes.id, recipeId)).run();
     }
   });
 }
 
 // Servings of a scheduled or listed meal, falling back to the recipe's serving size
-export function mealServings(servings: typeof mealSchedule.servings | typeof shoppingListRecipes.servings) {
-  return sql<number>`coalesce(${servings}, ${recipes.servingSize})`;
+export function mealServings(servings: typeof schema.mealSchedule.servings | typeof schema.shoppingListRecipes.servings) {
+  return sql<number>`coalesce(${servings}, ${schema.recipes.servingSize})`;
 }
 
 export async function restoreRecipe(recipeId: number) {
-  await db.update(recipes).set({ archived: false }).where(eq(recipes.id, recipeId)).run();
+  await db.update(schema.recipes).set({ archived: false }).where(eq(schema.recipes.id, recipeId)).run();
 }
 
 // Attach each meal's ingredients, scaled to its servings
@@ -43,19 +43,19 @@ export async function withIngredients<T extends { id: number; servings: number; 
   const rows = meals.length
     ? await db
         .select({
-          recipeId: recipeIngredients.recipeId,
-          itemId: recipeIngredients.itemId,
-          name: items.name,
-          plural: items.plural,
-          quantity: recipeIngredients.quantity,
-          unit: recipeIngredients.unit,
-          note: recipeIngredients.note,
-          noteOnList: recipeIngredients.noteOnList,
+          recipeId: schema.recipeIngredients.recipeId,
+          itemId: schema.recipeIngredients.itemId,
+          name: schema.items.name,
+          plural: schema.items.plural,
+          quantity: schema.recipeIngredients.quantity,
+          unit: schema.recipeIngredients.unit,
+          note: schema.recipeIngredients.note,
+          noteOnList: schema.recipeIngredients.noteOnList,
         })
-        .from(recipeIngredients)
-        .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-        .where(inArray(recipeIngredients.recipeId, meals.map((m) => m.id)))
-        .orderBy(asc(recipeIngredients.position))
+        .from(schema.recipeIngredients)
+        .innerJoin(schema.items, eq(schema.recipeIngredients.itemId, schema.items.id))
+        .where(inArray(schema.recipeIngredients.recipeId, meals.map((m) => m.id)))
+        .orderBy(asc(schema.recipeIngredients.position))
     : [];
   return meals.map((m) => ({
     ...m,
@@ -69,35 +69,35 @@ export async function withIngredients<T extends { id: number; servings: number; 
 export async function upsertIngredient(
   recipeId: number,
   itemId: number,
-  { quantity, unit, note, noteOnList }: Pick<typeof recipeIngredients.$inferInsert, "quantity" | "unit" | "note" | "noteOnList">,
+  { quantity, unit, note, noteOnList }: Pick<typeof schema.recipeIngredients.$inferInsert, "quantity" | "unit" | "note" | "noteOnList">,
 ) {
-  const last = sql<number>`(select coalesce(max(${recipeIngredients.position}), 0) + 1 from ${recipeIngredients} where ${recipeIngredients.recipeId} = ${recipeId})`;
+  const last = sql<number>`(select coalesce(max(${schema.recipeIngredients.position}), 0) + 1 from ${schema.recipeIngredients} where ${schema.recipeIngredients.recipeId} = ${recipeId})`;
   await db
-    .insert(recipeIngredients)
+    .insert(schema.recipeIngredients)
     .values({ recipeId, itemId, quantity, unit, note, noteOnList, position: last })
-    .onConflictDoUpdate({ target: [recipeIngredients.recipeId, recipeIngredients.itemId], set: { quantity, unit, note, noteOnList } })
+    .onConflictDoUpdate({ target: [schema.recipeIngredients.recipeId, schema.recipeIngredients.itemId], set: { quantity, unit, note, noteOnList } })
     .run();
 }
 
 // Swap positions with the neighbouring ingredient in the same recipe
 export async function moveIngredient(recipeId: number, itemId: number, up: boolean) {
   await db.transaction(async (tx) => {
-    const ofItem = (id: number) => and(eq(recipeIngredients.recipeId, recipeId), eq(recipeIngredients.itemId, id));
-    const current = await tx.select().from(recipeIngredients).where(ofItem(itemId)).get();
+    const ofItem = (id: number) => and(eq(schema.recipeIngredients.recipeId, recipeId), eq(schema.recipeIngredients.itemId, id));
+    const current = await tx.select().from(schema.recipeIngredients).where(ofItem(itemId)).get();
     if (!current) return;
     const neighbour = await tx
       .select()
-      .from(recipeIngredients)
+      .from(schema.recipeIngredients)
       .where(and(
-        eq(recipeIngredients.recipeId, recipeId),
-        up ? lt(recipeIngredients.position, current.position) : gt(recipeIngredients.position, current.position),
+        eq(schema.recipeIngredients.recipeId, recipeId),
+        up ? lt(schema.recipeIngredients.position, current.position) : gt(schema.recipeIngredients.position, current.position),
       ))
-      .orderBy(up ? desc(recipeIngredients.position) : asc(recipeIngredients.position))
+      .orderBy(up ? desc(schema.recipeIngredients.position) : asc(schema.recipeIngredients.position))
       .limit(1)
       .get();
     if (!neighbour) return;
-    await tx.update(recipeIngredients).set({ position: neighbour.position }).where(ofItem(current.itemId)).run();
-    await tx.update(recipeIngredients).set({ position: current.position }).where(ofItem(neighbour.itemId)).run();
+    await tx.update(schema.recipeIngredients).set({ position: neighbour.position }).where(ofItem(current.itemId)).run();
+    await tx.update(schema.recipeIngredients).set({ position: current.position }).where(ofItem(neighbour.itemId)).run();
   });
 }
 
@@ -112,25 +112,25 @@ export async function importRecipe({ ingredients, ...recipe }: Omit<ParsedRecipe
   ingredients: (ParsedIngredient & { noteOnList: boolean })[];
 }) {
   return db.transaction(async (tx) => {
-    const existing = await tx.select({ id: items.id, name: items.name, plural: items.plural }).from(items).all();
+    const existing = await tx.select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural }).from(schema.items).all();
     const idsByKey = new Map(existing.flatMap((i) => itemKeys(i).map((key) => [key, i.id] as const)));
 
-    const store = await tx.select({ id: stores.id, name: stores.name }).from(stores)
-      .where(eq(stores.name, IMPORT_STORE_NAME)).orderBy(asc(stores.id)).get();
+    const store = await tx.select({ id: schema.stores.id, name: schema.stores.name }).from(schema.stores)
+      .where(eq(schema.stores.name, IMPORT_STORE_NAME)).orderBy(asc(schema.stores.id)).get();
 
     const newItems: { id: number; name: string; storeId: number | null; defaultUnit: UnitKey | null }[] = [];
     for (const ing of ingredients) {
       if (idsByKey.has(itemKey(ing.name))) continue;
       const [item] = await tx
-        .insert(items)
+        .insert(schema.items)
         .values({ name: ing.name, storeId: store?.id ?? null, defaultUnit: ing.unit })
-        .returning({ id: items.id, name: items.name, storeId: items.storeId, defaultUnit: items.defaultUnit });
+        .returning({ id: schema.items.id, name: schema.items.name, storeId: schema.items.storeId, defaultUnit: schema.items.defaultUnit });
       idsByKey.set(itemKey(item.name), item.id);
       newItems.push(item);
     }
 
-    const [{ id }] = await tx.insert(recipes).values(recipe).returning({ id: recipes.id });
-    await tx.insert(recipeIngredients).values(ingredients.map((ing, index) => ({
+    const [{ id }] = await tx.insert(schema.recipes).values(recipe).returning({ id: schema.recipes.id });
+    await tx.insert(schema.recipeIngredients).values(ingredients.map((ing, index) => ({
       recipeId: id,
       position: index + 1,
       itemId: idsByKey.get(itemKey(ing.name))!,

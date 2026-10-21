@@ -11,7 +11,7 @@ import { isDateString, localDate } from "~/dates";
 import { db } from "~/db/client";
 import { recordRecipeVersion } from "~/db/recipe-versions";
 import { withIngredients } from "~/db/recipes.server";
-import { mealHistory, mealSchedule, recipes } from "~/db/schema";
+import * as schema from "~/db/schema";
 import { optionalText } from "~/forms";
 import { formatAmount } from "~/units";
 import { pageTitle } from "~/page-title";
@@ -27,15 +27,15 @@ async function scheduledMeal(request: Request, recipeId: number) {
   if (param == null) return null;
   const entry = await db
     .select()
-    .from(mealSchedule)
-    .where(and(eq(mealSchedule.position, Number(param)), eq(mealSchedule.recipeId, recipeId)))
+    .from(schema.mealSchedule)
+    .where(and(eq(schema.mealSchedule.position, Number(param)), eq(schema.mealSchedule.recipeId, recipeId)))
     .get();
   return entry ?? null;
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const id = Number(params.id);
-  const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
+  const [recipe] = await db.select().from(schema.recipes).where(eq(schema.recipes.id, id));
   if (!recipe) throw new Response("Not found", { status: 404 });
 
   const meal = await scheduledMeal(request, id);
@@ -59,9 +59,9 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (position == null && new URL(request.url).searchParams.has("position")) return redirect("/");
 
   await db.transaction(async (tx) => {
-    await tx.update(recipes).set({ comments }).where(eq(recipes.id, id)).run();
-    if (position != null) await tx.delete(mealSchedule).where(eq(mealSchedule.position, position)).run();
-    await tx.insert(mealHistory).values({ recipeId: id, cookedAt }).run();
+    await tx.update(schema.recipes).set({ comments }).where(eq(schema.recipes.id, id)).run();
+    if (position != null) await tx.delete(schema.mealSchedule).where(eq(schema.mealSchedule.position, position)).run();
+    await tx.insert(schema.mealHistory).values({ recipeId: id, cookedAt }).run();
     await recordRecipeVersion(tx, id);
   });
 

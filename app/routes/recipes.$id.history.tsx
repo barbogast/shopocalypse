@@ -5,7 +5,7 @@ import { asc, eq } from "drizzle-orm";
 import { Link } from "react-router";
 import { LocalDateTime } from "~/components/local-date-time";
 import { db } from "~/db/client";
-import { recipes, recipeVersions } from "~/db/schema";
+import * as schema from "~/db/schema";
 import { pageTitle } from "~/page-title";
 import { type DiffLine, diffVersions } from "~/recipe-history";
 import type { Route } from "./+types/recipes.$id.history";
@@ -16,14 +16,14 @@ export function meta({ data }: Route.MetaArgs) {
 
 export async function loader({ params }: Route.LoaderArgs) {
   const id = Number(params.id);
-  const recipe = await db.select({ id: recipes.id, name: recipes.name }).from(recipes).where(eq(recipes.id, id)).get();
+  const recipe = await db.select({ id: schema.recipes.id, name: schema.recipes.name }).from(schema.recipes).where(eq(schema.recipes.id, id)).get();
   if (!recipe) throw new Response("Not found", { status: 404 });
 
   const rows = await db
     .select()
-    .from(recipeVersions)
-    .where(eq(recipeVersions.recipeId, id))
-    .orderBy(asc(recipeVersions.savedAt), asc(recipeVersions.id));
+    .from(schema.recipeVersions)
+    .where(eq(schema.recipeVersions.recipeId, id))
+    .orderBy(asc(schema.recipeVersions.savedAt), asc(schema.recipeVersions.id));
   // Each version with what changed since the one before; newest first
   const versions = rows
     .map((v, i) => ({ id: v.id, savedAt: v.savedAt, text: v.text, diff: i > 0 ? diffVersions(rows[i - 1].text, v.text) : null }))

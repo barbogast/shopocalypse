@@ -37,7 +37,7 @@ import {
   upsertIngredient,
   withIngredients,
 } from "~/db/recipes.server";
-import { items, mealHistory, recipeIngredients, recipes, recipeVersions, stores } from "~/db/schema";
+import * as schema from "~/db/schema";
 import { int, optionalText, optionalUrl, text } from "~/forms";
 import { itemKey, itemKeys } from "~/recipe-import";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
@@ -50,29 +50,29 @@ export function meta({ data }: Route.MetaArgs) {
 
 export async function loader({ params }: Route.LoaderArgs) {
   const id = Number(params.id);
-  const [recipe] = await db.select().from(recipes).where(eq(recipes.id, id));
+  const [recipe] = await db.select().from(schema.recipes).where(eq(schema.recipes.id, id));
   if (!recipe) throw new Response("Not found", { status: 404 });
 
   const [{ ingredients }] = await withIngredients([{ ...recipe, servings: recipe.servingSize }]);
 
   const allItems = await db
-    .select({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit })
-    .from(items)
-    .orderBy(sql`${items.name} collate nocase`);
+    .select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit })
+    .from(schema.items)
+    .orderBy(sql`${schema.items.name} collate nocase`);
 
-  const allStores = await db.select().from(stores).orderBy(stores.name);
+  const allStores = await db.select().from(schema.stores).orderBy(schema.stores.name);
 
   const cookedDates = await db
-    .select({ id: mealHistory.id, cookedAt: mealHistory.cookedAt })
-    .from(mealHistory)
-    .where(eq(mealHistory.recipeId, id))
-    .orderBy(desc(mealHistory.cookedAt), desc(mealHistory.id))
+    .select({ id: schema.mealHistory.id, cookedAt: schema.mealHistory.cookedAt })
+    .from(schema.mealHistory)
+    .where(eq(schema.mealHistory.recipeId, id))
+    .orderBy(desc(schema.mealHistory.cookedAt), desc(schema.mealHistory.id))
     .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
 
   const { versionCount } = await db
     .select({ versionCount: count() })
-    .from(recipeVersions)
-    .where(eq(recipeVersions.recipeId, id))
+    .from(schema.recipeVersions)
+    .where(eq(schema.recipeVersions.recipeId, id))
     .get() ?? { versionCount: 0 };
 
   return {
@@ -95,7 +95,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       const autoFill = form.get("autoFill") === "on";
       if (!name || !servingSize) return { error: "Name and a whole-number serving size are required." };
       if (weblink === undefined) return { error: "The weblink must be a web address, like https://example.com/recipe." };
-      await db.update(recipes).set({ name, servingSize, instructions, comments, weblink, autoFill }).where(eq(recipes.id, id));
+      await db.update(schema.recipes).set({ name, servingSize, instructions, comments, weblink, autoFill }).where(eq(schema.recipes.id, id));
       await recordRecipeVersion(db, id);
       return { saved: true };
     }
@@ -127,9 +127,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       const parsed = await parseItemForm(form);
       if (parsed.error) return { createError: parsed.error };
       const [item] = await db
-        .insert(items)
+        .insert(schema.items)
         .values(parsed.values)
-        .returning({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit });
+        .returning({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit });
       return { createdItem: item };
     }
 
@@ -137,8 +137,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       const itemId = int(form, "itemId");
       if (!itemId) return null;
       await db
-        .delete(recipeIngredients)
-        .where(and(eq(recipeIngredients.recipeId, id), eq(recipeIngredients.itemId, itemId)));
+        .delete(schema.recipeIngredients)
+        .where(and(eq(schema.recipeIngredients.recipeId, id), eq(schema.recipeIngredients.itemId, itemId)));
       await recordRecipeVersion(db, id);
       break;
     }

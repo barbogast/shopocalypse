@@ -3,12 +3,12 @@ import { IconSparkles } from "@tabler/icons-react";
 import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { StoreShelfFields } from "~/components/store-shelf-fields";
-import type { itemCategories, stores } from "~/db/schema";
+import type * as schema from "~/db/schema";
 import type { action as suggestAction } from "~/routes/items.suggest";
 import { UNIT_OPTIONS } from "~/units";
 
-type Store = typeof stores.$inferSelect;
-type Shelf = typeof itemCategories.$inferSelect;
+type Store = typeof schema.stores.$inferSelect;
+type Shelf = typeof schema.itemCategories.$inferSelect;
 
 type Values = {
   name?: string;

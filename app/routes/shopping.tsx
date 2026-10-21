@@ -36,16 +36,7 @@ import { db } from "~/db/client";
 import { listParents, listShelves, parseItemForm } from "~/db/items.server";
 import { mealServings, withIngredients } from "~/db/recipes.server";
 import { changeItemsForMeals, getActiveList, listIngredients, listMeals } from "~/db/shopping.server";
-import {
-  itemCategories,
-  items,
-  mealSchedule,
-  recipes,
-  shoppingListItems,
-  shoppingListRecipes,
-  shoppingLists,
-  stores,
-} from "~/db/schema";
+import * as schema from "~/db/schema";
 import { int, text } from "~/forms";
 import { itemKey, itemKeys } from "~/recipe-import";
 import { listAmounts, listAsText } from "~/shopping-list";
@@ -75,92 +66,92 @@ export async function loader() {
 
   const scheduled = await db
     .select({
-      position: mealSchedule.position,
-      name: recipes.name,
-      servings: mealServings(mealSchedule.servings),
-      servingSize: recipes.servingSize,
+      position: schema.mealSchedule.position,
+      name: schema.recipes.name,
+      servings: mealServings(schema.mealSchedule.servings),
+      servingSize: schema.recipes.servingSize,
     })
-    .from(mealSchedule)
-    .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
-    .orderBy(asc(mealSchedule.position));
+    .from(schema.mealSchedule)
+    .innerJoin(schema.recipes, eq(schema.mealSchedule.recipeId, schema.recipes.id))
+    .orderBy(asc(schema.mealSchedule.position));
 
   if (!activeList) {
     return { activeList: null, listItems: [], scheduled };
   }
 
-  const parents = alias(items, "parents");
-  const listedParents = alias(shoppingListItems, "listed_parents");
+  const parentItems = alias(schema.items, "parents");
+  const listedParents = alias(schema.shoppingListItems, "listed_parents");
   // Indented under its parent only when the parent is on the list too and they share a shelf
-  const isVariant = sql<boolean>`${listedParents.id} is not null and ${parents.storeId} is ${items.storeId} and ${parents.categoryId} is ${items.categoryId}`;
+  const isVariant = sql<boolean>`${listedParents.id} is not null and ${parentItems.storeId} is ${schema.items.storeId} and ${parentItems.categoryId} is ${schema.items.categoryId}`;
   const listItems = await db
     .select({
-      id: shoppingListItems.id,
-      itemId: shoppingListItems.itemId,
+      id: schema.shoppingListItems.id,
+      itemId: schema.shoppingListItems.itemId,
       isVariant: isVariant.mapWith(Boolean),
-      itemName: items.name,
-      itemPlural: items.plural,
-      amounts: shoppingListItems.amounts,
-      notes: shoppingListItems.notes,
-      bought: shoppingListItems.bought,
-      source: shoppingListItems.source,
-      storeName: stores.name,
-      shelfName: itemCategories.name,
+      itemName: schema.items.name,
+      itemPlural: schema.items.plural,
+      amounts: schema.shoppingListItems.amounts,
+      notes: schema.shoppingListItems.notes,
+      bought: schema.shoppingListItems.bought,
+      source: schema.shoppingListItems.source,
+      storeName: schema.stores.name,
+      shelfName: schema.itemCategories.name,
     })
-    .from(shoppingListItems)
-    .innerJoin(items, eq(shoppingListItems.itemId, items.id))
-    .leftJoin(stores, eq(items.storeId, stores.id))
-    .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
-    .leftJoin(parents, eq(items.parentId, parents.id))
+    .from(schema.shoppingListItems)
+    .innerJoin(schema.items, eq(schema.shoppingListItems.itemId, schema.items.id))
+    .leftJoin(schema.stores, eq(schema.items.storeId, schema.stores.id))
+    .leftJoin(schema.itemCategories, eq(schema.items.categoryId, schema.itemCategories.id))
+    .leftJoin(parentItems, eq(schema.items.parentId, parentItems.id))
     .leftJoin(listedParents, and(
-      eq(listedParents.shoppingListId, shoppingListItems.shoppingListId),
-      eq(listedParents.itemId, items.parentId),
+      eq(listedParents.shoppingListId, schema.shoppingListItems.shoppingListId),
+      eq(listedParents.itemId, schema.items.parentId),
     ))
-    .where(eq(shoppingListItems.shoppingListId, activeList.id))
+    .where(eq(schema.shoppingListItems.shoppingListId, activeList.id))
     // Stores alphabetically, then shelves in walking order; items without a store or shelf go last.
     // Variants on their parent's shelf come right after it
     .orderBy(
-      sql`${stores.name} is null`,
-      stores.name,
-      sql`${itemCategories.position} is null`,
-      itemCategories.position,
-      sql`case when ${isVariant} then ${parents.name} else ${items.name} end collate nocase`,
+      sql`${schema.stores.name} is null`,
+      schema.stores.name,
+      sql`${schema.itemCategories.position} is null`,
+      schema.itemCategories.position,
+      sql`case when ${isVariant} then ${parentItems.name} else ${schema.items.name} end collate nocase`,
       isVariant,
-      sql`${items.name} collate nocase`,
+      sql`${schema.items.name} collate nocase`,
     );
 
   // Items already on the list can be added again to raise their amount
   const listedItemIds = new Set(listItems.map((i) => i.itemId));
   const allItems = await db
-    .select({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit })
-    .from(items)
-    .orderBy(sql`${items.name} collate nocase`)
+    .select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit })
+    .from(schema.items)
+    .orderBy(sql`${schema.items.name} collate nocase`)
     .then((all) => all.map((i) => ({ ...i, listed: listedItemIds.has(i.id) })));
 
   const listRecipeRows = await db
     .select({
-      listRecipeId: shoppingListRecipes.id,
-      id: recipes.id,
-      name: recipes.name,
-      servingSize: recipes.servingSize,
-      servings: mealServings(shoppingListRecipes.servings),
-      instructions: recipes.instructions,
-      comments: recipes.comments,
-      weblink: recipes.weblink,
+      listRecipeId: schema.shoppingListRecipes.id,
+      id: schema.recipes.id,
+      name: schema.recipes.name,
+      servingSize: schema.recipes.servingSize,
+      servings: mealServings(schema.shoppingListRecipes.servings),
+      instructions: schema.recipes.instructions,
+      comments: schema.recipes.comments,
+      weblink: schema.recipes.weblink,
     })
-    .from(shoppingListRecipes)
-    .innerJoin(recipes, eq(shoppingListRecipes.recipeId, recipes.id))
-    .where(eq(shoppingListRecipes.shoppingListId, activeList.id))
-    .orderBy(asc(shoppingListRecipes.id));
+    .from(schema.shoppingListRecipes)
+    .innerJoin(schema.recipes, eq(schema.shoppingListRecipes.recipeId, schema.recipes.id))
+    .where(eq(schema.shoppingListRecipes.shoppingListId, activeList.id))
+    .orderBy(asc(schema.shoppingListRecipes.id));
 
   const listRecipes = countRecipes(await withIngredients(listRecipeRows));
 
   const allRecipes = await db
-    .select({ id: recipes.id, name: recipes.name, servingSize: recipes.servingSize })
-    .from(recipes)
-    .where(eq(recipes.archived, false))
-    .orderBy(sql`${recipes.name} collate nocase`);
+    .select({ id: schema.recipes.id, name: schema.recipes.name, servingSize: schema.recipes.servingSize })
+    .from(schema.recipes)
+    .where(eq(schema.recipes.archived, false))
+    .orderBy(sql`${schema.recipes.name} collate nocase`);
 
-  const allStores = await db.select().from(stores).orderBy(stores.name);
+  const allStores = await db.select().from(schema.stores).orderBy(schema.stores.name);
 
   return {
     activeList,
@@ -192,14 +183,14 @@ export async function action({ request }: Route.ActionArgs) {
           positions.length > 0
             ? await tx
                 .select({
-                  recipeId: mealSchedule.recipeId,
-                  servings: mealServings(mealSchedule.servings),
-                  servingSize: recipes.servingSize,
+                  recipeId: schema.mealSchedule.recipeId,
+                  servings: mealServings(schema.mealSchedule.servings),
+                  servingSize: schema.recipes.servingSize,
                 })
-                .from(mealSchedule)
-                .innerJoin(recipes, eq(mealSchedule.recipeId, recipes.id))
-                .where(inArray(mealSchedule.position, positions))
-                .orderBy(asc(mealSchedule.position))
+                .from(schema.mealSchedule)
+                .innerJoin(schema.recipes, eq(schema.mealSchedule.recipeId, schema.recipes.id))
+                .where(inArray(schema.mealSchedule.position, positions))
+                .orderBy(asc(schema.mealSchedule.position))
                 .all()
             : [];
 
@@ -208,19 +199,19 @@ export async function action({ request }: Route.ActionArgs) {
         const toAdd = listAmounts(scheduled, ingredients, includeInStock);
 
         const list = await tx
-          .insert(shoppingLists)
+          .insert(schema.shoppingLists)
           .values({ createdAt: new Date().toISOString(), status: "active", includeInStock })
           .returning()
           .get();
 
         if (scheduled.length > 0) {
-          await tx.insert(shoppingListRecipes)
+          await tx.insert(schema.shoppingListRecipes)
             .values(scheduled.map((meal) => ({ shoppingListId: list.id, recipeId: meal.recipeId, servings: meal.servings })))
             .run();
         }
 
         if (toAdd.size > 0) {
-          await tx.insert(shoppingListItems)
+          await tx.insert(schema.shoppingListItems)
             .values(
               [...toAdd.entries()].map(([itemId, { amounts, notes }]) => ({
                 shoppingListId: list.id,
@@ -248,16 +239,16 @@ export async function action({ request }: Route.ActionArgs) {
       await db.transaction(async (tx) => {
         const listed = await tx
           .select()
-          .from(shoppingListItems)
-          .where(and(eq(shoppingListItems.shoppingListId, activeList.id), eq(shoppingListItems.itemId, itemId)))
+          .from(schema.shoppingListItems)
+          .where(and(eq(schema.shoppingListItems.shoppingListId, activeList.id), eq(schema.shoppingListItems.itemId, itemId)))
           .get();
         if (listed) {
-          await tx.update(shoppingListItems)
+          await tx.update(schema.shoppingListItems)
             .set({ amounts: combineAmounts([...listed.amounts, parsed.amount]), bought: false })
-            .where(eq(shoppingListItems.id, listed.id))
+            .where(eq(schema.shoppingListItems.id, listed.id))
             .run();
         } else {
-          await tx.insert(shoppingListItems)
+          await tx.insert(schema.shoppingListItems)
             .values({ shoppingListId: activeList.id, itemId, amounts: combineAmounts([parsed.amount]), source: "manual" })
             .run();
         }
@@ -270,9 +261,9 @@ export async function action({ request }: Route.ActionArgs) {
       const parsed = await parseItemForm(form);
       if (parsed.error) return { createError: parsed.error };
       const [item] = await db
-        .insert(items)
+        .insert(schema.items)
         .values(parsed.values)
-        .returning({ id: items.id, name: items.name, plural: items.plural, defaultUnit: items.defaultUnit });
+        .returning({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit });
       return { createdItem: item };
     }
 
@@ -285,13 +276,13 @@ export async function action({ request }: Route.ActionArgs) {
       const servings = int(form, "servings");
       if (!recipeId) return { addRecipeError: "Pick a recipe first." };
       if (text(form, "servings") && !servings) return { addRecipeError: "Servings must be a whole number of at least 1." };
-      const recipe = await db.select().from(recipes).where(eq(recipes.id, recipeId)).get();
+      const recipe = await db.select().from(schema.recipes).where(eq(schema.recipes.id, recipeId)).get();
       if (!recipe || recipe.archived) return { addRecipeError: "That recipe is no longer available." };
 
       await db.transaction(async (tx) => {
         const before = await listMeals(tx, activeList.id);
         const added = { recipeId, servings: servings ?? recipe.servingSize, servingSize: recipe.servingSize };
-        await tx.insert(shoppingListRecipes).values({ shoppingListId: activeList.id, recipeId, servings }).run();
+        await tx.insert(schema.shoppingListRecipes).values({ shoppingListId: activeList.id, recipeId, servings }).run();
         await changeItemsForMeals(tx, activeList, before, [...before, added]);
       });
       // Tells the page to clear its recipe picker
@@ -307,7 +298,7 @@ export async function action({ request }: Route.ActionArgs) {
       await db.transaction(async (tx) => {
         const before = await listMeals(tx, activeList.id);
         if (!before.some((m) => m.id === id)) return;
-        await tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.id, id)).run();
+        await tx.delete(schema.shoppingListRecipes).where(eq(schema.shoppingListRecipes.id, id)).run();
         await changeItemsForMeals(tx, activeList, before, before.filter((m) => m.id !== id));
       });
       break;
@@ -317,9 +308,9 @@ export async function action({ request }: Route.ActionArgs) {
       const id = int(form, "id");
       if (!id) return null;
       await db
-        .update(shoppingListItems)
+        .update(schema.shoppingListItems)
         .set({ bought: true })
-        .where(eq(shoppingListItems.id, id));
+        .where(eq(schema.shoppingListItems.id, id));
       break;
     }
 
@@ -327,16 +318,16 @@ export async function action({ request }: Route.ActionArgs) {
       const id = int(form, "id");
       if (!id) return null;
       await db
-        .update(shoppingListItems)
+        .update(schema.shoppingListItems)
         .set({ bought: false })
-        .where(eq(shoppingListItems.id, id));
+        .where(eq(schema.shoppingListItems.id, id));
       break;
     }
 
     case "remove-item": {
       const id = int(form, "id");
       if (!id) return null;
-      await db.delete(shoppingListItems).where(eq(shoppingListItems.id, id));
+      await db.delete(schema.shoppingListItems).where(eq(schema.shoppingListItems.id, id));
       break;
     }
 
@@ -346,9 +337,9 @@ export async function action({ request }: Route.ActionArgs) {
 
       // Stock tracking is deferred, so finishing doesn't add bought items to it
       await db
-        .update(shoppingLists)
+        .update(schema.shoppingLists)
         .set({ status: "completed" })
-        .where(eq(shoppingLists.id, activeList.id));
+        .where(eq(schema.shoppingLists.id, activeList.id));
       break;
     }
 
@@ -356,9 +347,9 @@ export async function action({ request }: Route.ActionArgs) {
       const activeList = await getActiveList();
       if (!activeList) return null;
       await db.transaction(async (tx) => {
-        await tx.delete(shoppingListItems).where(eq(shoppingListItems.shoppingListId, activeList.id)).run();
-        await tx.delete(shoppingListRecipes).where(eq(shoppingListRecipes.shoppingListId, activeList.id)).run();
-        await tx.delete(shoppingLists).where(eq(shoppingLists.id, activeList.id)).run();
+        await tx.delete(schema.shoppingListItems).where(eq(schema.shoppingListItems.shoppingListId, activeList.id)).run();
+        await tx.delete(schema.shoppingListRecipes).where(eq(schema.shoppingListRecipes.shoppingListId, activeList.id)).run();
+        await tx.delete(schema.shoppingLists).where(eq(schema.shoppingLists.id, activeList.id)).run();
       });
       break;
     }

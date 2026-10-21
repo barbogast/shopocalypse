@@ -2,7 +2,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { changeListMeals } from "~/shopping-list";
 import { db } from "./client";
 import { mealServings } from "./recipes.server";
-import { items, recipeIngredients, recipes, shoppingListItems, shoppingListRecipes, shoppingLists } from "./schema";
+import * as schema from "./schema";
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Meal = { recipeId: number; servings: number; servingSize: number };
@@ -10,24 +10,24 @@ type Meal = { recipeId: number; servings: number; servingSize: number };
 // The one active shopping list (a unique index allows at most one), if any.
 // Pass a transaction to read within it.
 export async function getActiveList(q: typeof db | Tx = db) {
-  return (await q.select().from(shoppingLists).where(eq(shoppingLists.status, "active")).get()) ?? null;
+  return (await q.select().from(schema.shoppingLists).where(eq(schema.shoppingLists.status, "active")).get()) ?? null;
 }
 
 // What the given recipes need, as listAmounts takes it
 export async function listIngredients(tx: Tx, recipeIds: number[]) {
   return tx
     .select({
-      recipeId: recipeIngredients.recipeId,
-      itemId: recipeIngredients.itemId,
-      quantity: recipeIngredients.quantity,
-      unit: recipeIngredients.unit,
-      note: recipeIngredients.note,
-      noteOnList: recipeIngredients.noteOnList,
-      alwaysAvailable: items.alwaysAvailable,
+      recipeId: schema.recipeIngredients.recipeId,
+      itemId: schema.recipeIngredients.itemId,
+      quantity: schema.recipeIngredients.quantity,
+      unit: schema.recipeIngredients.unit,
+      note: schema.recipeIngredients.note,
+      noteOnList: schema.recipeIngredients.noteOnList,
+      alwaysAvailable: schema.items.alwaysAvailable,
     })
-    .from(recipeIngredients)
-    .innerJoin(items, eq(recipeIngredients.itemId, items.id))
-    .where(inArray(recipeIngredients.recipeId, recipeIds))
+    .from(schema.recipeIngredients)
+    .innerJoin(schema.items, eq(schema.recipeIngredients.itemId, schema.items.id))
+    .where(inArray(schema.recipeIngredients.recipeId, recipeIds))
     .all();
 }
 
@@ -35,15 +35,15 @@ export async function listIngredients(tx: Tx, recipeIds: number[]) {
 export async function listMeals(tx: Tx, listId: number) {
   return tx
     .select({
-      id: shoppingListRecipes.id,
-      recipeId: shoppingListRecipes.recipeId,
-      servings: mealServings(shoppingListRecipes.servings),
-      servingSize: recipes.servingSize,
+      id: schema.shoppingListRecipes.id,
+      recipeId: schema.shoppingListRecipes.recipeId,
+      servings: mealServings(schema.shoppingListRecipes.servings),
+      servingSize: schema.recipes.servingSize,
     })
-    .from(shoppingListRecipes)
-    .innerJoin(recipes, eq(shoppingListRecipes.recipeId, recipes.id))
-    .where(eq(shoppingListRecipes.shoppingListId, listId))
-    .orderBy(asc(shoppingListRecipes.id))
+    .from(schema.shoppingListRecipes)
+    .innerJoin(schema.recipes, eq(schema.shoppingListRecipes.recipeId, schema.recipes.id))
+    .where(eq(schema.shoppingListRecipes.shoppingListId, listId))
+    .orderBy(asc(schema.shoppingListRecipes.id))
     .all();
 }
 
@@ -56,23 +56,23 @@ export async function changeItemsForMeals(
 ) {
   const ingredients = await listIngredients(tx, [...new Set([...before, ...after].map((m) => m.recipeId))]);
   const listed = await tx
-    .select({ id: shoppingListItems.id, itemId: shoppingListItems.itemId, amounts: shoppingListItems.amounts, source: shoppingListItems.source })
-    .from(shoppingListItems)
-    .where(eq(shoppingListItems.shoppingListId, list.id))
+    .select({ id: schema.shoppingListItems.id, itemId: schema.shoppingListItems.itemId, amounts: schema.shoppingListItems.amounts, source: schema.shoppingListItems.source })
+    .from(schema.shoppingListItems)
+    .where(eq(schema.shoppingListItems.shoppingListId, list.id))
     .all();
 
   for (const change of changeListMeals(listed, before, after, ingredients, list.includeInStock)) {
     if (change.kind === "insert") {
       const { itemId, amounts, notes } = change;
-      await tx.insert(shoppingListItems).values({ shoppingListId: list.id, itemId, amounts, notes, source: "meal_plan" }).run();
+      await tx.insert(schema.shoppingListItems).values({ shoppingListId: list.id, itemId, amounts, notes, source: "meal_plan" }).run();
     } else if (change.kind === "update") {
       const { amounts, notes, buyAgain } = change;
-      await tx.update(shoppingListItems)
+      await tx.update(schema.shoppingListItems)
         .set({ amounts, notes, ...(buyAgain && { bought: false }) })
-        .where(eq(shoppingListItems.id, change.id))
+        .where(eq(schema.shoppingListItems.id, change.id))
         .run();
     } else {
-      await tx.delete(shoppingListItems).where(eq(shoppingListItems.id, change.id)).run();
+      await tx.delete(schema.shoppingListItems).where(eq(schema.shoppingListItems.id, change.id)).run();
     }
   }
 }

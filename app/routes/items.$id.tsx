@@ -6,7 +6,7 @@ import { ItemFields } from "~/components/item-fields";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { listParents, listShelves, mergeItem, parseItemForm, updateItem } from "~/db/items.server";
-import { items, stores } from "~/db/schema";
+import * as schema from "~/db/schema";
 import { int, itemsPath } from "~/forms";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items.$id";
@@ -17,19 +17,19 @@ export function meta({ data }: Route.MetaArgs) {
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const id = Number(params.id);
-  const [item] = await db.select().from(items).where(eq(items.id, id));
+  const [item] = await db.select().from(schema.items).where(eq(schema.items.id, id));
   if (!item) throw new Response("Not found", { status: 404 });
 
-  const allStores = await db.select().from(stores).orderBy(stores.name);
+  const allStores = await db.select().from(schema.stores).orderBy(schema.stores.name);
 
   const otherItems = await db
-    .select({ id: items.id, name: items.name })
-    .from(items)
-    .where(ne(items.id, id))
-    .orderBy(sql`${items.name} collate nocase`);
+    .select({ id: schema.items.id, name: schema.items.name })
+    .from(schema.items)
+    .where(ne(schema.items.id, id))
+    .orderBy(sql`${schema.items.name} collate nocase`);
 
   // An item with variants can't become a variant itself
-  const hasVariants = !!(await db.select().from(items).where(eq(items.parentId, id)).limit(1).get());
+  const hasVariants = !!(await db.select().from(schema.items).where(eq(schema.items.parentId, id)).limit(1).get());
   const parents = hasVariants ? undefined : await listParents(id);
 
   // The items view this was opened from, to go back to after saving

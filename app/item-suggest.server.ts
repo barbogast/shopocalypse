@@ -4,7 +4,7 @@ import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "~/db/client";
 import { nameClash, updateItem } from "~/db/items.server";
-import { itemCategories, items, stores } from "~/db/schema";
+import * as schema from "~/db/schema";
 import { type Catalog, describeCatalog, sanitizeSuggestion, type Suggestion } from "~/item-suggest";
 import { itemKey } from "~/recipe-import";
 
@@ -37,24 +37,24 @@ export const AcceptedSchema = z.array(RawSuggestionSchema.extend({ itemId: z.num
 // Items in exceptIds are left out, so an item being filed doesn't serve as its own example (or parent)
 export async function loadCatalog(exceptIds: number[] = []): Promise<Catalog> {
   return {
-    stores: await db.select({ id: stores.id, name: stores.name }).from(stores).orderBy(asc(stores.name)).all(),
+    stores: await db.select({ id: schema.stores.id, name: schema.stores.name }).from(schema.stores).orderBy(asc(schema.stores.name)).all(),
     shelves: await db
-      .select({ id: itemCategories.id, name: itemCategories.name, storeId: itemCategories.storeId })
-      .from(itemCategories)
-      .orderBy(asc(itemCategories.storeId), asc(itemCategories.position))
+      .select({ id: schema.itemCategories.id, name: schema.itemCategories.name, storeId: schema.itemCategories.storeId })
+      .from(schema.itemCategories)
+      .orderBy(asc(schema.itemCategories.storeId), asc(schema.itemCategories.position))
       .all(),
     items: (await db
       .select({
-        id: items.id,
-        name: items.name,
-        plural: items.plural,
-        parentId: items.parentId,
-        storeId: items.storeId,
-        categoryId: items.categoryId,
-        defaultUnit: items.defaultUnit,
+        id: schema.items.id,
+        name: schema.items.name,
+        plural: schema.items.plural,
+        parentId: schema.items.parentId,
+        storeId: schema.items.storeId,
+        categoryId: schema.items.categoryId,
+        defaultUnit: schema.items.defaultUnit,
       })
-      .from(items)
-      .orderBy(asc(items.name))
+      .from(schema.items)
+      .orderBy(asc(schema.items.name))
       .all()).filter((i) => !exceptIds.includes(i.id)),
   };
 }
@@ -105,7 +105,7 @@ export async function suggestItems(names: string[], itemIds: number[] = []): Pro
 export async function applySuggestions(accepted: z.infer<typeof AcceptedSchema>) {
   const shelved: number[] = [];
   for (const { itemId, ...raw } of accepted) {
-    const item = await db.select().from(items).where(eq(items.id, itemId)).get();
+    const item = await db.select().from(schema.items).where(eq(schema.items.id, itemId)).get();
     if (!item) continue;
     const s = sanitizeSuggestion(raw, item.name, await loadCatalog([itemId]));
     const storeId = item.storeId ?? s.storeId;

@@ -13,7 +13,7 @@ import { setPlural } from "~/db/items.server";
 import { AcceptedSchema, applySuggestions } from "~/item-suggest.server";
 import type { action as suggestAction } from "~/routes/items.suggest";
 import { importRecipe } from "~/db/recipes.server";
-import { itemCategories, items, recipes, stores } from "~/db/schema";
+import * as schema from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
 import { itemKey, itemKeys, likelySingular, type ParsedIngredient, parseRecipeText } from "~/recipe-import";
 import { formatAmount, UNITS, unitName, type UnitKey } from "~/units";
@@ -37,11 +37,11 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader() {
-  const allItems = await db.select({ id: items.id, name: items.name, plural: items.plural }).from(items);
-  const recipeNames = await db.select({ name: recipes.name }).from(recipes).where(eq(recipes.archived, false));
+  const allItems = await db.select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural }).from(schema.items);
+  const recipeNames = await db.select({ name: schema.recipes.name }).from(schema.recipes).where(eq(schema.recipes.archived, false));
   // Names for the suggested stores and shelves of new items
-  const allStores = await db.select({ id: stores.id, name: stores.name }).from(stores);
-  const allShelves = await db.select({ id: itemCategories.id, name: itemCategories.name }).from(itemCategories);
+  const allStores = await db.select({ id: schema.stores.id, name: schema.stores.name }).from(schema.stores);
+  const allShelves = await db.select({ id: schema.itemCategories.id, name: schema.itemCategories.name }).from(schema.itemCategories);
   return { allItems, recipeNames: recipeNames.map((r) => r.name), allStores, allShelves };
 }
 
