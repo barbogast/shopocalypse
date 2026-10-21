@@ -34,8 +34,8 @@ const dump = await response.text();
 
 removeDb(PARTIAL);
 const local = createClient({ url: `file:${PARTIAL}` });
-// Production doesn't enforce foreign keys (see app/db/client.ts), so its rows
-// needn't satisfy them, but the local client checks them by default
+// The dump's rows needn't come in an order that satisfies foreign keys, which
+// the local client enforces by default
 await local.executeMultiple(`PRAGMA foreign_keys=OFF;\n${dump}`);
 // Inserting the rows already filled sqlite_sequence, and the dump's own entries
 // for it came after; keep only those, as production's counters may be ahead
