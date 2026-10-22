@@ -21,10 +21,10 @@ import {
 } from "@mantine/core";
 import { IconCheck, IconChefHat, IconChevronDown, IconChevronRight, IconCopy, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
-import { Form, useActionData, useFetcher, useFetchers } from "react-router";
+import { Form, type ShouldRevalidateFunctionArgs, useActionData, useFetcher, useFetchers, useSubmit } from "react-router";
 import { FormError } from "~/components/form-error";
 import { ItemFields } from "~/components/item-fields";
 import { itemSearchFilter } from "~/components/item-search";
@@ -40,6 +40,7 @@ import * as schema from "~/db/schema";
 import { int, text } from "~/forms";
 import { itemKey, itemKeys } from "~/recipe-import";
 import { listAmounts, listAsText } from "~/shopping-list";
+import * as outbox from "~/tick-outbox";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { combineAmounts, DEFAULT_UNIT, formatAmounts, nameForAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
 import { pageTitle } from "~/page-title";
@@ -164,6 +165,16 @@ export async function loader() {
     allShelves: await listShelves(),
     parents: await listParents(),
   };
+}
+
+function onActiveList(listItemId: number) {
+  return and(
+    eq(schema.shoppingListItems.id, listItemId),
+    inArray(
+      schema.shoppingListItems.shoppingListId,
+      db.select({ id: schema.shoppingLists.id }).from(schema.shoppingLists).where(eq(schema.shoppingLists.status, "active")),
+    ),
+  );
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -304,30 +315,22 @@ export async function action({ request }: Route.ActionArgs) {
       break;
     }
 
-    case "tick": {
-      const id = int(form, "id");
-      if (!id) return null;
-      await db
-        .update(schema.shoppingListItems)
-        .set({ bought: true })
-        .where(eq(schema.shoppingListItems.id, id));
-      break;
-    }
-
+    // Only on the active list: a tick sent again from the outbox may arrive after the list was finished
+    case "tick":
     case "untick": {
       const id = int(form, "id");
       if (!id) return null;
       await db
         .update(schema.shoppingListItems)
-        .set({ bought: false })
-        .where(eq(schema.shoppingListItems.id, id));
+        .set({ bought: intent === "tick" })
+        .where(onActiveList(id));
       break;
     }
 
     case "remove-item": {
       const id = int(form, "id");
       if (!id) return null;
-      await db.delete(schema.shoppingListItems).where(eq(schema.shoppingListItems.id, id));
+      await db.delete(schema.shoppingListItems).where(onActiveList(id));
       break;
     }
 
@@ -358,6 +361,72 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   return null;
+}
+
+// Ticks go to the outbox first, and the fetcher actions never throw: a thrown
+// error, even just from a lost connection, would replace the whole list with
+// the error page
+export async function clientAction({ request, serverAction }: Route.ClientActionArgs) {
+  const form = await request.clone().formData();
+  const intent = form.get("intent");
+  const id = int(form, "id");
+
+  if ((intent === "tick" || intent === "untick") && id) {
+    const bought = intent === "tick";
+    outbox.queue(id, bought);
+    try {
+      await serverAction();
+      outbox.markSynced(id, bought);
+    } catch {
+      // Stays in the outbox and is sent again later
+    }
+    return null;
+  }
+  if (intent === "remove-item") {
+    try {
+      return await serverAction();
+    } catch {
+      return { removeError: "Couldn't remove it. Try again." };
+    }
+  }
+  return serverAction();
+}
+
+// The outbox keeps ticks showing, so reloading the whole list after each one
+// would only cost round trips in the shop. Changes made on another device show
+// on the next visit to the page.
+export function shouldRevalidate({ formData, actionResult, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  const intent = formData?.get("intent");
+  if (intent === "tick" || intent === "untick") return false;
+  // The reload would fail the same way, and show the error page
+  if (actionResult?.removeError) return false;
+  return defaultShouldRevalidate;
+}
+
+// Sends the outbox's unsent ticks when there's a chance they'll get through:
+// on load, when the connection or the page comes back, and every 30 seconds,
+// since the phone can claim to be online with too little reception to use
+function useFlushOutbox() {
+  const submit = useSubmit();
+
+  useEffect(() => {
+    const flush = () => {
+      for (const { id, bought } of outbox.unsynced(outbox.getSnapshot())) {
+        // One fetcher per item, so a resend replaces the previous attempt
+        submit({ intent: bought ? "tick" : "untick", id }, { method: "post", navigate: false, fetcherKey: `outbox-${id}` });
+      }
+    };
+    const onVisible = () => document.visibilityState === "visible" && flush();
+    flush();
+    window.addEventListener("online", flush);
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(flush, 30_000);
+    return () => {
+      window.removeEventListener("online", flush);
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+  }, [submit]);
 }
 
 function PrepareList({ scheduled }: { scheduled: { position: number; name: string; servings: number; servingSize: number }[] }) {
@@ -619,7 +688,7 @@ function AddItemForm({ items, stores, shelves, parents }: {
 // One line of the list. Ticking and removing go through a fetcher, so the row
 // updates at once instead of waiting for the server and a reload of the list.
 function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | undefined }) {
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<typeof clientAction>();
   const ticked = item.bought;
 
   return (
@@ -655,6 +724,7 @@ function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | unde
         {item.source === "manual" && (
           <Badge size="xs" variant="outline" color="gray">manual</Badge>
         )}
+        <FormError error={fetcher.data && "removeError" in fetcher.data ? fetcher.data.removeError : null} mt="xs" />
       </Table.Td>
       <Table.Td style={{ width: 60 }}>
         <fetcher.Form method="post">
@@ -710,7 +780,16 @@ function ListView({
   allShelves,
   parents,
 }: ActiveListData) {
-  const listItems = withPendingChanges(loadedItems, useFetchers());
+  const entries = useSyncExternalStore(outbox.subscribe, outbox.getSnapshot, outbox.getServerSnapshot);
+  const fetchers = useFetchers();
+  const listItems = withPendingChanges(outbox.applyEntries(loadedItems, entries), fetchers);
+  // Not counting ticks still on their way, so a tick that goes through doesn't flash this up
+  const sending = new Set(fetchers.filter((f) => f.formData).map((f) => Number(f.formData!.get("id"))));
+  const unsentCount = outbox.unsynced(entries).filter((e) => !sending.has(e.id)).length;
+  useFlushOutbox();
+
+  // Each fresh load of the list has what the server already got
+  useEffect(() => outbox.settle(loadedItems), [loadedItems]);
 
   const groups = groupByStoreAndShelf(listItems);
   const tickedCount = listItems.filter((i) => i.bought).length;
@@ -729,6 +808,7 @@ function ListView({
       <Group justify="space-between" mb="xs">
         <Title>Shopping</Title>
         <Group gap="sm">
+          {unsentCount > 0 && <Text c="orange" size="sm">{unsentCount} not saved yet</Text>}
           <Text c="dimmed" size="sm">{tickedCount}/{listItems.length}</Text>
           {/* Copies what's still to buy, to paste into another app */}
           <CopyButton value={listAsText(listItems)}>
