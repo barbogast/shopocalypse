@@ -1,15 +1,17 @@
-import { Alert, Anchor, Badge, Button, Card, Checkbox, Code, Container, Group, List, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
-import { IconAlertCircle, IconCamera, IconCheck, IconFileImport, IconSparkles } from "@tabler/icons-react";
+import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Code, Container, Group, List, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
+import { IconAlertCircle, IconCamera, IconCheck, IconFileImport, IconSparkles, IconTrash } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { eq } from "drizzle-orm";
-import { Form, Link, useFetcher } from "react-router";
+import { Form, Link, redirect, type ShouldRevalidateFunctionArgs, useFetcher } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
+import { LocalDateTime } from "~/components/local-date-time";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
 import { Weblink } from "~/components/weblink";
 import { db } from "~/db/client";
 import { setPlural } from "~/db/items.server";
+import { createDraft, deleteDraft, getDraft, listDrafts, saveDraft } from "~/db/recipe-drafts.server";
 import { AcceptedSchema, applySuggestions } from "~/item-suggest.server";
 import type { action as suggestAction } from "~/routes/items.suggest";
 import { importRecipe } from "~/db/recipes.server";
@@ -38,13 +40,19 @@ export function meta({}: Route.MetaArgs) {
   return [{ title: pageTitle("Import Recipe") }];
 }
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
   const allItems = await db.select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural }).from(schema.items);
   const recipeNames = await db.select({ name: schema.recipes.name }).from(schema.recipes).where(eq(schema.recipes.archived, false));
   // Names for the suggested stores and shelves of new items
   const allStores = await db.select({ id: schema.stores.id, name: schema.stores.name }).from(schema.stores);
   const allShelves = await db.select({ id: schema.itemCategories.id, name: schema.itemCategories.name }).from(schema.itemCategories);
-  return { allItems, recipeNames: recipeNames.map((r) => r.name), allStores, allShelves };
+  // The draft being edited, from ?draft=
+  const draftParam = new URL(request.url).searchParams.get("draft");
+  const draft = draftParam ? (await getDraft(Number(draftParam))) ?? null : null;
+  return {
+    allItems, recipeNames: recipeNames.map((r) => r.name), allStores, allShelves,
+    draft, draftGone: draftParam != null && !draft, drafts: await listDrafts(),
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -78,7 +86,23 @@ export async function action({ request }: Route.ActionArgs) {
       photos.push({ mediaType: "image/jpeg", base64: Buffer.from(await file.arrayBuffer()).toString("base64") });
     }
     const result = await transcribeRecipe(photos);
-    return "error" in result ? { error: result.error, imported: null } : { error: null, imported: null, text: result.text };
+    if ("error" in result) return { error: result.error, imported: null };
+    // Saved straight away, so it can be finished on another device
+    return redirect(`/recipes/import?draft=${await createDraft(result.text)}`);
+  }
+
+  // Autosaved while editing a draft, through a fetcher; not trimmed, so the text stays as typed
+  if (form.get("intent") === "save-draft") {
+    const draftId = int(form, "draftId");
+    if (draftId) await saveDraft(draftId, String(form.get("text") ?? ""));
+    return { error: null, imported: null };
+  }
+
+  if (form.get("intent") === "discard-draft") {
+    const draftId = int(form, "draftId");
+    if (draftId) await deleteDraft(draftId);
+    // From the list of drafts, through a fetcher; otherwise from the draft itself, which is gone now
+    return form.get("from") === "list" ? { error: null, imported: null } : redirect("/recipes/import");
   }
 
   // Parsed again here rather than trusting the preview
@@ -89,6 +113,8 @@ export async function action({ request }: Route.ActionArgs) {
   const noteOnListLines = new Set(form.getAll("noteOnList").map(Number));
   const ingredients = recipe.ingredients.map((ing) => ({ ...ing, noteOnList: ing.note !== null && noteOnListLines.has(ing.line) }));
   const { id, newItems, storeName } = await importRecipe({ ...recipe, servingSize: recipe.servingSize, ingredients });
+  const draftId = int(form, "draftId");
+  if (draftId) await deleteDraft(draftId);
   return { error: null, imported: { id, name: recipe.name, newItems, storeName } };
 }
 
@@ -117,17 +143,12 @@ function FormatHelp() {
 }
 
 // Opens the camera on a phone (or a file picker elsewhere) and lets Claude write the recipe text from the
-// photos; several photos are pages of one recipe. The text replaces what's in the textarea, after asking.
-function PhotoButton({ hasText, onText }: { hasText: boolean; onText: (text: string) => void }) {
+// photos; several photos are pages of one recipe. The text is saved as a new draft, which then opens.
+function PhotoButton({ hasUnsavedText }: { hasUnsavedText: boolean }) {
   const fetcher = useFetcher<typeof action>();
   const input = useRef<HTMLInputElement>(null);
   const [resizing, setResizing] = useState(false);
   const [resizeError, setResizeError] = useState<string | null>(null);
-  const text = fetcher.data && "text" in fetcher.data ? fetcher.data.text : null;
-
-  useEffect(() => {
-    if (text) onText(text);
-  }, [fetcher.data]);
 
   async function upload(files: File[]) {
     if (files.length === 0) return;
@@ -165,7 +186,7 @@ function PhotoButton({ hasText, onText }: { hasText: boolean; onText: (text: str
         leftSection={<IconCamera size={16} />}
         loading={resizing || fetcher.state !== "idle"}
         onClick={() => {
-          if (hasText && !confirm("Replace the recipe text with the one from the photo?")) return;
+          if (hasUnsavedText && !confirm("Discard the text typed here for the one from the photo?")) return;
           input.current?.click();
         }}
       >
@@ -174,6 +195,91 @@ function PhotoButton({ hasText, onText }: { hasText: boolean; onText: (text: str
       {(resizeError ?? fetcher.data?.error) && <Text size="sm" c="red">{resizeError ?? fetcher.data?.error}</Text>}
     </Group>
   );
+}
+
+// Buttons rather than forms, since they sit inside the import form
+
+// Drafts to pick up, shown while not editing one
+function DraftList({ drafts }: { drafts: { id: number; name: string; updatedAt: string }[] }) {
+  if (drafts.length === 0) return null;
+  return (
+    <Card withBorder radius="md" p="md">
+      <Title order={5} mb="xs">Drafts</Title>
+      <Table>
+        <Table.Tbody>
+          {drafts.map((d) => <DraftRow key={d.id} {...d} />)}
+        </Table.Tbody>
+      </Table>
+    </Card>
+  );
+}
+
+function DraftRow({ id, name, updatedAt }: { id: number; name: string; updatedAt: string }) {
+  const fetcher = useFetcher<typeof action>();
+  if (fetcher.state !== "idle") return null;
+  return (
+    <Table.Tr>
+      <Table.Td>
+        <Anchor component={Link} to={`/recipes/import?draft=${id}`} size="sm">{name || "Untitled"}</Anchor>
+      </Table.Td>
+      <Table.Td c="dimmed" fz="sm"><LocalDateTime iso={updatedAt} /></Table.Td>
+      <Table.Td style={{ width: 40 }}>
+        <ActionIcon
+          variant="subtle"
+          color="red"
+          aria-label={`Discard ${name || "the untitled draft"}`}
+          onClick={() => {
+            if (confirm(`Discard the draft "${name || "Untitled"}"?`)) fetcher.submit({ intent: "discard-draft", draftId: id, from: "list" }, { method: "post" });
+          }}
+        >
+          <IconTrash size={16} />
+        </ActionIcon>
+      </Table.Td>
+    </Table.Tr>
+  );
+}
+
+// Discarding the open draft goes back to the empty form
+function DiscardDraftButton({ id }: { id: number }) {
+  const fetcher = useFetcher<typeof action>();
+  return (
+    <Button
+      size="xs"
+      variant="subtle"
+      color="red"
+      leftSection={<IconTrash size={14} />}
+      loading={fetcher.state !== "idle"}
+      onClick={() => {
+        if (confirm("Discard this draft?")) fetcher.submit({ intent: "discard-draft", draftId: id }, { method: "post" });
+      }}
+    >
+      Discard draft
+    </Button>
+  );
+}
+
+// Saves the text a second after typing stops, and says whether it's saved
+function useAutosave(draft: { id: number; text: string } | null, input: string) {
+  const fetcher = useFetcher<typeof action>();
+  const saved = useRef(draft?.text);
+
+  useEffect(() => {
+    if (!draft || input === saved.current) return;
+    const timer = setTimeout(() => {
+      saved.current = input;
+      fetcher.submit({ intent: "save-draft", draftId: draft.id, text: input }, { method: "post" });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [input]);
+
+  if (fetcher.state !== "idle") return "Saving…";
+  return input === saved.current ? "Saved" : "Unsaved changes";
+}
+
+// Autosaves don't change anything else on the page
+export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  if (formData?.get("intent") === "save-draft") return false;
+  return defaultShouldRevalidate;
 }
 
 // Shared by the textarea and its gutter so wrapped lines line up; the left
@@ -390,9 +496,15 @@ function Imported({ id, name, newItems, storeName, names, onImportAnother }: {
 // Identifies a ticked note across edits of the text, which move its line
 const noteKey = (ing: ParsedIngredient) => `${itemKey(ing.name)}\n${ing.note}`;
 
-export default function ImportRecipe({ loaderData, actionData }: Route.ComponentProps) {
-  const { allItems, recipeNames, allStores, allShelves } = loaderData;
-  const [input, setInput] = useState("");
+export default function ImportRecipe(props: Route.ComponentProps) {
+  // Opening another draft starts the form afresh
+  return <ImportForm key={props.loaderData.draft?.id ?? "new"} {...props} />;
+}
+
+function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
+  const { allItems, recipeNames, allStores, allShelves, draft, draftGone, drafts } = loaderData;
+  const [input, setInput] = useState(draft?.text ?? "");
+  const saveStatus = useAutosave(draft, input);
   const [notesOnList, setNotesOnList] = useState(() => new Set<string>());
   const toggleNoteOnList = (ing: ParsedIngredient, checked: boolean) =>
     setNotesOnList((prev) => {
@@ -424,7 +536,20 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
         <Form method="post">
           <Stack>
-            <PhotoButton hasText={input.trim() !== ""} onText={setInput} />
+            {draftGone && (
+              <Alert color="yellow" variant="light" py="xs">That draft is gone: it was imported or discarded.</Alert>
+            )}
+            {draft ? (
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">Draft · {saveStatus}</Text>
+                <DiscardDraftButton id={draft.id} />
+              </Group>
+            ) : (
+              <>
+                <PhotoButton hasUnsavedText={input.trim() !== ""} />
+                {input.trim() === "" && <DraftList drafts={drafts} />}
+              </>
+            )}
             <Textarea
               name="text"
               label="Recipe text"
@@ -443,6 +568,7 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
                 </div>
               )}
             />
+            {draft && <input type="hidden" name="draftId" value={draft.id} />}
             {recipe.ingredients
               .filter((ing) => ing.note && notesOnList.has(noteKey(ing)))
               .map((ing) => <input key={ing.line} type="hidden" name="noteOnList" value={ing.line} />)}

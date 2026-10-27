@@ -64,6 +64,14 @@ export const recipeVersions = sqliteTable("recipe_versions", {
   text: text("text").notNull(),
 }, (t) => [index("recipe_versions_recipe").on(t.recipeId, t.savedAt)]);
 
+// Recipe text not imported yet, in the import format: made from a photo on one device, finished on another
+export const recipeDrafts = sqliteTable("recipe_drafts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  text: text("text").notNull(),
+  // ISO timestamp of the last save
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const recipeIngredients = sqliteTable("recipe_ingredients", {
   recipeId: integer("recipe_id")
     .notNull()
