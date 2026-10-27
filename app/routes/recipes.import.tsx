@@ -1,6 +1,6 @@
 import { Alert, Anchor, Badge, Button, Card, Checkbox, Code, Container, Group, List, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
-import { IconAlertCircle, IconCheck, IconFileImport, IconSparkles } from "@tabler/icons-react";
-import { useEffect, useMemo, useState } from "react";
+import { IconAlertCircle, IconCamera, IconCheck, IconFileImport, IconSparkles } from "@tabler/icons-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { eq } from "drizzle-orm";
 import { Form, Link, useFetcher } from "react-router";
 import { FormError } from "~/components/form-error";
@@ -15,6 +15,8 @@ import type { action as suggestAction } from "~/routes/items.suggest";
 import { importRecipe } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
+import { resizePhoto } from "~/image-resize";
+import { type Photo, transcribeRecipe } from "~/recipe-photo.server";
 import { itemKey, itemKeys, likelySingular, type ParsedIngredient, parseRecipeText } from "~/recipe-import";
 import { formatAmount, UNITS, unitName, type UnitKey } from "~/units";
 import { pageTitle } from "~/page-title";
@@ -68,6 +70,17 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: null, imported: null, shelved: await applySuggestions(accepted.data) };
   }
 
+  // From the photo button, through a fetcher; the text then goes into the textarea for review
+  if (form.get("intent") === "transcribe-photo") {
+    const photos: Photo[] = [];
+    for (const file of form.getAll("photo")) {
+      if (!(file instanceof File) || file.type !== "image/jpeg") return { error: "That photo couldn't be read.", imported: null };
+      photos.push({ mediaType: "image/jpeg", base64: Buffer.from(await file.arrayBuffer()).toString("base64") });
+    }
+    const result = await transcribeRecipe(photos);
+    return "error" in result ? { error: result.error, imported: null } : { error: null, imported: null, text: result.text };
+  }
+
   // Parsed again here rather than trusting the preview
   const { recipe, errors } = parseRecipeText(text(form, "text"));
   if (errors.length || recipe.servingSize == null) return { error: "Fix the errors in the text first.", imported: null };
@@ -100,6 +113,66 @@ function FormatHelp() {
         <List.Item>Ingredients are matched to items by name or plural (without the note); unknown names become new items</List.Item>
       </List>
     </Card>
+  );
+}
+
+// Opens the camera on a phone (or a file picker elsewhere) and lets Claude write the recipe text from the
+// photos; several photos are pages of one recipe. The text replaces what's in the textarea, after asking.
+function PhotoButton({ hasText, onText }: { hasText: boolean; onText: (text: string) => void }) {
+  const fetcher = useFetcher<typeof action>();
+  const input = useRef<HTMLInputElement>(null);
+  const [resizing, setResizing] = useState(false);
+  const [resizeError, setResizeError] = useState<string | null>(null);
+  const text = fetcher.data && "text" in fetcher.data ? fetcher.data.text : null;
+
+  useEffect(() => {
+    if (text) onText(text);
+  }, [fetcher.data]);
+
+  async function upload(files: File[]) {
+    if (files.length === 0) return;
+    setResizing(true);
+    setResizeError(null);
+    try {
+      const form = new FormData();
+      form.set("intent", "transcribe-photo");
+      for (const file of files) form.append("photo", await resizePhoto(file), "photo.jpg");
+      fetcher.submit(form, { method: "post", encType: "multipart/form-data" });
+    } catch {
+      setResizeError("That photo couldn't be opened.");
+    } finally {
+      setResizing(false);
+    }
+  }
+
+  return (
+    <Group gap="sm">
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = [...(e.currentTarget.files ?? [])];
+          e.currentTarget.value = "";
+          upload(files);
+        }}
+      />
+      <Button
+        variant="light"
+        leftSection={<IconCamera size={16} />}
+        loading={resizing || fetcher.state !== "idle"}
+        onClick={() => {
+          if (hasText && !confirm("Replace the recipe text with the one from the photo?")) return;
+          input.current?.click();
+        }}
+      >
+        From photo
+      </Button>
+      {(resizeError ?? fetcher.data?.error) && <Text size="sm" c="red">{resizeError ?? fetcher.data?.error}</Text>}
+    </Group>
   );
 }
 
@@ -351,6 +424,7 @@ export default function ImportRecipe({ loaderData, actionData }: Route.Component
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
         <Form method="post">
           <Stack>
+            <PhotoButton hasText={input.trim() !== ""} onText={setInput} />
             <Textarea
               name="text"
               label="Recipe text"
