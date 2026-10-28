@@ -14,16 +14,18 @@ export function formatCookedAt(cookedAt: string) {
 }
 
 // Recipes with meal history are archived rather than deleted, so the
-// "least recently cooked" rotation keeps its data. Either way the recipe
-// leaves the schedule.
+// "least recently cooked" rotation keeps its data. So are recipes on a
+// shopping list: the list keeps the meal, and removing it there still takes
+// its items off. Either way the recipe leaves the schedule.
 export async function deleteOrArchiveRecipe(recipeId: number) {
   await db.transaction(async (tx) => {
     await tx.delete(schema.mealSchedule).where(eq(schema.mealSchedule.recipeId, recipeId)).run();
-    if (await tx.select().from(schema.mealHistory).where(eq(schema.mealHistory.recipeId, recipeId)).limit(1).get()) {
+    const cooked = await tx.select().from(schema.mealHistory).where(eq(schema.mealHistory.recipeId, recipeId)).limit(1).get();
+    const listed = await tx.select().from(schema.shoppingListRecipes).where(eq(schema.shoppingListRecipes.recipeId, recipeId)).limit(1).get();
+    if (cooked || listed) {
       await tx.update(schema.recipes).set({ archived: true }).where(eq(schema.recipes.id, recipeId)).run();
     } else {
       await tx.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, recipeId)).run();
-      await tx.delete(schema.shoppingListRecipes).where(eq(schema.shoppingListRecipes.recipeId, recipeId)).run();
       await tx.delete(schema.recipeVersions).where(eq(schema.recipeVersions.recipeId, recipeId)).run();
       await tx.delete(schema.recipes).where(eq(schema.recipes.id, recipeId)).run();
     }
