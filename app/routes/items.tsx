@@ -260,10 +260,11 @@ type UsedIn = Route.ComponentProps["loaderData"]["recipesByItem"][number];
 function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedIn; showPlace: boolean }) {
   // Saving the item comes back to this view
   const { pathname, search } = useLocation();
+  const editPath = editItemPath(item.id, pathname + search);
   return (
     <Table.Tr>
       <Table.Td pl={item.isVariant ? "xl" : undefined}>
-        {item.name}
+        <Anchor component={Link} to={editPath} c="inherit">{item.name}</Anchor>
         {item.alwaysAvailable && (
           <Badge size="xs" variant="outline" color="gray" ml={6}>immer vorrätig</Badge>
         )}
@@ -281,7 +282,7 @@ function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedI
       <Table.Td style={{ width: 104 }}>
         <Group gap={4} wrap="nowrap">
           <UsedInRecipes name={item.name} recipes={usedIn} />
-          <ActionIcon component={Link} to={editItemPath(item.id, pathname + search)} variant="subtle">
+          <ActionIcon component={Link} to={editPath} variant="subtle">
             <IconPencil size={16} />
           </ActionIcon>
           {usedIn.length > 0 ? (
