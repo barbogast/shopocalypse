@@ -39,7 +39,7 @@ import {
 } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
 import { confirmFirst, int, optionalText, optionalUrl, text } from "~/forms";
-import { itemKey, itemKeys } from "~/recipe-import";
+import { itemKey, itemKeys } from "~/item-names";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes.$id";

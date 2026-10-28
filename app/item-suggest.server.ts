@@ -6,7 +6,7 @@ import { db } from "~/db/client";
 import { nameClash, updateItem } from "~/db/items.server";
 import * as schema from "~/db/schema";
 import { type Catalog, describeCatalog, sanitizeSuggestion, type Suggestion } from "~/item-suggest";
-import { itemKey } from "~/recipe-import";
+import { itemKey } from "~/item-names";
 
 const MODEL = "claude-opus-5-5";
 

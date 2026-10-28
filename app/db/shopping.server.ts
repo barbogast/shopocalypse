@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { itemKey, type ParsedIngredient } from "~/recipe-import";
+import { itemKey } from "~/item-names";
+import { type ParsedIngredient } from "~/recipe-import";
 import { addNote, changeListMeals } from "~/shopping-list";
 import { combineAmounts } from "~/units";
 import { db } from "./client";

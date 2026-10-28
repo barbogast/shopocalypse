@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gt, inArray, isNull, lt, max, sql } from "drizzle-o
 import { db } from "./client";
 import * as schema from "./schema";
 import { int, optionalText, text } from "~/forms";
-import { itemKey, itemKeys, likelySingular } from "~/recipe-import";
+import { itemKey, itemKeys, likelySingular } from "~/item-names";
 import { addNote } from "~/shopping-list";
 import { combineAmounts, formatAmount, isUnitKey, mergeAmounts } from "~/units";
 

@@ -1,7 +1,7 @@
 // Suggested store, shelf, unit, plural and parent for new items, from the way the existing ones are filed.
 // The model's answer goes through sanitizeSuggestion, so only values that would pass the item form are kept.
 
-import { itemKey, itemKeys } from "./recipe-import";
+import { itemKey, itemKeys } from "./item-names";
 import { isUnitKey, UNITS, type UnitKey } from "./units";
 
 export type Catalog = {

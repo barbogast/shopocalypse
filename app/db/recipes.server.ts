@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
-import { itemKey, itemKeys, type ParsedIngredient, type ParsedRecipe } from "~/recipe-import";
+import { itemKey, itemKeys } from "~/item-names";
+import { type ParsedIngredient, type ParsedRecipe } from "~/recipe-import";
 import { scaleAmount, type UnitKey } from "~/units";
 import { db } from "./client";
 import { recordRecipeVersion } from "./recipe-versions";
