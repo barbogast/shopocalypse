@@ -1,0 +1,1 @@
+ALTER TABLE `items` ADD `needs_thawing` integer DEFAULT false NOT NULL;

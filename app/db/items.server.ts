@@ -43,6 +43,7 @@ export async function parseItemForm(form: FormData, itemId?: number) {
   const rawUnit = form.get("defaultUnit");
   const defaultUnit = isUnitKey(rawUnit) ? rawUnit : null;
   const alwaysAvailable = form.get("alwaysAvailable") === "on";
+  const needsThawing = form.get("needsThawing") === "on";
 
   if (!name) return { error: "Bitte einen Namen angeben." } as const;
   const clash = await nameClash([name, plural], itemId);
@@ -59,7 +60,7 @@ export async function parseItemForm(form: FormData, itemId?: number) {
     const shelf = await db.select().from(schema.itemCategories).where(eq(schema.itemCategories.id, categoryId)).get();
     if (!shelf || shelf.storeId !== storeId) return { error: "Dieses Regal gehört nicht zum gewählten Laden." } as const;
   }
-  return { values: { name, plural, parentId, storeId, categoryId, defaultUnit, alwaysAvailable } } as const;
+  return { values: { name, plural, parentId, storeId, categoryId, defaultUnit, alwaysAvailable, needsThawing } } as const;
 }
 
 type ItemValues = NonNullable<Awaited<ReturnType<typeof parseItemForm>>["values"]>;

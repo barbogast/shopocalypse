@@ -24,6 +24,7 @@
 - category_id — the shelf; must be one of the item's store's shelves
 - default_unit (optional) — prefilled when adding the item to a recipe or the shopping list
 - always_available (boolean) — assumed to be in stock (salt, oil…); left off prepared shopping lists unless "Include items in stock" is checked
+- needs_thawing (boolean) — has to come out of the freezer ahead of cooking (fish, but not spinach that goes in frozen, so the shelf can't tell). Warned about on the next meal's card and the cook page, and marked with a snowflake in ingredient lists
 
 ### Recipe
 

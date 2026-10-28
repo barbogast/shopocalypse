@@ -51,6 +51,7 @@ export async function withIngredients<T extends { id: number; servings: number; 
           itemId: schema.recipeIngredients.itemId,
           name: schema.items.name,
           plural: schema.items.plural,
+          needsThawing: schema.items.needsThawing,
           quantity: schema.recipeIngredients.quantity,
           unit: schema.recipeIngredients.unit,
           note: schema.recipeIngredients.note,

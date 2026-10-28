@@ -123,6 +123,7 @@ export async function applySuggestions(accepted: z.infer<typeof AcceptedSchema>)
       categoryId,
       defaultUnit: item.defaultUnit ?? s.defaultUnit,
       alwaysAvailable: item.alwaysAvailable,
+      needsThawing: item.needsThawing,
     });
     if (categoryId != null) shelved.push(itemId);
   }

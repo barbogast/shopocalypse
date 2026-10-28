@@ -18,6 +18,7 @@ type Values = {
   categoryId?: number | null;
   defaultUnit?: string | null;
   alwaysAvailable?: boolean;
+  needsThawing?: boolean;
 };
 
 // The item form's fields, read on the server by parseItemForm
@@ -121,6 +122,13 @@ export function ItemFields({
         description="Kommt nicht auf neue Einkaufslisten"
         defaultChecked={base.alwaysAvailable}
       />
+      <Checkbox
+        key={`thawing-${version}`}
+        name="needsThawing"
+        label="Muss aufgetaut werden"
+        description="Warnt im Speiseplan und beim Kochen, damit es rechtzeitig aus dem Tiefkühler kommt"
+        defaultChecked={base.needsThawing}
+      />
     </>
   );
 }
@@ -153,6 +161,7 @@ function useSuggestion(
       categoryId: id("categoryId"),
       defaultUnit: String(form.get("defaultUnit") ?? "") || null,
       alwaysAvailable: form.get("alwaysAvailable") === "on",
+      needsThawing: form.get("needsThawing") === "on",
     };
     setMessage(null);
     fetcher.submit({ name, ...(itemId && { itemId }) }, { method: "post", action: "/items/suggest" });
@@ -184,6 +193,7 @@ function useSuggestion(
       categoryId: was.categoryId ?? null,
       defaultUnit: pick(was.defaultUnit, suggestion.defaultUnit, "Einheit"),
       alwaysAvailable: was.alwaysAvailable,
+      needsThawing: was.needsThawing,
     };
     // A suggested shelf is in the suggested store, so it only fills in where that's the store now
     if (next.storeId === suggestion.storeId) next.categoryId = pick(was.categoryId, suggestion.categoryId, "Regal");

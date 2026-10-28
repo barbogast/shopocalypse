@@ -32,6 +32,8 @@ export const items = sqliteTable("items", {
   defaultUnit: text("default_unit").$type<UnitKey>(),
   // Assumed to be in stock (salt, oil…): left off prepared shopping lists unless asked for
   alwaysAvailable: integer("always_available", { mode: "boolean" }).notNull().default(false),
+  // Has to come out of the freezer ahead of cooking: warned about on the schedule and when cooking
+  needsThawing: integer("needs_thawing", { mode: "boolean" }).notNull().default(false),
 }, (t) => [
   // Backstop for parseItemForm's check, which also catches non-ASCII case differences
   uniqueIndex("items_name_unique").on(sql`${t.name} collate nocase`),

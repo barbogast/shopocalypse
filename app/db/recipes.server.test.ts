@@ -2,7 +2,7 @@ import "./test-db";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "./client";
-import { deleteOrArchiveRecipe, importRecipe } from "./recipes.server";
+import { deleteOrArchiveRecipe, importRecipe, withIngredients } from "./recipes.server";
 import * as schema from "./schema";
 
 const getRecipe = (id: number) => db.select().from(schema.recipes).where(eq(schema.recipes.id, id)).get();
@@ -23,6 +23,16 @@ describe("importRecipe", () => {
     expect(ingredients).toHaveLength(1);
     const versions = await db.select().from(schema.recipeVersions).where(eq(schema.recipeVersions.recipeId, id));
     expect(versions).toHaveLength(1);
+  });
+});
+
+describe("withIngredients", () => {
+  it("says which ingredients have to be thawed", async () => {
+    const id = await importSoup("Fischsuppe");
+    const [{ itemId }] = await db.select().from(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, id));
+    await db.update(schema.items).set({ needsThawing: true }).where(eq(schema.items.id, itemId)).run();
+    const [meal] = await withIngredients([{ id, servings: 2, servingSize: 2 }]);
+    expect(meal.ingredients).toMatchObject([{ itemId, needsThawing: true }]);
   });
 });
 

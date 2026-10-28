@@ -53,6 +53,7 @@ export async function loader({ request }: Route.LoaderArgs) {
           : sql<boolean>`${schema.items.parentId} is not null`.mapWith(Boolean),
       defaultUnit: schema.items.defaultUnit,
       alwaysAvailable: schema.items.alwaysAvailable,
+      needsThawing: schema.items.needsThawing,
       shelfName: schema.itemCategories.name,
       storeName: schema.stores.name,
     })
@@ -265,6 +266,9 @@ function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedI
         {item.name}
         {item.alwaysAvailable && (
           <Badge size="xs" variant="outline" color="gray" ml={6}>immer vorrätig</Badge>
+        )}
+        {item.needsThawing && (
+          <Badge size="xs" variant="outline" color="cyan" ml={6}>auftauen</Badge>
         )}
       </Table.Td>
       <Table.Td c="dimmed">{item.defaultUnit ? unitName(item.defaultUnit) : "—"}</Table.Td>

@@ -23,6 +23,7 @@ import { MoveButtons } from "~/components/move-buttons";
 import { ServingsControl } from "~/components/servings";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SubmitButton } from "~/components/submit-button";
+import { ThawWarning } from "~/components/thaw-warning";
 import { db } from "~/db/client";
 import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
 import { autoFill, moveScheduledMeal, scheduleRecipe } from "~/db/schedule.server";
@@ -183,6 +184,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                 </Button>
               </Group>
             </Group>
+            <ThawWarning ingredients={next.ingredients} mt="md" />
           </Card>
 
           {upcoming.length > 0 && (
