@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gt, inArray, isNull, lt, max, sql } from "drizzle-o
 import { db } from "./client";
 import * as schema from "./schema";
 import { int, optionalText, text } from "~/forms";
-import { itemKey, itemKeys } from "~/recipe-import";
+import { itemKey, itemKeys, likelySingular } from "~/recipe-import";
 import { addNote } from "~/shopping-list";
 import { combineAmounts, formatAmount, isUnitKey, mergeAmounts } from "~/units";
 
@@ -235,14 +235,15 @@ export async function mergeItem(duplicateId: number, keepId: number) {
       await tx.update(schema.stock).set({ itemId: keepId }).where(eq(schema.stock.itemId, duplicateId)).run();
     }
 
-    // A variant of the duplicate that's kept takes its place
+    // A variant of the duplicate that's kept takes its place. A duplicate that looks like the kept
+    // item's plural ("Karotten" into "Karotte") becomes its plural, so imports keep matching that name.
     const keepParentId = keep.parentId === duplicateId ? null : keep.parentId;
     await tx
       .update(schema.items)
       .set({
         ...(keep.storeId == null && { storeId: duplicate.storeId, categoryId: duplicate.categoryId }),
         parentId: keepParentId,
-        plural: keep.plural ?? duplicate.plural,
+        plural: keep.plural ?? duplicate.plural ?? (likelySingular(duplicate.name, [keep]) ? duplicate.name : null),
         defaultUnit: keep.defaultUnit ?? duplicate.defaultUnit,
       })
       .where(eq(schema.items.id, keepId))
