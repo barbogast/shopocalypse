@@ -238,7 +238,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                 <Form method="post">
                   <input type="hidden" name="intent" value="remove" />
                   <input type="hidden" name="position" value={next.position} />
-                  <Button type="submit" variant="subtle" color="gray" size="xs" px={6}>
+                  <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`Remove ${next.name} from the schedule`}>
                     <IconX size={14} />
                   </Button>
                 </Form>
@@ -283,7 +283,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                       <Form method="post">
                         <input type="hidden" name="intent" value="remove" />
                         <input type="hidden" name="position" value={meal.position} />
-                        <Button type="submit" variant="subtle" color="gray" size="xs" px={6}>
+                        <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`Remove ${meal.name} from the schedule`}>
                           <IconX size={14} />
                         </Button>
                       </Form>
