@@ -184,6 +184,11 @@ describe("parseRecipeText", () => {
     ]);
   });
 
+  it("reports ingredients that are the same existing item", () => {
+    const { errors } = parseRecipeText("Soup\n2\n---\n1 Zwiebel\n2 Zwiebeln - in Ringen", [{ name: "Zwiebel", plural: "Zwiebeln" }]);
+    expect(errors).toEqual([{ line: 5, message: expect.stringContaining('same item as "Zwiebel" in line 4') }]);
+  });
+
   it("reports missing parts", () => {
     expect(parseRecipeText("").errors.map((e) => e.message)).toEqual([
       expect.stringContaining("recipe name"),
@@ -286,6 +291,15 @@ describe("parseItemsText", () => {
       { line: 2, message: "Quantity must be more than 0." },
       { line: 3, message: '"zwiebeln" is already listed in line 1; combine them into one line.' },
     ]);
+  });
+
+  it("reports an existing item's name and plural as the same item", () => {
+    const items = [{ name: "Zwiebel", plural: "Zwiebeln" }];
+    expect(parseItemsText("1 Zwiebel\n2 Zwiebeln - in Ringen", items).errors).toEqual([
+      { line: 2, message: '"Zwiebeln" is the same item as "Zwiebel" in line 1; combine them into one line.' },
+    ]);
+    // Without the item, they're two new ones
+    expect(parseItemsText("1 Zwiebel\n2 Zwiebeln").errors).toEqual([]);
   });
 });
 

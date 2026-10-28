@@ -108,7 +108,8 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Parsed again here rather than trusting the preview
-  const { recipe, errors } = parseRecipeText(text(form, "text"));
+  const allItems = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
+  const { recipe, errors } = parseRecipeText(text(form, "text"), allItems);
   if (errors.length || recipe.servingSize == null) return { error: "Fix the errors in the text first.", imported: null };
 
   // Lines whose note was ticked in the preview to go on the shopping list
@@ -451,7 +452,7 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
       else next.delete(noteKey(ing));
       return next;
     });
-  const { recipe, errors } = useMemo(() => parseRecipeText(input), [input]);
+  const { recipe, errors } = useMemo(() => parseRecipeText(input, allItems), [input, allItems]);
   const knownItems = useMemo(() => new Set(allItems.flatMap(itemKeys)), [allItems]);
   const errorLines = new Set(errors.flatMap((e) => (e.line != null ? [e.line] : [])));
 

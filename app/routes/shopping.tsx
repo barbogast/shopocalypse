@@ -280,7 +280,8 @@ export async function action({ request }: Route.ActionArgs) {
       if (!activeList) return null;
 
       // Parsed again here rather than trusting the preview
-      const { items, errors } = parseItemsText(text(form, "text"));
+      const allItems = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
+      const { items, errors } = parseItemsText(text(form, "text"), allItems);
       if (errors.length) return { importError: "Fix the errors in the text first." };
       if (items.length === 0) return { importError: "List at least one item." };
       const { newItems } = await addItemsToList(activeList.id, items);
@@ -716,7 +717,7 @@ function ImportItemsButton({ items }: { items: { id: number; name: string; plura
   const [opened, modal] = useDisclosure(false);
   const [input, setInput] = useState("");
   const actionData = useActionData<typeof action>();
-  const { items: parsed, errors } = useMemo(() => parseItemsText(input), [input]);
+  const { items: parsed, errors } = useMemo(() => parseItemsText(input, items), [input, items]);
   const knownItems = useMemo(() => new Set(items.flatMap(itemKeys)), [items]);
   const errorLines = new Set(errors.flatMap((e) => (e.line != null ? [e.line] : [])));
   const newItemCount = parsed.filter((i) => !knownItems.has(itemKey(i.name))).length;

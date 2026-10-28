@@ -158,28 +158,44 @@ export function parseIngredient(text: string): Omit<ParsedIngredient, "line"> | 
   return { name, quantity, unit: unit ?? "pcs", note };
 }
 
-// Parses one ingredient line onto the list, or notes why it can't; blank lines are skipped
-function addIngredientLine(ingredients: ParsedIngredient[], errors: ImportError[], line: number, trimmed: string) {
+// The key of the item a name stands for: an existing item's name and plural share its name's key
+function itemKeyIn(items: { name: string; plural: string | null }[]) {
+  const keys = new Map(items.flatMap((i) => itemKeys(i).map((key) => [key, itemKey(i.name)] as const)));
+  return (name: string) => keys.get(itemKey(name)) ?? itemKey(name);
+}
+
+// Parses one ingredient line onto the list, or notes why it can't; blank lines are skipped.
+// Two lines for the same item are an error, also when one uses its name and the other its plural.
+function addIngredientLine(
+  ingredients: ParsedIngredient[], errors: ImportError[], line: number, trimmed: string, keyOf: (name: string) => string,
+) {
   if (!trimmed) return;
   const parsed = parseIngredient(trimmed);
   if ("error" in parsed) {
     errors.push({ line, message: parsed.error });
     return;
   }
-  const duplicate = ingredients.find((ing) => itemKey(ing.name) === itemKey(parsed.name));
+  const duplicate = ingredients.find((ing) => keyOf(ing.name) === keyOf(parsed.name));
   if (duplicate) {
-    errors.push({ line, message: `"${parsed.name}" is already listed in line ${duplicate.line}; combine them into one line.` });
+    const message = itemKey(duplicate.name) === itemKey(parsed.name)
+      ? `"${parsed.name}" is already listed in line ${duplicate.line}; combine them into one line.`
+      : `"${parsed.name}" is the same item as "${duplicate.name}" in line ${duplicate.line}; combine them into one line.`;
+    errors.push({ line, message });
     return;
   }
   ingredients.push({ line, ...parsed });
 }
 
-// Items for a shopping list, one per line, written like a recipe's ingredients
-export function parseItemsText(text: string): { items: ParsedIngredient[]; errors: ImportError[] } {
-  const items: ParsedIngredient[] = [];
+// Items for a shopping list, one per line, written like a recipe's ingredients.
+// `items` are the existing ones, to catch two lines for the same item.
+export function parseItemsText(
+  text: string, items: { name: string; plural: string | null }[] = [],
+): { items: ParsedIngredient[]; errors: ImportError[] } {
+  const parsed: ParsedIngredient[] = [];
   const errors: ImportError[] = [];
-  text.split(/\r?\n/).forEach((raw, i) => addIngredientLine(items, errors, i + 1, raw.trim()));
-  return { items, errors };
+  const keyOf = itemKeyIn(items);
+  text.split(/\r?\n/).forEach((raw, i) => addIngredientLine(parsed, errors, i + 1, raw.trim(), keyOf));
+  return { items: parsed, errors };
 }
 
 // The servings: "4", "Serves 4", "4 Personen", "4 Portionen", "für 4", "für 4 Personen"
@@ -190,7 +206,11 @@ function sectionOf(line: string): Section | null {
   return (SECTIONS as readonly string[]).includes(word) ? (word as Section) : null;
 }
 
-export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: ImportError[] } {
+// `items` are the existing ones, to catch two ingredient lines for the same item
+export function parseRecipeText(
+  text: string, items: { name: string; plural: string | null }[] = [],
+): { recipe: ParsedRecipe; errors: ImportError[] } {
+  const keyOf = itemKeyIn(items);
   const lines = text.split(/\r?\n/);
   const errors: ImportError[] = [];
   const recipe: ParsedRecipe = { name: "", servingSize: null, weblink: null, ingredients: [], instructions: null, comments: null };
@@ -255,7 +275,7 @@ export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: I
       }
 
       case "ingredients":
-        addIngredientLine(recipe.ingredients, errors, line, trimmed);
+        addIngredientLine(recipe.ingredients, errors, line, trimmed, keyOf);
         return;
 
       default:
