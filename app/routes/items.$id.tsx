@@ -7,7 +7,7 @@ import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { listParents, listShelves, mergeItem, parseItemForm, updateItem } from "~/db/items.server";
 import * as schema from "~/db/schema";
-import { int, itemsPath } from "~/forms";
+import { confirmFirst, int, itemsPath } from "~/forms";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items.$id";
 
@@ -82,12 +82,7 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
       <Text size="sm" c="dimmed" mb="md">
         For a duplicate: recipes and shopping lists switch to the chosen item, and {item.name} is deleted.
       </Text>
-      <Form
-        method="post"
-        onSubmit={(e) => {
-          if (!confirm(`Merge ${item.name} into the chosen item? This can't be undone.`)) e.preventDefault();
-        }}
-      >
+      <Form method="post" onSubmit={confirmFirst(`Merge ${item.name} into the chosen item? This can't be undone.`)}>
         <input type="hidden" name="intent" value="merge" />
         <input type="hidden" name="returnTo" value={returnTo} />
         <Stack>

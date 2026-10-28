@@ -25,7 +25,7 @@ import { MoveButtons } from "~/components/move-buttons";
 import { db } from "~/db/client";
 import { addShelf, deleteItem, deleteShelf, deleteStore, listShelves, moveShelf } from "~/db/items.server";
 import * as schema from "~/db/schema";
-import { editItemPath, int, text } from "~/forms";
+import { confirmFirst, editItemPath, int, text } from "~/forms";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
 import { unitName } from "~/units";
 import { pageTitle } from "~/page-title";
@@ -290,7 +290,7 @@ function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedI
               </span>
             </Tooltip>
           ) : (
-            <Form method="post">
+            <Form method="post" onSubmit={confirmFirst(`Delete ${item.name}?`)}>
               <input type="hidden" name="intent" value="delete-item" />
               <input type="hidden" name="id" value={item.id} />
               <ActionIcon type="submit" variant="subtle" color="red" aria-label={`Delete ${item.name}`}>
@@ -379,7 +379,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
             <Card key={store.id} withBorder radius="md" p="md">
               <Group justify="space-between" mb="xs">
                 <RenamableName intent="rename-store" id={store.id} name={store.name} fw={600} />
-                <Form method="post">
+                <Form method="post" onSubmit={confirmFirst(`Delete ${store.name} and its shelves? Its items are kept without a store.`)}>
                   <input type="hidden" name="intent" value="delete-store" />
                   <input type="hidden" name="id" value={store.id} />
                   <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`Delete ${store.name}`}>
@@ -393,7 +393,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
                     <RenamableName intent="rename-shelf" id={shelf.id} name={shelf.name} size="sm" />
                     <Group gap={0} wrap="nowrap">
                       <MoveButtons intent="move-shelf" fields={{ id: shelf.id }} first={i === 0} last={i === shelves.length - 1} />
-                      <Form method="post">
+                      <Form method="post" onSubmit={confirmFirst(`Delete the shelf ${shelf.name}? Its items are kept without a shelf.`)}>
                         <input type="hidden" name="intent" value="delete-shelf" />
                         <input type="hidden" name="id" value={shelf.id} />
                         <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`Delete ${shelf.name}`}>

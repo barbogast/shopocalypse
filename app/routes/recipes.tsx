@@ -5,7 +5,7 @@ import { Form, Link, useSearchParams } from "react-router";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
-import { int } from "~/forms";
+import { confirmFirst, int } from "~/forms";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes";
 
@@ -114,7 +114,7 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
                 </Tooltip>
               </Table.Td>
               <Table.Td style={{ width: 40 }}>
-                <Form method="post">
+                <Form method="post" onSubmit={recipe.archived ? undefined : confirmFirst(`Delete ${recipe.name}?`)}>
                   <input type="hidden" name="id" value={recipe.id} />
                   <input type="hidden" name="intent" value={recipe.archived ? "restore" : "delete"} />
                   {recipe.archived ? (

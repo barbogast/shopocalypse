@@ -38,7 +38,7 @@ import {
   withIngredients,
 } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
-import { int, optionalText, optionalUrl, text } from "~/forms";
+import { confirmFirst, int, optionalText, optionalUrl, text } from "~/forms";
 import { itemKey, itemKeys } from "~/recipe-import";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import { pageTitle } from "~/page-title";
@@ -251,7 +251,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   return (
     <Container size="sm" py="xl">
       {/* Kept outside the save form: forms can't be nested */}
-      <Form method="post" id="recipe-status-form">
+      <Form method="post" id="recipe-status-form" onSubmit={recipe.archived ? undefined : confirmFirst(`Delete ${recipe.name}?`)}>
         <input type="hidden" name="intent" value={recipe.archived ? "restore" : "delete"} />
       </Form>
       <Group justify="space-between" mb="md">

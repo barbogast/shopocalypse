@@ -43,3 +43,10 @@ export function itemsPath(value: string | null): string {
 export function editItemPath(id: number, returnTo: string): string {
   return `/items/${id}?returnTo=${encodeURIComponent(returnTo)}`;
 }
+
+// A form's onSubmit that asks before a destructive action and cancels it on "Cancel"
+export function confirmFirst(message: string) {
+  return (e: { preventDefault(): void }) => {
+    if (!confirm(message)) e.preventDefault();
+  };
+}

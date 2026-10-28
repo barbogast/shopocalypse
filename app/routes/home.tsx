@@ -26,7 +26,7 @@ import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
-import { int, text } from "~/forms";
+import { confirmFirst, int, text } from "~/forms";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/home";
 
@@ -376,7 +376,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                   <Anchor component={Link} to={`/recipes/${entry.recipeId}`} c="inherit">{entry.name}</Anchor>
                 </Table.Td>
                 <Table.Td style={{ width: 40 }}>
-                  <Form method="post">
+                  <Form method="post" onSubmit={confirmFirst(`Remove ${entry.name} on ${entry.cookedAt} from the history?`)}>
                     <input type="hidden" name="intent" value="remove-history" />
                     <input type="hidden" name="id" value={entry.id} />
                     <ActionIcon type="submit" variant="subtle" color="gray" aria-label={`Remove ${entry.name} on ${entry.cookedAt} from history`}>

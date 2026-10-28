@@ -44,7 +44,7 @@ import { listParents, listShelves, parseItemForm } from "~/db/items.server";
 import { mealServings, withIngredients } from "~/db/recipes.server";
 import { addItemsToList, changeItemsForMeals, getActiveList, listIngredients, listMeals } from "~/db/shopping.server";
 import * as schema from "~/db/schema";
-import { int, text } from "~/forms";
+import { confirmFirst, int, text } from "~/forms";
 import { itemKey, itemKeys, likelySingular, parseItemsText } from "~/recipe-import";
 import { listAmounts, listAsText } from "~/shopping-list";
 import * as outbox from "~/tick-outbox";
@@ -991,7 +991,7 @@ function ListView({
             Finish shopping
           </SubmitButton>
         </Form>
-        <Form method="post">
+        <Form method="post" onSubmit={confirmFirst("Discard this shopping list and everything on it?")}>
           <input type="hidden" name="intent" value="discard" />
           <SubmitButton variant="subtle" color="red">Discard list</SubmitButton>
         </Form>
