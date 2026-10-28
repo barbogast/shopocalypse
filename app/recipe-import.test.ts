@@ -5,6 +5,7 @@ import {
   itemKeys,
   likelySingular,
   parseIngredient,
+  parseItemsText,
   parseRecipeText,
   type RecipeForText,
   recipeToText,
@@ -265,6 +266,26 @@ describe("parseRecipeText", () => {
       .toEqual([{ line: 3, message: expect.stringContaining("valid web address") }]);
     expect(parseRecipeText("Soup\nhttps://a.com\n2\nhttps://b.com\n---\nwater").errors)
       .toEqual([{ line: 4, message: expect.stringContaining("line 2") }]);
+  });
+});
+
+describe("parseItemsText", () => {
+  it("parses one item per line, skipping blank lines", () => {
+    expect(parseItemsText("500 g Tomaten\n\nSalz\n200 ml Sahne - mind. 30% Fett")).toEqual({
+      items: [
+        { line: 1, name: "Tomaten", quantity: 500, unit: "g", note: null },
+        { line: 3, name: "Salz", quantity: null, unit: null, note: null },
+        { line: 4, name: "Sahne", quantity: 200, unit: "ml", note: "mind. 30% Fett" },
+      ],
+      errors: [],
+    });
+  });
+
+  it("reports bad lines and repeated items by line", () => {
+    expect(parseItemsText("2 Zwiebeln\n0 g Mehl\n1 zwiebeln").errors).toEqual([
+      { line: 2, message: "Quantity must be more than 0." },
+      { line: 3, message: '"zwiebeln" is already listed in line 1; combine them into one line.' },
+    ]);
   });
 });
 

@@ -1,7 +1,9 @@
-import { asc, eq, inArray } from "drizzle-orm";
-import { changeListMeals } from "~/shopping-list";
+import { and, asc, eq, inArray } from "drizzle-orm";
+import { itemKey, type ParsedIngredient } from "~/recipe-import";
+import { addNote, changeListMeals } from "~/shopping-list";
+import { combineAmounts } from "~/units";
 import { db } from "./client";
-import { mealServings } from "./recipes.server";
+import { findOrCreateItems, mealServings } from "./recipes.server";
 import * as schema from "./schema";
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -75,4 +77,31 @@ export async function changeItemsForMeals(
       await tx.delete(schema.shoppingListItems).where(eq(schema.shoppingListItems.id, change.id)).run();
     }
   }
+}
+
+// Adds parsed items to a list by hand, with their notes, creating the items that don't exist yet
+// (see findOrCreateItems). An item already on the list gets the amounts added up, and needs buying again.
+export async function addItemsToList(listId: number, items: ParsedIngredient[]) {
+  return db.transaction(async (tx) => {
+    const { idsByKey, newItems, storeName } = await findOrCreateItems(tx, items);
+    for (const { name, quantity, unit, note } of items) {
+      const itemId = idsByKey.get(itemKey(name))!;
+      const amounts = combineAmounts([{ quantity, unit }]);
+      const notes = note ? [{ note, amounts }] : [];
+      const listed = await tx
+        .select()
+        .from(schema.shoppingListItems)
+        .where(and(eq(schema.shoppingListItems.shoppingListId, listId), eq(schema.shoppingListItems.itemId, itemId)))
+        .get();
+      if (listed) {
+        await tx.update(schema.shoppingListItems)
+          .set({ amounts: combineAmounts([...listed.amounts, ...amounts]), notes: addNote(listed.notes, ...notes), bought: false })
+          .where(eq(schema.shoppingListItems.id, listed.id))
+          .run();
+      } else {
+        await tx.insert(schema.shoppingListItems).values({ shoppingListId: listId, itemId, amounts, notes, source: "manual" }).run();
+      }
+    }
+    return { newItems, storeName };
+  });
 }

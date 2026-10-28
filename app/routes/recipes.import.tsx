@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 import { Form, Link, redirect, type ShouldRevalidateFunctionArgs, useFetcher } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
+import { LineGutter, TEXT_METRICS } from "~/components/line-gutter";
+import { PluralSuggestion } from "~/components/plural-suggestion";
 import { LocalDateTime } from "~/components/local-date-time";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
@@ -280,70 +282,6 @@ function useAutosave(draft: { id: number; text: string } | null, input: string) 
 export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
   if (formData?.get("intent") === "save-draft") return false;
   return defaultShouldRevalidate;
-}
-
-// Shared by the textarea and its gutter so wrapped lines line up; the left
-// padding leaves room for three-digit line numbers
-const TEXT_METRICS = {
-  fontFamily: "var(--mantine-font-family-monospace)",
-  fontSize: "var(--mantine-font-size-sm)",
-  lineHeight: "var(--mantine-line-height)",
-  padding: "8px 12px 8px calc(3ch + 20px)",
-} as const;
-
-// Line numbers drawn over the textarea. Each line is repeated here in
-// transparent text so it wraps exactly like the textarea and its number sits on
-// its first row; the textarea autosizes, so there's no scrolling to keep in sync.
-function LineGutter({ text, errorLines }: { text: string; errorLines: Set<number> }) {
-  return (
-    <div
-      aria-hidden
-      style={{
-        ...TEXT_METRICS,
-        position: "absolute",
-        inset: 0,
-        border: "1px solid transparent",
-        pointerEvents: "none",
-        whiteSpace: "pre-wrap",
-        overflowWrap: "break-word",
-        color: "transparent",
-      }}
-    >
-      {text.split(/\r?\n/).map((line, i) => (
-        <div key={i} style={{ position: "relative" }}>
-          <span
-            style={{
-              position: "absolute",
-              right: "calc(100% + 10px)",
-              color: errorLines.has(i + 1) ? "var(--mantine-color-red-6)" : "var(--mantine-color-dimmed)",
-              fontWeight: errorLines.has(i + 1) ? 700 : undefined,
-            }}
-          >
-            {i + 1}
-          </span>
-          {line || " "}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Offers to save an unknown ingredient name as the plural of the item it probably is, which
-// then matches it. Never matched without asking: guessing plurals goes wrong too often.
-function PluralSuggestion({ name, singular }: { name: string; singular: { id: number; name: string } | undefined }) {
-  const fetcher = useFetcher<typeof action>();
-  if (!singular) return null;
-  return (
-    <fetcher.Form method="post" style={{ display: "inline" }}>
-      <input type="hidden" name="intent" value="set-plural" />
-      <input type="hidden" name="itemId" value={singular.id} />
-      <input type="hidden" name="plural" value={name} />
-      <Button type="submit" size="compact-xs" variant="subtle" ml={4} loading={fetcher.state !== "idle"}>
-        Plural of {singular.name}?
-      </Button>
-      {fetcher.data?.error && <Text span size="xs" c="red" ml={4}>{fetcher.data.error}</Text>}
-    </fetcher.Form>
-  );
 }
 
 // Lists the new items on top, and editing one comes back there, since this page is gone once left

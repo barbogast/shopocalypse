@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Button,
   Checkbox,
@@ -17,32 +18,38 @@ import {
   Stack,
   Table,
   Text,
+  Textarea,
   Title,
 } from "@mantine/core";
-import { IconCheck, IconChefHat, IconChevronDown, IconChevronRight, IconCopy, IconPlus, IconShoppingCart, IconTrash } from "@tabler/icons-react";
+import {
+  IconAlertCircle, IconCheck, IconChefHat, IconChevronDown, IconChevronRight, IconCopy, IconFileImport, IconPlus, IconShoppingCart, IconTrash,
+} from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { Form, type ShouldRevalidateFunctionArgs, useActionData, useFetcher, useFetchers, useSubmit } from "react-router";
 import { FormError } from "~/components/form-error";
+import { IngredientName } from "~/components/ingredient-name";
 import { ItemFields } from "~/components/item-fields";
 import { itemSearchFilter } from "~/components/item-search";
+import { LineGutter, TEXT_METRICS } from "~/components/line-gutter";
 import { LocalDateTime } from "~/components/local-date-time";
+import { PluralSuggestion } from "~/components/plural-suggestion";
 import { RecipeDrawer } from "~/components/recipe-drawer";
 import { Servings } from "~/components/servings";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { listParents, listShelves, parseItemForm } from "~/db/items.server";
 import { mealServings, withIngredients } from "~/db/recipes.server";
-import { changeItemsForMeals, getActiveList, listIngredients, listMeals } from "~/db/shopping.server";
+import { addItemsToList, changeItemsForMeals, getActiveList, listIngredients, listMeals } from "~/db/shopping.server";
 import * as schema from "~/db/schema";
 import { int, text } from "~/forms";
-import { itemKey, itemKeys } from "~/recipe-import";
+import { itemKey, itemKeys, likelySingular, parseItemsText } from "~/recipe-import";
 import { listAmounts, listAsText } from "~/shopping-list";
 import * as outbox from "~/tick-outbox";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
-import { combineAmounts, DEFAULT_UNIT, formatAmounts, nameForAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
+import { combineAmounts, DEFAULT_UNIT, formatAmount, formatAmounts, nameForAmounts, parseAmount, UNIT_OPTIONS } from "~/units";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/shopping";
 
@@ -265,6 +272,19 @@ export async function action({ request }: Route.ActionArgs) {
         }
       });
       break;
+    }
+
+    // Items pasted as text, one per line like a recipe's ingredients
+    case "import-items": {
+      const activeList = await getActiveList();
+      if (!activeList) return null;
+
+      // Parsed again here rather than trusting the preview
+      const { items, errors } = parseItemsText(text(form, "text"));
+      if (errors.length) return { importError: "Fix the errors in the text first." };
+      if (items.length === 0) return { importError: "List at least one item." };
+      const { newItems } = await addItemsToList(activeList.id, items);
+      return { itemsImported: { count: items.length, newItems: newItems.length } };
     }
 
     // New item from the item picker; it's then preselected for adding
@@ -685,6 +705,104 @@ function AddItemForm({ items, stores, shelves, parents }: {
   );
 }
 
+const IMPORT_PLACEHOLDER = `500 g Tomaten
+2 Zwiebeln
+Salz
+200 ml Sahne - mind. 30% Fett`;
+
+// Adds several items at once from text, one per line in the recipe import's ingredient format,
+// with a preview of what each line becomes. Notes go on the list with the item.
+function ImportItemsButton({ items }: { items: { id: number; name: string; plural: string | null }[] }) {
+  const [opened, modal] = useDisclosure(false);
+  const [input, setInput] = useState("");
+  const actionData = useActionData<typeof action>();
+  const { items: parsed, errors } = useMemo(() => parseItemsText(input), [input]);
+  const knownItems = useMemo(() => new Set(items.flatMap(itemKeys)), [items]);
+  const errorLines = new Set(errors.flatMap((e) => (e.line != null ? [e.line] : [])));
+  const newItemCount = parsed.filter((i) => !knownItems.has(itemKey(i.name))).length;
+  const canImport = parsed.length > 0 && errors.length === 0;
+
+  // Done once the items are on the list
+  useEffect(() => {
+    if (actionData && "itemsImported" in actionData) {
+      modal.close();
+      setInput("");
+    }
+  }, [actionData]);
+
+  return (
+    <>
+      <Button variant="subtle" size="compact-sm" mt="xs" leftSection={<IconFileImport size={14} />} onClick={modal.open}>
+        Paste items
+      </Button>
+      <Modal opened={opened} onClose={modal.close} title="Paste items" size="lg">
+        {/* The preview stays outside the form, since its plural suggestions are forms of their own */}
+        <Stack>
+          <Form method="post" id="import-items">
+            <input type="hidden" name="intent" value="import-items" />
+            <Textarea
+              name="text"
+              description="One item per line, like a recipe's ingredients: quantity, unit, name, and a note after “ - ”"
+              placeholder={IMPORT_PLACEHOLDER}
+              value={input}
+              onChange={(e) => setInput(e.currentTarget.value)}
+              autosize
+              minRows={6}
+              data-autofocus
+              styles={{ input: TEXT_METRICS }}
+              inputContainer={(children) => (
+                <div style={{ position: "relative" }}>
+                  {children}
+                  {input !== "" && <LineGutter text={input} errorLines={errorLines} />}
+                </div>
+              )}
+            />
+          </Form>
+          {errors.length > 0 && (
+            <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />} py="xs">
+              <List size="sm">
+                {errors.map((e, i) => (
+                  <List.Item key={i}>{e.line != null && <b>Line {e.line}: </b>}{e.message}</List.Item>
+                ))}
+              </List>
+            </Alert>
+          )}
+          {parsed.length > 0 && (
+            <Table>
+              <Table.Tbody>
+                {parsed.map((ing) => (
+                  <Table.Tr key={ing.line}>
+                    <Table.Td c="dimmed" ta="right" style={{ width: 90, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
+                    <Table.Td>
+                      <IngredientName {...ing}>
+                        {!knownItems.has(itemKey(ing.name)) && (
+                          <>
+                            <Badge size="xs" variant="light" color="orange" ml={6}>new item</Badge>
+                            <PluralSuggestion name={ing.name} singular={likelySingular(ing.name, items)} />
+                          </>
+                        )}
+                      </IngredientName>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          )}
+          <FormError error={actionData && "importError" in actionData ? actionData.importError : null} />
+          <Group>
+            <SubmitButton form="import-items" disabled={!canImport} leftSection={<IconPlus size={16} />}>
+              Add {parsed.length || ""} item{parsed.length === 1 ? "" : "s"}
+            </SubmitButton>
+            {canImport && newItemCount > 0 && (
+              <Text size="sm" c="dimmed">Creates {newItemCount} new item{newItemCount === 1 ? "" : "s"}</Text>
+            )}
+          </Group>
+        </Stack>
+      </Modal>
+    </>
+  );
+}
+
 // One line of the list. Ticking and removing go through a fetcher, so the row
 // updates at once instead of waiting for the server and a reload of the list.
 function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[] | undefined }) {
@@ -862,6 +980,7 @@ function ListView({
 
       <Divider my="md" />
       <AddItemForm items={allItems} stores={allStores} shelves={allShelves} parents={parents} />
+      <ImportItemsButton items={allItems} />
 
       <Divider my="lg" />
       <Group>

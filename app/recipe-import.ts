@@ -158,6 +158,30 @@ export function parseIngredient(text: string): Omit<ParsedIngredient, "line"> | 
   return { name, quantity, unit: unit ?? "pcs", note };
 }
 
+// Parses one ingredient line onto the list, or notes why it can't; blank lines are skipped
+function addIngredientLine(ingredients: ParsedIngredient[], errors: ImportError[], line: number, trimmed: string) {
+  if (!trimmed) return;
+  const parsed = parseIngredient(trimmed);
+  if ("error" in parsed) {
+    errors.push({ line, message: parsed.error });
+    return;
+  }
+  const duplicate = ingredients.find((ing) => itemKey(ing.name) === itemKey(parsed.name));
+  if (duplicate) {
+    errors.push({ line, message: `"${parsed.name}" is already listed in line ${duplicate.line}; combine them into one line.` });
+    return;
+  }
+  ingredients.push({ line, ...parsed });
+}
+
+// Items for a shopping list, one per line, written like a recipe's ingredients
+export function parseItemsText(text: string): { items: ParsedIngredient[]; errors: ImportError[] } {
+  const items: ParsedIngredient[] = [];
+  const errors: ImportError[] = [];
+  text.split(/\r?\n/).forEach((raw, i) => addIngredientLine(items, errors, i + 1, raw.trim()));
+  return { items, errors };
+}
+
 // The servings: "4", "Serves 4", "4 Personen", "4 Portionen", "für 4", "für 4 Personen"
 const SERVES = /^(?:(?:serves|für)\s+(\S+)(?:\s+(?:person|portion)(?:en)?)?|(\S+)\s+(?:person|portion)(?:en)?|(\d\S*))$/i;
 
@@ -230,21 +254,9 @@ export function parseRecipeText(text: string): { recipe: ParsedRecipe; errors: I
         return;
       }
 
-      case "ingredients": {
-        if (!trimmed) return;
-        const parsed = parseIngredient(trimmed);
-        if ("error" in parsed) {
-          errors.push({ line, message: parsed.error });
-          return;
-        }
-        const duplicate = recipe.ingredients.find((ing) => itemKey(ing.name) === itemKey(parsed.name));
-        if (duplicate) {
-          errors.push({ line, message: `"${parsed.name}" is already listed in line ${duplicate.line}; combine them into one line.` });
-          return;
-        }
-        recipe.ingredients.push({ line, ...parsed });
+      case "ingredients":
+        addIngredientLine(recipe.ingredients, errors, line, trimmed);
         return;
-      }
 
       default:
         freeText[section].push(raw);

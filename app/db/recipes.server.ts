@@ -3,6 +3,7 @@ import { itemKey, itemKeys, type ParsedIngredient, type ParsedRecipe } from "~/r
 import { scaleAmount, type UnitKey } from "~/units";
 import { db } from "./client";
 import { recordRecipeVersion } from "./recipe-versions";
+import type { Tx } from "./shopping.server";
 import * as schema from "./schema";
 
 // Cook dates are stored as YYYY-MM-DD; format on the server so client and server render the same string
@@ -103,31 +104,38 @@ export async function moveIngredient(recipeId: number, itemId: number, up: boole
 
 const IMPORT_STORE_NAME = "Supermarkt";
 
+// The item ids for parsed ingredient names, matched by name or plural; missing items are created in the
+// "Supermarkt" store (if there is one) without a shelf, with the ingredient's unit as their default.
+// Returns the ids by itemKey, the items it created and the store they were put in.
+export async function findOrCreateItems(tx: Tx, ingredients: Pick<ParsedIngredient, "name" | "unit">[]) {
+  const existing = await tx.select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural }).from(schema.items).all();
+  const idsByKey = new Map(existing.flatMap((i) => itemKeys(i).map((key) => [key, i.id] as const)));
+
+  const store = await tx.select({ id: schema.stores.id, name: schema.stores.name }).from(schema.stores)
+    .where(eq(schema.stores.name, IMPORT_STORE_NAME)).orderBy(asc(schema.stores.id)).get();
+
+  const newItems: { id: number; name: string; storeId: number | null; defaultUnit: UnitKey | null }[] = [];
+  for (const ing of ingredients) {
+    if (idsByKey.has(itemKey(ing.name))) continue;
+    const [item] = await tx
+      .insert(schema.items)
+      .values({ name: ing.name, storeId: store?.id ?? null, defaultUnit: ing.unit })
+      .returning({ id: schema.items.id, name: schema.items.name, storeId: schema.items.storeId, defaultUnit: schema.items.defaultUnit });
+    idsByKey.set(itemKey(item.name), item.id);
+    newItems.push(item);
+  }
+  return { idsByKey, newItems, storeName: store?.name ?? null };
+}
+
 // Creates a parsed recipe in one go, with the notes ticked to go on the shopping list. Ingredients are
-// matched to items by name or plural; missing
-// items are created in the "Supermarkt" store (if there is one) without a shelf, with the recipe's unit as their default.
+// matched to items, or new ones created, by findOrCreateItems.
 // Returns the recipe id, the items it created and the store they were put in.
 export async function importRecipe({ ingredients, ...recipe }: Omit<ParsedRecipe, "ingredients"> & {
   servingSize: number;
   ingredients: (ParsedIngredient & { noteOnList: boolean })[];
 }) {
   return db.transaction(async (tx) => {
-    const existing = await tx.select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural }).from(schema.items).all();
-    const idsByKey = new Map(existing.flatMap((i) => itemKeys(i).map((key) => [key, i.id] as const)));
-
-    const store = await tx.select({ id: schema.stores.id, name: schema.stores.name }).from(schema.stores)
-      .where(eq(schema.stores.name, IMPORT_STORE_NAME)).orderBy(asc(schema.stores.id)).get();
-
-    const newItems: { id: number; name: string; storeId: number | null; defaultUnit: UnitKey | null }[] = [];
-    for (const ing of ingredients) {
-      if (idsByKey.has(itemKey(ing.name))) continue;
-      const [item] = await tx
-        .insert(schema.items)
-        .values({ name: ing.name, storeId: store?.id ?? null, defaultUnit: ing.unit })
-        .returning({ id: schema.items.id, name: schema.items.name, storeId: schema.items.storeId, defaultUnit: schema.items.defaultUnit });
-      idsByKey.set(itemKey(item.name), item.id);
-      newItems.push(item);
-    }
+    const { idsByKey, newItems, storeName } = await findOrCreateItems(tx, ingredients);
 
     const [{ id }] = await tx.insert(schema.recipes).values(recipe).returning({ id: schema.recipes.id });
     await tx.insert(schema.recipeIngredients).values(ingredients.map((ing, index) => ({
@@ -141,6 +149,6 @@ export async function importRecipe({ ingredients, ...recipe }: Omit<ParsedRecipe
     }))).run();
     await recordRecipeVersion(tx, id);
 
-    return { id, newItems, storeName: store?.name ?? null };
+    return { id, newItems, storeName };
   });
 }
