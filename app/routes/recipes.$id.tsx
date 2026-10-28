@@ -5,7 +5,6 @@ import {
   Checkbox,
   Container,
   Group,
-  Modal,
   NumberInput,
   Select,
   Stack,
@@ -16,18 +15,16 @@ import {
   Title,
 } from "@mantine/core";
 import { IconArchive, IconArchiveOff, IconCheck, IconHistory, IconPencil, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
-import { useDisclosure } from "@mantine/hooks";
 import { useEffect, useRef, useState } from "react";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
-import { ItemFields } from "~/components/item-fields";
-import { itemSearchFilter } from "~/components/item-search";
+import { ItemPicker, type PickerItem } from "~/components/item-picker";
 import { MoveButtons } from "~/components/move-buttons";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { listParents, listShelves, parseItemForm } from "~/db/items.server";
+import { loadItemFormOptions } from "~/db/items.server";
 import { recordRecipeVersion } from "~/db/recipe-versions";
 import {
   deleteOrArchiveRecipe,
@@ -39,7 +36,6 @@ import {
 } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
 import { confirmFirst, int, optionalText, optionalUrl, text } from "~/forms";
-import { itemKey, itemKeys } from "~/item-names";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes.$id";
@@ -60,8 +56,6 @@ export async function loader({ params }: Route.LoaderArgs) {
     .from(schema.items)
     .orderBy(sql`${schema.items.name} collate nocase`);
 
-  const allStores = await db.select().from(schema.stores).orderBy(schema.stores.name);
-
   const cookedDates = await db
     .select({ id: schema.mealHistory.id, cookedAt: schema.mealHistory.cookedAt })
     .from(schema.mealHistory)
@@ -76,7 +70,7 @@ export async function loader({ params }: Route.LoaderArgs) {
     .get() ?? { versionCount: 0 };
 
   return {
-    recipe, ingredients, allItems, allStores, allShelves: await listShelves(), parents: await listParents(), cookedDates, versionCount,
+    recipe, ingredients, allItems, ...await loadItemFormOptions(), cookedDates, versionCount,
   };
 }
 
@@ -120,17 +114,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       await moveIngredient(id, itemId, form.get("direction") === "up");
       await recordRecipeVersion(db, id);
       break;
-    }
-
-    // New item from the ingredient picker; it's then preselected for adding
-    case "create-item": {
-      const parsed = await parseItemForm(form);
-      if (parsed.error) return { createError: parsed.error };
-      const [item] = await db
-        .insert(schema.items)
-        .values(parsed.values)
-        .returning({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit });
-      return { createdItem: item };
     }
 
     case "remove-ingredient": {
@@ -183,30 +166,17 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   // The ingredient loaded into the form for editing, which stays selectable
   const [editingId, setEditingId] = useState<number | null>(null);
-  const availableItems = allItems
-    .filter((i) => !usedItemIds.has(i.id) || i.id === editingId)
-    .map((i) => ({ value: String(i.id), label: i.name }));
   const [itemId, setItemId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [quantity, setQuantity] = useState<string | number>(1);
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
   const [note, setNote] = useState("");
   const [noteOnList, setNoteOnList] = useState(false);
-  const [createOpened, createModal] = useDisclosure(false);
-  const [createName, setCreateName] = useState("");
-  const [createError, setCreateError] = useState<string | null>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState(false);
   const markUnsaved = () => setSaved(false);
 
-  // Offer to create the searched-for item when no item has that name or plural yet
-  const searchName = search.trim();
-  const canCreate = searchName !== "" && !allItems.some((i) => itemKeys(i).includes(itemKey(searchName)));
-  const itemOptions = canCreate
-    ? [...availableItems, { value: "__create__", label: `+ Create "${searchName}"` }]
-    : availableItems;
-
-  const selectItem = (item: (typeof allItems)[number] | undefined) => {
+  const selectItem = (item: PickerItem | undefined) => {
     setItemId(item ? String(item.id) : null);
     setSearch(item?.name ?? "");
     setUnit(item?.defaultUnit ?? DEFAULT_UNIT);
@@ -239,13 +209,6 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
 
   useEffect(() => {
     if (actionData && "saved" in actionData) setSaved(true);
-    if (actionData && "createError" in actionData) setCreateError(actionData.createError ?? null);
-    // Arrives before the loader reruns, so the new item isn't in allItems yet
-    if (actionData && "createdItem" in actionData) {
-      createModal.close();
-      selectItem(actionData.createdItem);
-      quantityRef.current?.focus();
-    }
   }, [actionData]);
 
   return (
@@ -331,26 +294,24 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
       <Form method="post">
         <input type="hidden" name="intent" value="add-ingredient" />
         <Group align="flex-end" gap="xs">
-          <Select
+          <ItemPicker
             name="itemId"
             label={editingId ? "Edit ingredient" : "Add ingredient"}
-            placeholder="Search or create…"
-            data={itemOptions}
+            items={allItems}
+            // The ingredient being edited stays selectable
+            hidden={(i) => usedItemIds.has(i.id) && i.id !== editingId}
             value={itemId}
-            searchable
-            filter={itemSearchFilter(allItems)}
-            searchValue={search}
+            search={search}
             onSearchChange={setSearch}
-            onChange={(value) => {
-              if (value === "__create__") {
-                setCreateName(searchName);
-                setCreateError(null);
-                createModal.open();
-              } else {
-                selectItem(allItems.find((i) => String(i.id) === value));
-              }
+            onSelect={selectItem}
+            onCreated={(item) => {
+              selectItem(item);
+              quantityRef.current?.focus();
             }}
-            style={{ flex: 1, minWidth: 140 }}
+            defaultUnit={unit}
+            stores={allStores}
+            shelves={allShelves}
+            parents={parents}
           />
           {/* Leave the quantity empty for ingredients without one, like spices */}
           <NumberInput ref={quantityRef} name="quantity" label="Qty" min={0} decimalScale={2} decimalSeparator="," placeholder="—"
@@ -368,27 +329,6 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         </Group>
         <FormError error={actionData && "ingredientError" in actionData ? actionData.ingredientError : null} mt="xs" />
       </Form>
-
-      {/* No returnFocus: it would take focus back from the quantity field to the item picker */}
-      <Modal opened={createOpened} onClose={createModal.close} title="New item" returnFocus={false}>
-        <Form method="post">
-          <input type="hidden" name="intent" value="create-item" />
-          <Stack>
-            <ItemFields
-              stores={allStores}
-              shelves={allShelves}
-              parents={parents}
-              defaults={{ name: createName, defaultUnit: unit }}
-              autoFocus
-            />
-            <FormError error={createError} />
-            <Group justify="flex-end">
-              <Button variant="subtle" onClick={createModal.close}>Cancel</Button>
-              <SubmitButton>Create</SubmitButton>
-            </Group>
-          </Stack>
-        </Form>
-      </Modal>
 
       {/* Part of the save form above via the `form` attribute; their change events don't reach its onChange */}
       <Stack mt="xl">

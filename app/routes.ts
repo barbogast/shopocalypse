@@ -10,6 +10,7 @@ export default [
   route("cook/:id", "routes/cook.$id.tsx"),
   route("items", "routes/items.tsx"),
   route("items/new", "routes/items.new.tsx"),
+  route("items/create", "routes/items.create.ts"),
   route("items/suggest", "routes/items.suggest.ts"),
   route("items/:id", "routes/items.$id.tsx"),
   route("shopping", "routes/shopping.tsx"),

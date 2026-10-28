@@ -21,6 +21,15 @@ export async function listParents(exceptId?: number) {
     .filter((i) => i.parentId == null && i.id !== exceptId);
 }
 
+// The stores, shelves and parents the item form picks from; pass the edited item's id to leave it out of the parents
+export async function loadItemFormOptions(exceptId?: number) {
+  return {
+    allStores: await db.select().from(schema.stores).orderBy(schema.stores.name),
+    allShelves: await listShelves(),
+    parents: await listParents(exceptId),
+  };
+}
+
 // Reads the item form's name/plural/parent/store/shelf/unit fields; a shelf must belong to the chosen store.
 // Names and plurals must be unique across all items, so each one matches a single item.
 // Pass the item's own id when editing, so keeping its name isn't a clash.

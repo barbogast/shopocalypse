@@ -4,7 +4,7 @@ import { FormError } from "~/components/form-error";
 import { ItemFields } from "~/components/item-fields";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { listParents, listShelves, parseItemForm } from "~/db/items.server";
+import { loadItemFormOptions, parseItemForm } from "~/db/items.server";
 import * as schema from "~/db/schema";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items.new";
@@ -14,8 +14,7 @@ export function meta() {
 }
 
 export async function loader() {
-  const allStores = await db.select().from(schema.stores).orderBy(schema.stores.name);
-  return { allShelves: await listShelves(), allStores, parents: await listParents() };
+  return loadItemFormOptions();
 }
 
 export async function action({ request }: Route.ActionArgs) {

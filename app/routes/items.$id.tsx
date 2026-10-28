@@ -5,7 +5,7 @@ import { FormError } from "~/components/form-error";
 import { ItemFields } from "~/components/item-fields";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { listParents, listShelves, mergeItem, parseItemForm, updateItem } from "~/db/items.server";
+import { loadItemFormOptions, mergeItem, parseItemForm, updateItem } from "~/db/items.server";
 import * as schema from "~/db/schema";
 import { confirmFirst, int, itemsPath } from "~/forms";
 import { pageTitle } from "~/page-title";
@@ -20,8 +20,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const [item] = await db.select().from(schema.items).where(eq(schema.items.id, id));
   if (!item) throw new Response("Not found", { status: 404 });
 
-  const allStores = await db.select().from(schema.stores).orderBy(schema.stores.name);
-
   const otherItems = await db
     .select({ id: schema.items.id, name: schema.items.name })
     .from(schema.items)
@@ -30,12 +28,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   // An item with variants can't become a variant itself
   const hasVariants = !!(await db.select().from(schema.items).where(eq(schema.items.parentId, id)).limit(1).get());
-  const parents = hasVariants ? undefined : await listParents(id);
+  const { allStores, allShelves, parents } = await loadItemFormOptions(id);
 
   // The items view this was opened from, to go back to after saving
   const returnTo = itemsPath(new URL(request.url).searchParams.get("returnTo"));
 
-  return { item, allShelves: await listShelves(), allStores, otherItems, parents, returnTo };
+  return { item, allShelves, allStores, otherItems, parents: hasVariants ? undefined : parents, returnTo };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
