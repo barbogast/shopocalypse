@@ -3,6 +3,7 @@ import { IconCheck, IconPencil } from "@tabler/icons-react";
 import { and, eq } from "drizzle-orm";
 import { useEffect, useRef } from "react";
 import { Form, Link, redirect, useLocation, useNavigate } from "react-router";
+import { CookTimers, remarkTimers, timerComponents } from "~/components/cook-timers";
 import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
@@ -97,7 +98,9 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
   useWakeLock();
 
   return (
-    <Container size="sm" py="xl">
+    <CookTimers recipeId={recipe.id}>
+    {/* The bottom padding keeps the timer button clear of the form */}
+    <Container size="sm" pt="xl" pb={100}>
       <Group justify="space-between" align="baseline" mb="lg">
         <Title>{recipe.name}</Title>
         <Group gap="xs">
@@ -132,7 +135,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
       <Title order={3} mb="sm">Zubereitung</Title>
       {recipe.instructions ? (
         <Box fz="lg" mb="xl">
-          <Markdown>{recipe.instructions}</Markdown>
+          <Markdown remarkPlugins={[remarkTimers]} components={timerComponents}>{recipe.instructions}</Markdown>
         </Box>
       ) : (
         <Text size="lg" mb="xl" c="dimmed">Keine Zubereitung.</Text>
@@ -164,5 +167,6 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
         </Stack>
       </Form>
     </Container>
+    </CookTimers>
   );
 }
