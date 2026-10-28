@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseRecipeText } from "./recipe-import";
-import { EXAMPLE } from "./recipe-photo.server";
+import { EXAMPLE } from "./recipe-format-prompt";
 
 describe("EXAMPLE", () => {
   // The model copies this format, so it has to be one the import accepts

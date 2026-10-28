@@ -1,4 +1,5 @@
 import { desc, eq } from "drizzle-orm";
+import { type ChatMessage, parseChat } from "~/recipe-chat";
 import { db } from "./client";
 import * as schema from "./schema";
 
@@ -9,17 +10,27 @@ export async function listDrafts() {
 }
 
 export async function getDraft(id: number) {
-  return db.select().from(schema.recipeDrafts).where(eq(schema.recipeDrafts.id, id)).get();
+  const draft = await db.select().from(schema.recipeDrafts).where(eq(schema.recipeDrafts.id, id)).get();
+  return draft && { ...draft, chat: parseChat(draft.chat) };
 }
 
-export async function createDraft(text: string) {
-  const draft = await db.insert(schema.recipeDrafts).values({ text, updatedAt: new Date().toISOString() }).returning().get();
+export async function createDraft(text: string, chat: ChatMessage[] = []) {
+  const draft = await db.insert(schema.recipeDrafts)
+    .values({ text, chat: chat.length ? JSON.stringify(chat) : null, updatedAt: new Date().toISOString() })
+    .returning().get();
   return draft.id;
 }
 
 // Last save wins; a draft deleted meanwhile (imported or discarded on another device) stays deleted
 export async function saveDraft(id: number, text: string) {
   await db.update(schema.recipeDrafts).set({ text, updatedAt: new Date().toISOString() }).where(eq(schema.recipeDrafts.id, id)).run();
+}
+
+// A chat turn: the whole chat so far and the text it left
+export async function saveChat(id: number, chat: ChatMessage[], text: string) {
+  await db.update(schema.recipeDrafts)
+    .set({ text, chat: JSON.stringify(chat), updatedAt: new Date().toISOString() })
+    .where(eq(schema.recipeDrafts.id, id)).run();
 }
 
 export async function deleteDraft(id: number) {

@@ -1,8 +1,8 @@
-import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Code, Container, Group, List, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
-import { IconAlertCircle, IconCamera, IconCheck, IconFileImport, IconSparkles, IconTrash } from "@tabler/icons-react";
+import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Code, Container, Group, List, Paper, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
+import { IconAlertCircle, IconCamera, IconCheck, IconFileImport, IconMessageCircle, IconSend, IconSparkles, IconTrash } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { eq } from "drizzle-orm";
-import { Form, Link, redirect, type ShouldRevalidateFunctionArgs, useFetcher } from "react-router";
+import { type FetcherWithComponents, Form, Link, redirect, type ShouldRevalidateFunctionArgs, useFetcher } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { LineGutter, TEXT_METRICS } from "~/components/line-gutter";
@@ -13,13 +13,15 @@ import { SubmitButton } from "~/components/submit-button";
 import { Weblink } from "~/components/weblink";
 import { db } from "~/db/client";
 import { setPlural } from "~/db/items.server";
-import { createDraft, deleteDraft, getDraft, listDrafts, saveDraft } from "~/db/recipe-drafts.server";
+import { createDraft, deleteDraft, getDraft, listDrafts, saveChat, saveDraft } from "~/db/recipe-drafts.server";
 import { AcceptedSchema, applySuggestions } from "~/item-suggest.server";
 import type { action as suggestAction } from "~/routes/items.suggest";
 import { importRecipe } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
 import { resizePhoto } from "~/image-resize";
+import type { ChatMessage } from "~/recipe-chat";
+import { chatRecipe } from "~/recipe-chat.server";
 import { type Photo, transcribeRecipe } from "~/recipe-photo.server";
 import { itemKey, itemKeys, likelySingular } from "~/item-names";
 import { type ParsedIngredient, parseRecipeText } from "~/recipe-import";
@@ -92,6 +94,27 @@ export async function action({ request }: Route.ActionArgs) {
     if ("error" in result) return { error: result.error, imported: null };
     // Saved straight away, so it can be finished on another device
     return redirect(`/recipes/import?draft=${await createDraft(result.text)}`);
+  }
+
+  // From the chat, through a fetcher, with the text as it stands, so edits not autosaved yet aren't lost.
+  // Claude's text (if it changed any) replaces it; the first message starts a draft, which then opens.
+  if (form.get("intent") === "chat") {
+    const message = text(form, "message");
+    if (!message) return { error: "Bitte eine Nachricht eingeben.", imported: null };
+    const draftId = int(form, "draftId");
+    const draft = draftId ? await getDraft(draftId) : null;
+    if (draftId && !draft) return { error: "Diesen Entwurf gibt es nicht mehr: Er wurde importiert oder verworfen.", imported: null };
+    const draftText = String(form.get("text") ?? "");
+    const items = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
+    const result = await chatRecipe({ chat: draft?.chat ?? [], draftText, message, items });
+    if ("error" in result) return { error: result.error, imported: null };
+    const chat: ChatMessage[] = [...(draft?.chat ?? []), { role: "user", content: message }, { role: "assistant", content: result.reply }];
+    const newText = result.text ?? draftText;
+    if (draft) {
+      await saveChat(draft.id, chat, newText);
+      return { error: null, imported: null };
+    }
+    return redirect(`/recipes/import?draft=${await createDraft(newText, chat)}`);
   }
 
   // Autosaved while editing a draft, through a fetcher; not trimmed, so the text stays as typed
@@ -202,6 +225,68 @@ function PhotoButton({ hasUnsavedText }: { hasUnsavedText: boolean }) {
 }
 
 // Buttons rather than forms, since they sit inside the import form
+
+// Asks Claude for a recipe or a change to the draft. Sends the text as it stands, which Claude's answer
+// may replace; the form then starts afresh from the draft, so the textarea is read-only meanwhile.
+function RecipeChat({ fetcher, draftId, chat, text }: {
+  fetcher: FetcherWithComponents<Awaited<ReturnType<typeof action>>>;
+  draftId: number | null;
+  chat: ChatMessage[];
+  text: string;
+}) {
+  const [message, setMessage] = useState("");
+  const busy = fetcher.state !== "idle";
+  const sent = busy ? String(fetcher.formData?.get("message") ?? "") : null;
+  const error = !busy && fetcher.data && "error" in fetcher.data ? fetcher.data.error : null;
+
+  function send() {
+    if (!message.trim() || busy) return;
+    fetcher.submit({ intent: "chat", message, text, ...(draftId ? { draftId } : {}) }, { method: "post" });
+    setMessage("");
+  }
+
+  return (
+    <Card withBorder radius="md" p="md">
+      <Stack gap="sm">
+        {chat.length === 0 && !sent && (
+          <Text size="sm" c="dimmed">
+            Claude ein Rezept schreiben lassen („etwas Schnelles mit Lauch und Linsen für 4“) und dann im Gespräch anpassen.
+            Der Entwurf links lässt sich weiter von Hand bearbeiten; Claude sieht die Änderungen.
+          </Text>
+        )}
+        {[...chat, ...(sent ? [{ role: "user" as const, content: sent }] : [])].map((m, i) =>
+          m.role === "user"
+            ? <Paper key={i} bg="var(--mantine-primary-color-light)" p="xs" radius="md" ml="xl" style={{ whiteSpace: "pre-wrap" }} fz="sm">{m.content}</Paper>
+            : <div key={i}><Markdown>{m.content}</Markdown></div>,
+        )}
+        {sent && <Text size="sm" c="dimmed">Claude schreibt…</Text>}
+        {error && <Text size="sm" c="red">{error}</Text>}
+        <Group align="flex-end" gap="xs" wrap="nowrap">
+          <Textarea
+            aria-label="Nachricht an Claude"
+            placeholder={chat.length ? "Was soll anders werden?" : "Was möchtest du kochen?"}
+            value={message}
+            onChange={(e) => setMessage(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              // Enter alone makes a new line, as on a phone
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            autosize
+            minRows={1}
+            maxRows={6}
+            style={{ flex: 1 }}
+          />
+          <ActionIcon size="lg" aria-label="Senden" onClick={send} loading={busy} disabled={!message.trim()}>
+            <IconSend size={16} />
+          </ActionIcon>
+        </Group>
+      </Stack>
+    </Card>
+  );
+}
 
 // Drafts to pick up, shown while not editing one
 function DraftList({ drafts }: { drafts: { id: number; name: string; updatedAt: string }[] }) {
@@ -437,14 +522,22 @@ function Imported({ id, name, newItems, storeName, names, onImportAnother }: {
 const noteKey = (ing: ParsedIngredient) => `${itemKey(ing.name)}\n${ing.note}`;
 
 export default function ImportRecipe(props: Route.ComponentProps) {
-  // Opening another draft starts the form afresh
-  return <ImportForm key={props.loaderData.draft?.id ?? "new"} {...props} />;
+  // Opening another draft, or a chat turn, starts the form afresh from the saved text
+  const { draft } = props.loaderData;
+  return <ImportForm key={draft ? `${draft.id}-${draft.chat.length}` : "new"} {...props} />;
 }
 
 function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
   const { allItems, recipeNames, allStores, allShelves, draft, draftGone, drafts } = loaderData;
   const [input, setInput] = useState(draft?.text ?? "");
   const saveStatus = useAutosave(draft, input);
+  const chatFetcher = useFetcher<typeof action>();
+  const [chatOpen, setChatOpen] = useState((draft?.chat.length ?? 0) > 0);
+  const chatButton = !chatOpen && (
+    <Button variant="light" size={draft ? "xs" : "sm"} leftSection={<IconMessageCircle size={16} />} onClick={() => setChatOpen(true)}>
+      {draft ? "Mit Claude überarbeiten" : "Mit Claude"}
+    </Button>
+  );
   const [notesOnList, setNotesOnList] = useState(() => new Set<string>());
   const toggleNoteOnList = (ing: ParsedIngredient, checked: boolean) =>
     setNotesOnList((prev) => {
@@ -482,14 +575,21 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
             {draft ? (
               <Group justify="space-between">
                 <Text size="sm" c="dimmed">Entwurf · {saveStatus}</Text>
-                <DiscardDraftButton id={draft.id} />
+                <Group gap="xs">
+                  {chatButton}
+                  <DiscardDraftButton id={draft.id} />
+                </Group>
               </Group>
             ) : (
               <>
-                <PhotoButton hasUnsavedText={input.trim() !== ""} />
-                {input.trim() === "" && <DraftList drafts={drafts} />}
+                <Group gap="sm">
+                  <PhotoButton hasUnsavedText={input.trim() !== ""} />
+                  {chatButton}
+                </Group>
+                {input.trim() === "" && !chatOpen && <DraftList drafts={drafts} />}
               </>
             )}
+            {chatOpen && <RecipeChat fetcher={chatFetcher} draftId={draft?.id ?? null} chat={draft?.chat ?? []} text={input} />}
             <Textarea
               name="text"
               label="Rezepttext"
@@ -497,6 +597,7 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
               placeholder={PLACEHOLDER}
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
+              readOnly={chatFetcher.state !== "idle"}
               autosize
               minRows={16}
               autoFocus

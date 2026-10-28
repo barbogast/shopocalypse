@@ -176,6 +176,13 @@
       "when": 1793216135180,
       "tag": "0024_item_needs_thawing",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1793217754074,
+      "tag": "0025_recipe_draft_chat",
+      "breakpoints": true
     }
   ]
 }

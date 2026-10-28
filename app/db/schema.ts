@@ -70,6 +70,8 @@ export const recipeVersions = sqliteTable("recipe_versions", {
 export const recipeDrafts = sqliteTable("recipe_drafts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   text: text("text").notNull(),
+  // The chat with Claude that wrote it, as JSON [{ role, content }]; null for drafts typed or made from a photo
+  chat: text("chat"),
   // ISO timestamp of the last save
   updatedAt: text("updated_at").notNull(),
 });

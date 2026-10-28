@@ -1,0 +1,1 @@
+ALTER TABLE `recipe_drafts` ADD `chat` text;
