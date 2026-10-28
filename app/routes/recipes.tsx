@@ -10,7 +10,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes";
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: pageTitle("Recipes") }];
+  return [{ title: pageTitle("Rezepte") }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -60,15 +60,15 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="lg">
         <Group gap="xs" align="baseline">
-          <Title>Recipes</Title>
+          <Title>Rezepte</Title>
           <Text c="dimmed" size="sm">{all.length}</Text>
         </Group>
         <Group gap="xs">
           <Button component={Link} to="/recipes/import" variant="light" leftSection={<IconFileImport size={16} />}>
-            Import
+            Importieren
           </Button>
           <Button component={Link} to="/recipes/new" leftSection={<IconPlus size={16} />}>
-            New
+            Neu
           </Button>
         </Group>
       </Group>
@@ -76,12 +76,12 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
       <Group justify="space-between" mb="md">
         <SegmentedControl
           size="xs"
-          data={[{ label: "By name", value: "name" }, { label: "Newest first", value: "added" }]}
+          data={[{ label: "Nach Name", value: "name" }, { label: "Neueste zuerst", value: "added" }]}
           value={byAdded ? "added" : "name"}
           onChange={(by) => setParam("by", by === "added" ? by : null)}
         />
         <Switch
-          label="Show archived"
+          label="Archivierte zeigen"
           checked={showArchived}
           onChange={(e) => setParam("archived", e.currentTarget.checked ? "" : null)}
         />
@@ -97,40 +97,40 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
                   <span aria-hidden="true" style={{ position: "absolute", inset: 0 }} />
                 </Link>
                 {recipe.archived && (
-                  <Badge size="xs" variant="outline" color="gray" ml="xs">archived</Badge>
+                  <Badge size="xs" variant="outline" color="gray" ml="xs">archiviert</Badge>
                 )}
                 {!recipe.archived && !recipe.autoFill && (
-                  <Badge size="xs" variant="outline" color="gray" ml="xs">no auto-fill</Badge>
+                  <Badge size="xs" variant="outline" color="gray" ml="xs">nicht auffüllen</Badge>
                 )}
               </Table.Td>
               <Table.Td c="dimmed" style={{ width: 80 }}>
-                serves {recipe.servingSize}
+                für {recipe.servingSize}
               </Table.Td>
               <Table.Td style={{ width: 40 }}>
-                <Tooltip label="Cook now">
-                  <ActionIcon component={Link} to={`/cook/${recipe.id}`} style={{ position: "relative", zIndex: 1 }} variant="subtle" color="green" aria-label={`Cook ${recipe.name}`}>
+                <Tooltip label="Jetzt kochen">
+                  <ActionIcon component={Link} to={`/cook/${recipe.id}`} style={{ position: "relative", zIndex: 1 }} variant="subtle" color="green" aria-label={`${recipe.name} kochen`}>
                     <IconPlayerPlay size={16} />
                   </ActionIcon>
                 </Tooltip>
               </Table.Td>
               <Table.Td style={{ width: 40 }}>
-                <Form method="post" onSubmit={recipe.archived ? undefined : confirmFirst(`Delete ${recipe.name}?`)}>
+                <Form method="post" onSubmit={recipe.archived ? undefined : confirmFirst(`${recipe.name} löschen?`)}>
                   <input type="hidden" name="id" value={recipe.id} />
                   <input type="hidden" name="intent" value={recipe.archived ? "restore" : "delete"} />
                   {recipe.archived ? (
-                    <Tooltip label="Restore from archive">
-                      <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="blue" type="submit" aria-label={`Restore ${recipe.name}`}>
+                    <Tooltip label="Aus dem Archiv holen">
+                      <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="blue" type="submit" aria-label={`${recipe.name} wiederherstellen`}>
                         <IconArchiveOff size={16} />
                       </ActionIcon>
                     </Tooltip>
                   ) : recipe.cooked ? (
-                    <Tooltip label="Archive">
-                      <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="gray" type="submit" aria-label={`Archive ${recipe.name}`}>
+                    <Tooltip label="Archivieren">
+                      <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="gray" type="submit" aria-label={`${recipe.name} archivieren`}>
                         <IconArchive size={16} />
                       </ActionIcon>
                     </Tooltip>
                   ) : (
-                    <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="red" type="submit" aria-label={`Delete ${recipe.name}`}>
+                    <ActionIcon style={{ position: "relative", zIndex: 1 }} variant="subtle" color="red" type="submit" aria-label={`${recipe.name} löschen`}>
                       <IconTrash size={16} />
                     </ActionIcon>
                   )}
@@ -140,7 +140,7 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
           ))}
           {all.length === 0 && (
             <Table.Tr>
-              <Table.Td c="dimmed">No recipes yet.</Table.Td>
+              <Table.Td c="dimmed">Noch keine Rezepte.</Table.Td>
             </Table.Tr>
           )}
         </Table.Tbody>

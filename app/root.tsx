@@ -21,10 +21,10 @@ import { VersionFooter } from "./components/version-footer";
 import type { Route } from "./+types/root";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Schedule", icon: IconCalendarEvent, end: true },
-  { to: "/recipes", label: "Recipes", icon: IconChefHat, end: false },
-  { to: "/shopping", label: "Shopping", icon: IconShoppingCart, end: false },
-  { to: "/items", label: "Items", icon: IconListDetails, end: false },
+  { to: "/", label: "Speiseplan", icon: IconCalendarEvent, end: true },
+  { to: "/recipes", label: "Rezepte", icon: IconChefHat, end: false },
+  { to: "/shopping", label: "Einkaufen", icon: IconShoppingCart, end: false },
+  { to: "/items", label: "Artikel", icon: IconListDetails, end: false },
 ];
 
 // Runs before every loader and action, so no request gets past without the password
@@ -37,7 +37,7 @@ export const middleware: Route.MiddlewareFunction[] = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" {...mantineHtmlProps}>
+    <html lang="de" {...mantineHtmlProps}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -90,15 +90,15 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
+  let message = "Hoppla!";
+  let details = "Ein unerwarteter Fehler ist aufgetreten.";
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
+    message = error.status === 404 ? "404" : "Fehler";
     details =
       error.status === 404
-        ? "The requested page could not be found."
+        ? "Die Seite wurde nicht gefunden."
         : error.statusText || details;
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;

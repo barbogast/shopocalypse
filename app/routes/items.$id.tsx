@@ -12,7 +12,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items.$id";
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: pageTitle(data?.item.name ?? "Item") }];
+  return [{ title: pageTitle(data?.item.name ?? "Artikel") }];
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -43,7 +43,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (form.get("intent") === "merge") {
     const keepId = int(form, "keepId");
-    if (!keepId) return { mergeError: "Pick an item to merge into." };
+    if (!keepId) return { mergeError: "Bitte einen Artikel zum Zusammenführen wählen." };
     const merged = await mergeItem(id, keepId);
     if (merged.error) return { mergeError: merged.error };
     return redirect(returnTo);
@@ -61,40 +61,40 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
 
   return (
     <Container size="sm" py="xl">
-      <Title mb="lg">Edit item</Title>
+      <Title mb="lg">Artikel bearbeiten</Title>
       <Form method="post">
         <input type="hidden" name="returnTo" value={returnTo} />
         <Stack>
           <ItemFields stores={allStores} shelves={allShelves} parents={parents} itemId={item.id} defaults={item} />
           <FormError error={actionData && "error" in actionData ? actionData.error : null} />
           <Group>
-            <SubmitButton>Save</SubmitButton>
-            <Button component={Link} to={returnTo} variant="subtle">Cancel</Button>
+            <SubmitButton>Speichern</SubmitButton>
+            <Button component={Link} to={returnTo} variant="subtle">Abbrechen</Button>
           </Group>
         </Stack>
       </Form>
 
       <Divider my="xl" />
 
-      <Title order={4} mb="xs">Merge into another item</Title>
+      <Title order={4} mb="xs">Mit anderem Artikel zusammenführen</Title>
       <Text size="sm" c="dimmed" mb="md">
-        For a duplicate: recipes and shopping lists switch to the chosen item, and {item.name} is deleted.
+        Für Duplikate: Rezepte und Einkaufslisten verwenden danach den gewählten Artikel, und {item.name} wird gelöscht.
       </Text>
-      <Form method="post" onSubmit={confirmFirst(`Merge ${item.name} into the chosen item? This can't be undone.`)}>
+      <Form method="post" onSubmit={confirmFirst(`${item.name} mit dem gewählten Artikel zusammenführen? Das lässt sich nicht rückgängig machen.`)}>
         <input type="hidden" name="intent" value="merge" />
         <input type="hidden" name="returnTo" value={returnTo} />
         <Stack>
           <Select
             name="keepId"
-            label="Keep"
+            label="Behalten"
             data={otherItems.map((i) => ({ value: String(i.id), label: i.name }))}
             searchable
             required
-            placeholder="Select item…"
+            placeholder="Artikel wählen…"
           />
           <FormError error={actionData && "mergeError" in actionData ? actionData.mergeError : null} />
           <Group>
-            <SubmitButton variant="light" color="red">Merge</SubmitButton>
+            <SubmitButton variant="light" color="red">Zusammenführen</SubmitButton>
           </Group>
         </Stack>
       </Form>

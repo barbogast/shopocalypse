@@ -18,7 +18,7 @@ export function checkPassword(request: Request): Response | null {
     if (safeEqual(given, password)) return null;
   }
 
-  return new Response("Password required", {
+  return new Response("Passwort erforderlich", {
     status: 401,
     headers: { "WWW-Authenticate": 'Basic realm="Shopocalypse", charset="UTF-8"' },
   });

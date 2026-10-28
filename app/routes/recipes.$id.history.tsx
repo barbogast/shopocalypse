@@ -11,7 +11,7 @@ import { type DiffLine, diffVersions } from "~/recipe-history";
 import type { Route } from "./+types/recipes.$id.history";
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: pageTitle(data ? `${data.recipe.name} – History` : "History") }];
+  return [{ title: pageTitle(data ? `${data.recipe.name} – Verlauf` : "Verlauf") }];
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -48,7 +48,7 @@ function Diff({ lines }: { lines: DiffLine[] }) {
     <TextLines>
       {lines.map((line, i) => {
         if (line.kind === "skipped") {
-          return <Text key={i} size="xs" c="dimmed" fs="italic" py={2}>⋯ {line.count} unchanged lines</Text>;
+          return <Text key={i} size="xs" c="dimmed" fs="italic" py={2}>⋯ {line.count} unveränderte Zeilen</Text>;
         }
         const style = LINE_STYLES[line.kind];
         return (
@@ -67,7 +67,7 @@ function FullVersion({ text }: { text: string }) {
   return (
     <>
       <Button variant="subtle" size="xs" mt="sm" px={0} onClick={() => setShown((s) => !s)}>
-        {shown ? "Hide full version" : "Show full version"}
+        {shown ? "Vollständige Version ausblenden" : "Vollständige Version zeigen"}
       </Button>
       <Collapse expanded={shown}>
         <TextLines>{text}</TextLines>
@@ -84,13 +84,13 @@ export default function RecipeHistory({ loaderData }: Route.ComponentProps) {
       <Group justify="space-between" align="baseline" mb="lg">
         <Title>{recipe.name}</Title>
         <Button component={Link} to={`/recipes/${recipe.id}`} variant="subtle" size="xs" leftSection={<IconArrowLeft size={14} />}>
-          Recipe
+          Rezept
         </Button>
       </Group>
 
-      <Title order={3} mb="sm">History</Title>
+      <Title order={3} mb="sm">Verlauf</Title>
       {versions.length === 0 ? (
-        <Text size="sm" c="dimmed">No versions yet.</Text>
+        <Text size="sm" c="dimmed">Noch keine Versionen.</Text>
       ) : (
         <Accordion variant="separated" multiple defaultValue={[String(versions[0].id)]}>
           {versions.map((v, i) => (
@@ -99,7 +99,7 @@ export default function RecipeHistory({ loaderData }: Route.ComponentProps) {
                 <Group justify="space-between" wrap="nowrap" pr="xs">
                   <Text size="sm"><LocalDateTime iso={v.savedAt} /></Text>
                   <Text size="sm" c="dimmed">
-                    {[i === 0 && "Current", v.diff ? `+${v.diff.added} −${v.diff.removed}` : "First version"].filter(Boolean).join(" · ")}
+                    {[i === 0 && "Aktuell", v.diff ? `+${v.diff.added} −${v.diff.removed}` : "Erste Version"].filter(Boolean).join(" · ")}
                   </Text>
                 </Group>
               </Accordion.Control>

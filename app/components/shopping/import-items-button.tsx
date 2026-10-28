@@ -41,16 +41,16 @@ export function ImportItemsButton({ items }: { items: { id: number; name: string
   return (
     <>
       <Button variant="subtle" size="compact-sm" mt="xs" leftSection={<IconFileImport size={14} />} onClick={modal.open}>
-        Paste items
+        Artikel einfügen
       </Button>
-      <Modal opened={opened} onClose={modal.close} title="Paste items" size="lg">
+      <Modal opened={opened} onClose={modal.close} title="Artikel einfügen" size="lg">
         {/* The preview stays outside the form, since its plural suggestions are forms of their own */}
         <Stack>
           <Form method="post" id="import-items">
             <input type="hidden" name="intent" value="import-items" />
             <Textarea
               name="text"
-              description="One item per line, like a recipe's ingredients: quantity, unit, name, and a note after “ - ”"
+              description="Ein Artikel pro Zeile, wie die Zutaten eines Rezepts: Menge, Einheit, Name und eine Anmerkung nach „ - “"
               placeholder={IMPORT_PLACEHOLDER}
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
@@ -70,7 +70,7 @@ export function ImportItemsButton({ items }: { items: { id: number; name: string
             <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />} py="xs">
               <List size="sm">
                 {errors.map((e, i) => (
-                  <List.Item key={i}>{e.line != null && <b>Line {e.line}: </b>}{e.message}</List.Item>
+                  <List.Item key={i}>{e.line != null && <b>Zeile {e.line}: </b>}{e.message}</List.Item>
                 ))}
               </List>
             </Alert>
@@ -85,7 +85,7 @@ export function ImportItemsButton({ items }: { items: { id: number; name: string
                       <IngredientName {...ing}>
                         {!knownItems.has(itemKey(ing.name)) && (
                           <>
-                            <Badge size="xs" variant="light" color="orange" ml={6}>new item</Badge>
+                            <Badge size="xs" variant="light" color="orange" ml={6}>neuer Artikel</Badge>
                             <PluralSuggestion name={ing.name} singular={likelySingular(ing.name, items)} />
                           </>
                         )}
@@ -99,10 +99,10 @@ export function ImportItemsButton({ items }: { items: { id: number; name: string
           <FormError error={actionData && "importError" in actionData ? actionData.importError : null} />
           <Group>
             <SubmitButton form="import-items" disabled={!canImport} leftSection={<IconPlus size={16} />}>
-              Add {parsed.length || ""} item{parsed.length === 1 ? "" : "s"}
+              {parsed.length || ""} Artikel hinzufügen
             </SubmitButton>
             {canImport && newItemCount > 0 && (
-              <Text size="sm" c="dimmed">Creates {newItemCount} new item{newItemCount === 1 ? "" : "s"}</Text>
+              <Text size="sm" c="dimmed">Legt {newItemCount} {newItemCount === 1 ? "neuen Artikel" : "neue Artikel"} an</Text>
             )}
           </Group>
         </Stack>

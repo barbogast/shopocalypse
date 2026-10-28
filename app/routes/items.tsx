@@ -32,7 +32,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items";
 
 export function meta() {
-  return [{ title: pageTitle("Items") }];
+  return [{ title: pageTitle("Artikel") }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -161,7 +161,7 @@ function RenamableName({ intent, id, name, fw, size }: {
     return (
       <Group gap={4} wrap="nowrap">
         <Text fw={fw} size={size}>{name}</Text>
-        <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setEditing(true)} aria-label={`Rename ${name}`}>
+        <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setEditing(true)} aria-label={`${name} umbenennen`}>
           <IconPencil size={14} />
         </ActionIcon>
       </Group>
@@ -182,10 +182,10 @@ function RenamableName({ intent, id, name, fw, size }: {
           onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
           style={{ flex: 1 }}
         />
-        <ActionIcon type="submit" variant="subtle" color="green" size="sm" aria-label="Save name">
+        <ActionIcon type="submit" variant="subtle" color="green" size="sm" aria-label="Namen speichern">
           <IconCheck size={14} />
         </ActionIcon>
-        <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setEditing(false)} aria-label="Cancel rename">
+        <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setEditing(false)} aria-label="Umbenennen abbrechen">
           <IconX size={14} />
         </ActionIcon>
       </Group>
@@ -193,7 +193,7 @@ function RenamableName({ intent, id, name, fw, size }: {
   );
 }
 
-// Name field with an Add button; clears the field once the add went through
+// Name field with an add button; clears the field once the add went through
 function AddNameForm({ intent, storeId, placeholder, size }: {
   intent: string;
   storeId?: number;
@@ -214,7 +214,7 @@ function AddNameForm({ intent, storeId, placeholder, size }: {
       {storeId !== undefined && <input type="hidden" name="storeId" value={storeId} />}
       <Group align="flex-end">
         <TextInput name="name" placeholder={placeholder} size={size} style={{ flex: 1 }} />
-        <Button type="submit" variant="light" size={size} leftSection={<IconPlus size={14} />}>Add</Button>
+        <Button type="submit" variant="light" size={size} leftSection={<IconPlus size={14} />}>Hinzufügen</Button>
       </Group>
     </fetcher.Form>
   );
@@ -224,7 +224,7 @@ function AddNameForm({ intent, storeId, placeholder, size }: {
 function UsedInRecipes({ name, recipes }: { name: string; recipes: { id: number; name: string; archived: boolean }[] }) {
   if (recipes.length === 0) {
     return (
-      <ActionIcon variant="subtle" color="gray" disabled aria-label={`${name} isn't used in any recipe`}>
+      <ActionIcon variant="subtle" color="gray" disabled aria-label={`${name} wird in keinem Rezept verwendet`}>
         <IconToolsKitchen2 size={16} />
       </ActionIcon>
     );
@@ -233,17 +233,17 @@ function UsedInRecipes({ name, recipes }: { name: string; recipes: { id: number;
   return (
     <Popover position="bottom-end" shadow="md" withArrow>
       <Popover.Target>
-        <ActionIcon variant="subtle" color="gray" aria-label={`Recipes using ${name}`}>
+        <ActionIcon variant="subtle" color="gray" aria-label={`Rezepte mit ${name}`}>
           <IconToolsKitchen2 size={16} />
         </ActionIcon>
       </Popover.Target>
       <Popover.Dropdown>
-        <Text size="xs" fw={600} c="dimmed" mb={4}>Used in</Text>
+        <Text size="xs" fw={600} c="dimmed" mb={4}>Verwendet in</Text>
         <Stack gap={4}>
           {recipes.map((r) => (
             <Group key={r.id} gap={6} wrap="nowrap">
               <Anchor component={Link} to={`/recipes/${r.id}`} size="sm">{r.name}</Anchor>
-              {r.archived && <Badge size="xs" variant="outline" color="gray">archived</Badge>}
+              {r.archived && <Badge size="xs" variant="outline" color="gray">archiviert</Badge>}
             </Group>
           ))}
         </Stack>
@@ -264,7 +264,7 @@ function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedI
       <Table.Td pl={item.isVariant ? "xl" : undefined}>
         {item.name}
         {item.alwaysAvailable && (
-          <Badge size="xs" variant="outline" color="gray" ml={6}>always available</Badge>
+          <Badge size="xs" variant="outline" color="gray" ml={6}>immer vorrätig</Badge>
         )}
       </Table.Td>
       <Table.Td c="dimmed">{item.defaultUnit ? unitName(item.defaultUnit) : "—"}</Table.Td>
@@ -282,18 +282,18 @@ function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedI
           </ActionIcon>
           {usedIn.length > 0 ? (
             // Disabled buttons don't fire hover events, so the tooltip sits on a wrapper
-            <Tooltip label="Used in recipes; remove it from them first">
+            <Tooltip label="Wird in Rezepten verwendet; bitte zuerst dort entfernen">
               <span>
-                <ActionIcon variant="subtle" color="red" disabled aria-label={`Can't delete ${item.name}: used in recipes`}>
+                <ActionIcon variant="subtle" color="red" disabled aria-label={`${item.name} kann nicht gelöscht werden: wird in Rezepten verwendet`}>
                   <IconTrash size={16} />
                 </ActionIcon>
               </span>
             </Tooltip>
           ) : (
-            <Form method="post" onSubmit={confirmFirst(`Delete ${item.name}?`)}>
+            <Form method="post" onSubmit={confirmFirst(`${item.name} löschen?`)}>
               <input type="hidden" name="intent" value="delete-item" />
               <input type="hidden" name="id" value={item.id} />
-              <ActionIcon type="submit" variant="subtle" color="red" aria-label={`Delete ${item.name}`}>
+              <ActionIcon type="submit" variant="subtle" color="red" aria-label={`${item.name} löschen`}>
                 <IconTrash size={16} />
               </ActionIcon>
             </Form>
@@ -314,18 +314,18 @@ export default function Items({ loaderData }: Route.ComponentProps) {
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="md">
         <Group gap="xs" align="baseline">
-          <Title>Items</Title>
+          <Title>Artikel</Title>
           <Text c="dimmed" size="sm">{allItems.length}</Text>
         </Group>
         <Button component={Link} to="/items/new" leftSection={<IconPlus size={16} />}>
-          New
+          Neu
         </Button>
       </Group>
 
       <SegmentedControl
         mb="md"
         size="xs"
-        data={[{ label: "By name", value: "name" }, { label: "By shelf", value: "shelf" }, { label: "Newest", value: "newest" }]}
+        data={[{ label: "Nach Name", value: "name" }, { label: "Nach Regal", value: "shelf" }, { label: "Neueste", value: "newest" }]}
         value={by === "shelf" || by === "newest" ? by : "name"}
         onChange={(by) => setSearchParams(by === "name" ? {} : { by }, { replace: true })}
       />
@@ -342,7 +342,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
                     ? [
                         <Table.Tr key={`shelf-${shelfName ?? ""}`}>
                           <Table.Td colSpan={3} pt="md" pb={4}>
-                            <Text size="xs" fw={600} tt="uppercase" c="dimmed">{shelfName ?? "Other"}</Text>
+                            <Text size="xs" fw={600} tt="uppercase" c="dimmed">{shelfName ?? "Sonstiges"}</Text>
                           </Table.Td>
                         </Table.Tr>,
                       ]
@@ -364,13 +364,13 @@ export default function Items({ loaderData }: Route.ComponentProps) {
           </Table.Tbody>
         </Table>
       )}
-      {allItems.length === 0 && <Text c="dimmed" mb="xl">No items yet.</Text>}
+      {allItems.length === 0 && <Text c="dimmed" mb="xl">Noch keine Artikel.</Text>}
 
       <Divider mb="lg" />
 
-      <Title order={4} mb="sm">Stores and shelves</Title>
+      <Title order={4} mb="sm">Läden und Regale</Title>
       <Text size="sm" c="dimmed" mb="md">
-        Put each store's shelves in the order you walk past them; the shopping list follows it.
+        Die Regale jedes Ladens in der Reihenfolge anordnen, in der man an ihnen vorbeigeht; die Einkaufsliste folgt ihr.
       </Text>
       <Stack gap="md" mb="md">
         {allStores.map((store) => {
@@ -379,10 +379,10 @@ export default function Items({ loaderData }: Route.ComponentProps) {
             <Card key={store.id} withBorder radius="md" p="md">
               <Group justify="space-between" mb="xs">
                 <RenamableName intent="rename-store" id={store.id} name={store.name} fw={600} />
-                <Form method="post" onSubmit={confirmFirst(`Delete ${store.name} and its shelves? Its items are kept without a store.`)}>
+                <Form method="post" onSubmit={confirmFirst(`${store.name} mit allen Regalen löschen? Die Artikel bleiben ohne Laden erhalten.`)}>
                   <input type="hidden" name="intent" value="delete-store" />
                   <input type="hidden" name="id" value={store.id} />
-                  <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`Delete ${store.name}`}>
+                  <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`${store.name} löschen`}>
                     <IconTrash size={14} />
                   </ActionIcon>
                 </Form>
@@ -393,25 +393,25 @@ export default function Items({ loaderData }: Route.ComponentProps) {
                     <RenamableName intent="rename-shelf" id={shelf.id} name={shelf.name} size="sm" />
                     <Group gap={0} wrap="nowrap">
                       <MoveButtons intent="move-shelf" fields={{ id: shelf.id }} first={i === 0} last={i === shelves.length - 1} />
-                      <Form method="post" onSubmit={confirmFirst(`Delete the shelf ${shelf.name}? Its items are kept without a shelf.`)}>
+                      <Form method="post" onSubmit={confirmFirst(`Regal ${shelf.name} löschen? Die Artikel bleiben ohne Regal erhalten.`)}>
                         <input type="hidden" name="intent" value="delete-shelf" />
                         <input type="hidden" name="id" value={shelf.id} />
-                        <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`Delete ${shelf.name}`}>
+                        <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`${shelf.name} löschen`}>
                           <IconTrash size={14} />
                         </ActionIcon>
                       </Form>
                     </Group>
                   </Group>
                 ))}
-                {shelves.length === 0 && <Text size="sm" c="dimmed">No shelves yet.</Text>}
+                {shelves.length === 0 && <Text size="sm" c="dimmed">Noch keine Regale.</Text>}
               </Stack>
-              <AddNameForm intent="add-shelf" storeId={store.id} placeholder="New shelf…" size="xs" />
+              <AddNameForm intent="add-shelf" storeId={store.id} placeholder="Neues Regal…" size="xs" />
             </Card>
           );
         })}
-        {allStores.length === 0 && <Text size="sm" c="dimmed">No stores yet.</Text>}
+        {allStores.length === 0 && <Text size="sm" c="dimmed">Noch keine Läden.</Text>}
       </Stack>
-      <AddNameForm intent="add-store" placeholder="New store…" />
+      <AddNameForm intent="add-store" placeholder="Neuer Laden…" />
     </Container>
   );
 }

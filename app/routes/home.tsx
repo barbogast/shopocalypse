@@ -78,7 +78,7 @@ export async function action({ request }: Route.ActionArgs) {
   // A meal's new servings, or the servings for newly added meals (empty means
   // each recipe's serving size)
   const newServings = int(form, "servings");
-  if (text(form, "servings") && !newServings) return { servingsError: "Servings must be a whole number of at least 1." };
+  if (text(form, "servings") && !newServings) return { servingsError: "Die Portionen müssen eine ganze Zahl ab 1 sein." };
   const position = int(form, "position");
 
   switch (intent) {
@@ -108,7 +108,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     case "add": {
       const recipeId = int(form, "recipeId");
-      if (!recipeId) return { addError: "Pick a recipe first." };
+      if (!recipeId) return { addError: "Bitte zuerst ein Rezept wählen." };
       const { error } = await scheduleRecipe(recipeId, newServings);
       if (error) return { addError: error };
       // Tells the page to clear its recipe picker
@@ -117,7 +117,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     case "auto-fill": {
       const count = int(form, "count");
-      if (!count || count > MAX_AUTO_FILL) return { autoFillError: `Pick a number from 1 to ${MAX_AUTO_FILL}.` };
+      if (!count || count > MAX_AUTO_FILL) return { autoFillError: `Bitte eine Zahl von 1 bis ${MAX_AUTO_FILL} wählen.` };
       const { error } = await autoFill(count, newServings);
       if (error) return { autoFillError: error };
       break;
@@ -147,16 +147,16 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
 
   return (
     <Container size="sm" py="xl">
-      <Title mb="lg">Meal schedule</Title>
+      <Title mb="lg">Speiseplan</Title>
 
       {!next ? (
-        <Text c="dimmed" mb="xl">No meals scheduled.</Text>
+        <Text c="dimmed" mb="xl">Keine Mahlzeiten geplant.</Text>
       ) : (
         <Stack mb="xl">
           <Card withBorder shadow="sm" radius="md" p="lg">
             <Group justify="space-between" align="center">
               <Stack gap={4}>
-                <Badge color="green" variant="light">Next up</Badge>
+                <Badge color="green" variant="light">Als Nächstes</Badge>
                 <Title order={2}>
                   <Anchor component="button" type="button" inherit c="inherit" ta="left" onClick={() => setOpenPosition(next.position)}>
                     {next.name}
@@ -169,7 +169,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                 <Form method="post">
                   <input type="hidden" name="intent" value="remove" />
                   <input type="hidden" name="position" value={next.position} />
-                  <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`Remove ${next.name} from the schedule`}>
+                  <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`${next.name} aus dem Speiseplan entfernen`}>
                     <IconX size={14} />
                   </Button>
                 </Form>
@@ -179,7 +179,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                   color="green"
                   leftSection={<IconPlayerPlay size={16} />}
                 >
-                  Cook
+                  Kochen
                 </Button>
               </Group>
             </Group>
@@ -187,7 +187,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
 
           {upcoming.length > 0 && (
             <Stack gap="xs">
-              <Text size="sm" fw={500} c="dimmed">Upcoming</Text>
+              <Text size="sm" fw={500} c="dimmed">Danach</Text>
               {upcoming.map((meal, i) => (
                 <Card key={meal.position} withBorder radius="md" p="md">
                   <Group justify="space-between">
@@ -207,14 +207,14 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                         color="green"
                         size="xs"
                         px={6}
-                        aria-label={`Cook ${meal.name}`}
+                        aria-label={`${meal.name} kochen`}
                       >
                         <IconPlayerPlay size={14} />
                       </Button>
                       <Form method="post">
                         <input type="hidden" name="intent" value="remove" />
                         <input type="hidden" name="position" value={meal.position} />
-                        <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`Remove ${meal.name} from the schedule`}>
+                        <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`${meal.name} aus dem Speiseplan entfernen`}>
                           <IconX size={14} />
                         </Button>
                       </Form>
@@ -234,9 +234,9 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
       <Stack gap="md">
         {allRecipes.length > 0 && (
           <NumberInput
-            label="Servings"
-            description="For meals added below; empty uses each recipe's own"
-            placeholder="Recipe's"
+            label="Portionen"
+            description="Für die unten hinzugefügten Mahlzeiten; leer heißt: wie im Rezept"
+            placeholder="Wie im Rezept"
             min={1}
             allowDecimal={false}
             value={newServings}
@@ -254,15 +254,15 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
             <Group align="flex-end">
               <Select
                 name="recipeId"
-                label="Add to schedule"
+                label="Zum Speiseplan hinzufügen"
                 data={availableRecipes}
                 value={addRecipeId}
                 onChange={setAddRecipeId}
                 searchable
-                placeholder="Pick a recipe…"
+                placeholder="Rezept wählen…"
                 style={{ flex: 1 }}
               />
-              <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
+              <SubmitButton leftSection={<IconPlus size={16} />}>Hinzufügen</SubmitButton>
             </Group>
             <FormError error={actionData && "addError" in actionData ? actionData.addError : null} mt="xs" />
           </Form>
@@ -275,8 +275,8 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
             <Group align="flex-end">
               <NumberInput
                 name="count"
-                label="Auto-fill"
-                description="Appends least recently cooked recipes"
+                label="Auffüllen"
+                description="Hängt die am längsten nicht gekochten Rezepte an"
                 min={1}
                 max={MAX_AUTO_FILL}
                 allowDecimal={false}
@@ -284,7 +284,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                 style={{ width: 100 }}
               />
               <SubmitButton variant="light" leftSection={<IconRefresh size={16} />}>
-                Auto-fill
+                Auffüllen
               </SubmitButton>
             </Group>
             <FormError error={actionData && "autoFillError" in actionData ? actionData.autoFillError : null} mt="xs" />
@@ -294,9 +294,9 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
 
       <Divider my="lg" />
 
-      <Title order={4} mb="sm">Recently cooked</Title>
+      <Title order={4} mb="sm">Zuletzt gekocht</Title>
       {recentlyCooked.length === 0 ? (
-        <Text size="sm" c="dimmed">Nothing cooked yet.</Text>
+        <Text size="sm" c="dimmed">Noch nichts gekocht.</Text>
       ) : (
         <Table>
           <Table.Tbody>
@@ -307,10 +307,10 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                   <Anchor component={Link} to={`/recipes/${entry.recipeId}`} c="inherit">{entry.name}</Anchor>
                 </Table.Td>
                 <Table.Td style={{ width: 40 }}>
-                  <Form method="post" onSubmit={confirmFirst(`Remove ${entry.name} on ${entry.cookedAt} from the history?`)}>
+                  <Form method="post" onSubmit={confirmFirst(`${entry.name} vom ${entry.cookedAt} aus dem Verlauf entfernen?`)}>
                     <input type="hidden" name="intent" value="remove-history" />
                     <input type="hidden" name="id" value={entry.id} />
-                    <ActionIcon type="submit" variant="subtle" color="gray" aria-label={`Remove ${entry.name} on ${entry.cookedAt} from history`}>
+                    <ActionIcon type="submit" variant="subtle" color="gray" aria-label={`${entry.name} vom ${entry.cookedAt} aus dem Verlauf entfernen`}>
                       <IconTrash size={16} />
                     </ActionIcon>
                   </Form>

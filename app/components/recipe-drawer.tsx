@@ -30,8 +30,8 @@ export function RecipeDrawer({ recipe, note, onClose }: { recipe: RecipeDetails 
         <Stack>
           <Text size="sm" c="dimmed">
             {recipe.servings === recipe.servingSize
-              ? `serves ${recipe.servingSize}`
-              : `scaled to ${recipe.servings} servings (recipe serves ${recipe.servingSize})`}
+              ? `für ${recipe.servingSize} Portionen`
+              : `umgerechnet auf ${recipe.servings} Portionen (Rezept für ${recipe.servingSize})`}
             {note && ` · ${note}`}
           </Text>
           {recipe.weblink && <Weblink href={recipe.weblink} size="sm" />}
@@ -45,24 +45,24 @@ export function RecipeDrawer({ recipe, note, onClose }: { recipe: RecipeDetails 
               ))}
               {recipe.ingredients.length === 0 && (
                 <Table.Tr>
-                  <Table.Td c="dimmed">No ingredients.</Table.Td>
+                  <Table.Td c="dimmed">Keine Zutaten.</Table.Td>
                 </Table.Tr>
               )}
             </Table.Tbody>
           </Table>
           {recipe.instructions && (
             <div>
-              <Text fw={500} size="sm">Instructions</Text>
+              <Text fw={500} size="sm">Zubereitung</Text>
               <Markdown>{recipe.instructions}</Markdown>
             </div>
           )}
           {recipe.comments && (
             <div>
-              <Text fw={500} size="sm">Comments</Text>
+              <Text fw={500} size="sm">Anmerkungen</Text>
               <Text style={{ whiteSpace: "pre-wrap" }}>{recipe.comments}</Text>
             </div>
           )}
-          <Anchor component={Link} to={`/recipes/${recipe.id}`} size="sm">Open recipe page</Anchor>
+          <Anchor component={Link} to={`/recipes/${recipe.id}`} size="sm">Rezept öffnen</Anchor>
         </Stack>
       )}
     </Drawer>

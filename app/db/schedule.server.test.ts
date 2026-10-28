@@ -10,7 +10,7 @@ const schedule = () => db.select().from(schema.mealSchedule).orderBy(asc(schema.
 describe("autoFill", () => {
   it("says so when no recipe is in auto-fill", async () => {
     await db.insert(schema.recipes).values({ name: "Occasional", servingSize: 2, autoFill: false }).run();
-    expect(await autoFill(3, null)).toEqual({ error: "No recipes are included in auto-fill." });
+    expect(await autoFill(3, null)).toEqual({ error: "Kein Rezept ist für das automatische Auffüllen vorgesehen." });
   });
 
   it("goes round the rotation, after what's already scheduled", async () => {
@@ -29,6 +29,6 @@ describe("autoFill", () => {
 describe("scheduleRecipe", () => {
   it("won't add an archived recipe", async () => {
     const [r] = await db.insert(schema.recipes).values({ name: "Archived", servingSize: 2, archived: true }).returning();
-    expect(await scheduleRecipe(r.id, null)).toEqual({ error: "That recipe is no longer available." });
+    expect(await scheduleRecipe(r.id, null)).toEqual({ error: "Dieses Rezept gibt es nicht mehr." });
   });
 });

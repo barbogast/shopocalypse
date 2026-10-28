@@ -1,18 +1,18 @@
 // Parses a recipe written as plain text, in this format:
 //
 //   Spaghetti Carbonara
-//   4                   (or "Serves 4", "4 Personen", "4 Portionen", "für 4", "für 4 Personen")
+//   4                   (or "4 Personen", "4 Portionen", "für 4", "für 4 Personen", "Serves 4")
 //   https://example.com/carbonara   (optional weblink, starting with http(s):// or www.)
-//   ---                 (or "Ingredients")
+//   ---                 (or "Zutaten", "Ingredients")
 //   400 g spaghetti
 //   2 eggs              (a number without a unit means pieces)
 //   salt                (no quantity)
 //   1 garlic clove - finely chopped   (a note after " - ", "," or in parentheses)
 //   "Salz, Pfeffer"     (quotes keep commas, dashes and parentheses in the name)
 //
-//   ---                 (or "Instructions")
+//   ---                 (or "Zubereitung", "Instructions")
 //   Free markdown…
-//   ---                 (or "Comments")
+//   ---                 (or "Anmerkungen", "Comments")
 //   Free text…
 //
 // It's deliberately strict: anything it doesn't understand is an error on that
@@ -45,6 +45,12 @@ export type ImportError = { line: number | null; message: string };
 
 const SECTIONS = ["ingredients", "instructions", "comments"] as const;
 type Section = (typeof SECTIONS)[number];
+
+// Each section's heading, as written out and in messages; the English ones still read back
+const SECTION_HEADINGS: Record<Section, string> = { ingredients: "Zutaten", instructions: "Zubereitung", comments: "Anmerkungen" };
+const SECTION_WORDS = new Map<string, Section>(
+  SECTIONS.flatMap((s) => [[s, s], [SECTION_HEADINGS[s].toLowerCase(), s]] as const),
+);
 
 // Each unit's key, German label and plural, plus English and spelled-out names.
 // Matched lowercase and without a trailing dot ("Stk." → "stk").
@@ -109,33 +115,33 @@ function splitNote(text: string): { name: string; note: string | null } {
 function unquote(name: string): string | { error: string } {
   const quoted = /^["“„]([^"“”„]*)["“”]$/.exec(name);
   if (quoted) return quoted[1].trim();
-  if (QUOTE_CHAR.test(name)) return { error: "Put the quotes around the whole name." };
+  if (QUOTE_CHAR.test(name)) return { error: "Die Anführungszeichen gehören um den ganzen Namen." };
   return name;
 }
 
 export function parseIngredient(text: string): Omit<ParsedIngredient, "line"> | { error: string } {
   const rest = text.replace(/^[-*•]\s*/, "").replace(/\s+/g, " ").trim();
-  if (QUOTE_CHAR.test(rest.replace(QUOTED, ""))) return { error: "Missing the closing quote." };
+  if (QUOTE_CHAR.test(rest.replace(QUOTED, ""))) return { error: "Das schließende Anführungszeichen fehlt." };
   const match = QUANTITY.exec(rest);
   if (!match) {
     const { name: quotedName, note } = splitNote(rest);
     const name = unquote(quotedName);
     if (typeof name !== "string") return name;
-    if (!name) return { error: "Missing the ingredient name before the note." };
+    if (!name) return { error: "Vor der Anmerkung fehlt der Name der Zutat." };
     return { name, quantity: null, unit: null, note };
   }
 
   const quantity = parseQuantity(match[1]);
-  if (!(quantity > 0)) return { error: "Quantity must be more than 0." };
+  if (!(quantity > 0)) return { error: "Die Menge muss größer als 0 sein." };
 
   const afterQuantity = rest.slice(match[0].length).trim();
-  if (/^[-–]\s*\d/.test(afterQuantity)) return { error: "Ranges aren't supported; pick one quantity." };
+  if (/^[-–]\s*\d/.test(afterQuantity)) return { error: "Bereiche gehen nicht; bitte eine Menge wählen." };
   const { name: unitAndName, note } = splitNote(afterQuantity);
   const [word, ...nameWords] = unitAndName.split(" ");
   const unit = UNIT_ALIASES.get(word.toLowerCase().replace(/\.$/, ""));
   const name = unquote(unit ? nameWords.join(" ") : unitAndName);
   if (typeof name !== "string") return name;
-  if (!name) return { error: "Missing the ingredient name after the quantity." };
+  if (!name) return { error: "Nach der Menge fehlt der Name der Zutat." };
   return { name, quantity, unit: unit ?? "pcs", note };
 }
 
@@ -153,8 +159,8 @@ function addIngredientLine(
   const duplicate = ingredients.find((ing) => keyOf(ing.name) === keyOf(parsed.name));
   if (duplicate) {
     const message = itemKey(duplicate.name) === itemKey(parsed.name)
-      ? `"${parsed.name}" is already listed in line ${duplicate.line}; combine them into one line.`
-      : `"${parsed.name}" is the same item as "${duplicate.name}" in line ${duplicate.line}; combine them into one line.`;
+      ? `„${parsed.name}“ steht schon in Zeile ${duplicate.line}; bitte zu einer Zeile zusammenfassen.`
+      : `„${parsed.name}“ ist derselbe Artikel wie „${duplicate.name}“ in Zeile ${duplicate.line}; bitte zu einer Zeile zusammenfassen.`;
     errors.push({ line, message });
     return;
   }
@@ -173,12 +179,12 @@ export function parseItemsText(
   return { items: parsed, errors };
 }
 
-// The servings: "4", "Serves 4", "4 Personen", "4 Portionen", "für 4", "für 4 Personen"
+// The servings: "4", "4 Personen", "4 Portionen", "für 4", "für 4 Personen", "Serves 4"
 const SERVES = /^(?:(?:serves|für)\s+(\S+)(?:\s+(?:person|portion)(?:en)?)?|(\S+)\s+(?:person|portion)(?:en)?|(\d\S*))$/i;
 
 function sectionOf(line: string): Section | null {
   const word = line.trim().replace(/^#+\s*/, "").replace(/:$/, "").trim().toLowerCase();
-  return (SECTIONS as readonly string[]).includes(word) ? (word as Section) : null;
+  return SECTION_WORDS.get(word) ?? null;
 }
 
 // `items` are the existing ones, to catch two ingredient lines for the same item
@@ -203,10 +209,10 @@ export function parseRecipeText(
     if (/^-{3,}$/.test(trimmed)) {
       const after = section === "header" ? SECTIONS[0] : SECTIONS[SECTIONS.indexOf(section) + 1];
       if (!after) {
-        errors.push({ line, message: "There's no section after the comments." });
+        errors.push({ line, message: "Nach den Anmerkungen kommt kein weiterer Abschnitt." });
         return;
       }
-      if (seen.has(after)) errors.push({ line, message: `"${after[0].toUpperCase() + after.slice(1)}" appears twice.` });
+      if (seen.has(after)) errors.push({ line, message: `„${SECTION_HEADINGS[after]}“ kommt doppelt vor.` });
       seen.add(after);
       section = after;
       return;
@@ -214,7 +220,7 @@ export function parseRecipeText(
 
     const next = sectionOf(raw);
     if (next) {
-      if (seen.has(next)) errors.push({ line, message: `"${trimmed}" appears twice.` });
+      if (seen.has(next)) errors.push({ line, message: `„${trimmed}“ kommt doppelt vor.` });
       seen.add(next);
       section = next;
       return;
@@ -229,8 +235,8 @@ export function parseRecipeText(
         }
         if (/^(https?:\/\/|www\.)/i.test(trimmed)) {
           const url = webUrl(trimmed);
-          if (weblinkLine != null) errors.push({ line, message: `There's already a weblink in line ${weblinkLine}.` });
-          else if (!url) errors.push({ line, message: "The weblink isn't a valid web address." });
+          if (weblinkLine != null) errors.push({ line, message: `In Zeile ${weblinkLine} steht schon ein Weblink.` });
+          else if (!url) errors.push({ line, message: "Der Weblink ist keine gültige Webadresse." });
           else {
             weblinkLine = line;
             recipe.weblink = url;
@@ -242,10 +248,10 @@ export function parseRecipeText(
           servesLine = line;
           const n = Number(serves[1] ?? serves[2] ?? serves[3]);
           if (Number.isInteger(n) && n >= 1) recipe.servingSize = n;
-          else errors.push({ line, message: "Servings must be a whole number of at least 1." });
+          else errors.push({ line, message: "Die Portionen müssen eine ganze Zahl ab 1 sein." });
           return;
         }
-        errors.push({ line, message: 'Expected the servings ("4"), a weblink or "---" before the ingredients.' });
+        errors.push({ line, message: "Erwartet: die Portionen („4“), ein Weblink oder „---“ vor den Zutaten." });
         return;
       }
 
@@ -261,17 +267,17 @@ export function parseRecipeText(
   recipe.instructions = freeText.instructions.join("\n").trim() || null;
   recipe.comments = freeText.comments.join("\n").trim() || null;
 
-  if (!recipe.name) errors.push({ line: null, message: "The first line must be the recipe name." });
-  else if (servesLine == null) errors.push({ line: null, message: 'Add the servings ("4") below the name.' });
-  if (!seen.has("ingredients")) errors.push({ line: null, message: 'Add "---" (or "Ingredients") before the ingredients.' });
-  else if (recipe.ingredients.length === 0) errors.push({ line: null, message: "List at least one ingredient." });
+  if (!recipe.name) errors.push({ line: null, message: "Die erste Zeile muss der Name des Rezepts sein." });
+  else if (servesLine == null) errors.push({ line: null, message: "Unter dem Namen fehlen die Portionen („4“)." });
+  if (!seen.has("ingredients")) errors.push({ line: null, message: "Vor den Zutaten fehlt „---“ (oder „Zutaten“)." });
+  else if (recipe.ingredients.length === 0) errors.push({ line: null, message: "Mindestens eine Zutat angeben." });
 
   errors.sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity));
   return { recipe, errors };
 }
 
 // A recipe written out in the format above, to keep its versions. Reads back with parseRecipeText,
-// unless the instructions have a line that looks like a heading ("Comments", "---")
+// unless the instructions have a line that looks like a heading ("Anmerkungen", "---")
 export type RecipeForText = {
   name: string;
   servingSize: number;
@@ -305,10 +311,10 @@ export function ingredientToText(ing: IngredientForText): string {
 export function recipeToText(recipe: RecipeForText): string {
   const sections = [
     [recipe.name, String(recipe.servingSize), recipe.weblink].filter(Boolean).join("\n"),
-    ["Ingredients", ...recipe.ingredients.map(ingredientToText)].join("\n"),
+    [SECTION_HEADINGS.ingredients, ...recipe.ingredients.map(ingredientToText)].join("\n"),
   ];
-  if (recipe.instructions) sections.push(`Instructions\n${recipe.instructions}`);
-  if (recipe.comments) sections.push(`Comments\n${recipe.comments}`);
+  if (recipe.instructions) sections.push(`${SECTION_HEADINGS.instructions}\n${recipe.instructions}`);
+  if (recipe.comments) sections.push(`${SECTION_HEADINGS.comments}\n${recipe.comments}`);
   // Textareas submit \r\n
   return sections.join("\n\n").replace(/\r\n/g, "\n");
 }

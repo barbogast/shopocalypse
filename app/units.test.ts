@@ -102,7 +102,7 @@ describe("parseAmount", () => {
   });
 
   it("rejects unknown units", () => {
-    expect(parseAmount(form({ quantity: "1", unit: "furlong" }))).toEqual({ error: "Pick a unit." });
+    expect(parseAmount(form({ quantity: "1", unit: "furlong" }))).toEqual({ error: "Bitte eine Einheit wählen." });
   });
 });
 

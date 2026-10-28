@@ -38,7 +38,7 @@ import { parseAmount } from "~/units";
 import type { Route } from "./+types/shopping";
 
 export function meta() {
-  return [{ title: pageTitle("Shopping") }];
+  return [{ title: pageTitle("Einkaufen") }];
 }
 
 export async function loader() {
@@ -91,7 +91,7 @@ export async function action({ request }: Route.ActionArgs) {
 
       const itemId = int(form, "itemId");
       const parsed = parseAmount(form);
-      if (!itemId) return { addError: "Pick an item first." };
+      if (!itemId) return { addError: "Bitte zuerst einen Artikel wählen." };
       if ("error" in parsed) return { addError: parsed.error };
       await addItemToList(activeList.id, itemId, parsed.amount);
       break;
@@ -105,8 +105,8 @@ export async function action({ request }: Route.ActionArgs) {
       // Parsed again here rather than trusting the preview
       const allItems = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
       const { items, errors } = parseItemsText(text(form, "text"), allItems);
-      if (errors.length) return { importError: "Fix the errors in the text first." };
-      if (items.length === 0) return { importError: "List at least one item." };
+      if (errors.length) return { importError: "Bitte zuerst die Fehler im Text beheben." };
+      if (items.length === 0) return { importError: "Mindestens einen Artikel angeben." };
       const { newItems } = await addItemsToList(activeList.id, items);
       return { itemsImported: { count: items.length, newItems: newItems.length } };
     }
@@ -118,8 +118,8 @@ export async function action({ request }: Route.ActionArgs) {
       const recipeId = int(form, "recipeId");
       // Empty means the recipe's serving size
       const servings = int(form, "servings");
-      if (!recipeId) return { addRecipeError: "Pick a recipe first." };
-      if (text(form, "servings") && !servings) return { addRecipeError: "Servings must be a whole number of at least 1." };
+      if (!recipeId) return { addRecipeError: "Bitte zuerst ein Rezept wählen." };
+      if (text(form, "servings") && !servings) return { addRecipeError: "Die Portionen müssen eine ganze Zahl ab 1 sein." };
       const { error } = await addMeal(activeList, recipeId, servings);
       if (error) return { addRecipeError: error };
       // Tells the page to clear its recipe picker
@@ -190,7 +190,7 @@ export async function clientAction({ request, serverAction }: Route.ClientAction
     try {
       return await serverAction();
     } catch {
-      return { removeError: "Couldn't remove it. Try again." };
+      return { removeError: "Konnte nicht entfernt werden. Bitte noch mal versuchen." };
     }
   }
   return serverAction();
@@ -292,9 +292,9 @@ function ListView({
   return (
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="xs">
-        <Title>Shopping</Title>
+        <Title>Einkaufen</Title>
         <Group gap="sm">
-          {unsentCount > 0 && <Text c="orange" size="sm">{unsentCount} not saved yet</Text>}
+          {unsentCount > 0 && <Text c="orange" size="sm">{unsentCount} noch nicht gespeichert</Text>}
           <Text c="dimmed" size="sm">{tickedCount}/{listItems.length}</Text>
           {/* Copies what's still to buy, to paste into another app */}
           <CopyButton value={listAsText(listItems)}>
@@ -307,17 +307,17 @@ function ListView({
                 disabled={tickedCount === listItems.length}
                 onClick={copy}
               >
-                {copied ? "Copied" : "Copy list"}
+                {copied ? "Kopiert" : "Liste kopieren"}
               </Button>
             )}
           </CopyButton>
         </Group>
       </Group>
-      <Text c="dimmed" size="sm">Created <LocalDateTime iso={activeList.createdAt} /></Text>
+      <Text c="dimmed" size="sm">Erstellt am <LocalDateTime iso={activeList.createdAt} /></Text>
       <ListMeals recipes={listRecipes} allRecipes={allRecipes} />
 
       {listItems.length === 0 && (
-        <Text c="dimmed" mb="lg">No items on the list.</Text>
+        <Text c="dimmed" mb="lg">Keine Artikel auf der Liste.</Text>
       )}
 
       {[...groups.entries()].map(([storeName, shelves]) => (
@@ -332,7 +332,7 @@ function ListView({
                       // A tinted band, so the shelves stand apart from the items between them
                       <Table.Tr key={`shelf-${shelfName ?? ""}`} bg="var(--mantine-color-gray-light)">
                         <Table.Td colSpan={4} py={6}>
-                          <Text size="sm" fw={700}>{shelfName ?? "Other"}</Text>
+                          <Text size="sm" fw={700}>{shelfName ?? "Sonstiges"}</Text>
                         </Table.Td>
                       </Table.Tr>,
                     ]
@@ -355,12 +355,12 @@ function ListView({
         <Form method="post">
           <input type="hidden" name="intent" value="finish" />
           <SubmitButton color="green" disabled={tickedCount === 0}>
-            Finish shopping
+            Einkauf abschließen
           </SubmitButton>
         </Form>
-        <Form method="post" onSubmit={confirmFirst("Discard this shopping list and everything on it?")}>
+        <Form method="post" onSubmit={confirmFirst("Diese Einkaufsliste mit allem darauf verwerfen?")}>
           <input type="hidden" name="intent" value="discard" />
-          <SubmitButton variant="subtle" color="red">Discard list</SubmitButton>
+          <SubmitButton variant="subtle" color="red">Liste verwerfen</SubmitButton>
         </Form>
       </Group>
     </Container>

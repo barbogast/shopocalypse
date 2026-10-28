@@ -35,7 +35,7 @@ async function nextPosition() {
 export async function scheduleRecipe(recipeId: number, servings: number | null) {
   const recipe = await db.select().from(schema.recipes).where(eq(schema.recipes.id, recipeId)).get();
   // Gone or archived since the page loaded
-  if (!recipe || recipe.archived) return { error: "That recipe is no longer available." };
+  if (!recipe || recipe.archived) return { error: "Dieses Rezept gibt es nicht mehr." };
   await db.insert(schema.mealSchedule).values({ position: await nextPosition(), recipeId, servings });
   return { error: null };
 }
@@ -57,7 +57,7 @@ export async function autoFill(count: number, servings: number | null) {
     .where(and(eq(schema.recipes.archived, false), eq(schema.recipes.autoFill, true)));
 
   const rotation = rotationOrder(recipes, queue.map((r) => r.recipeId), new Map(lastCooked.map((r) => [r.recipeId, r.lastDate])));
-  if (rotation.length === 0) return { error: "No recipes are included in auto-fill." };
+  if (rotation.length === 0) return { error: "Kein Rezept ist für das automatische Auffüllen vorgesehen." };
 
   const start = await nextPosition();
   await db.insert(schema.mealSchedule).values(

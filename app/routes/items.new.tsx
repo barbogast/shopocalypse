@@ -10,7 +10,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items.new";
 
 export function meta() {
-  return [{ title: pageTitle("New Item") }];
+  return [{ title: pageTitle("Neuer Artikel") }];
 }
 
 export async function loader() {
@@ -31,14 +31,14 @@ export default function NewItem({ loaderData, actionData }: Route.ComponentProps
 
   return (
     <Container size="sm" py="xl">
-      <Title mb="lg">New item</Title>
+      <Title mb="lg">Neuer Artikel</Title>
       <Form method="post">
         <Stack>
           <ItemFields stores={allStores} shelves={allShelves} parents={parents} autoFocus />
           <FormError error={actionData?.error} />
           <Group>
-            <SubmitButton>Create</SubmitButton>
-            <Button component={Link} to="/items" variant="subtle">Cancel</Button>
+            <SubmitButton>Anlegen</SubmitButton>
+            <Button component={Link} to="/items" variant="subtle">Abbrechen</Button>
           </Group>
         </Stack>
       </Form>

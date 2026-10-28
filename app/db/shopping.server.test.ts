@@ -90,7 +90,7 @@ describe("addMeal and removeMeal", () => {
     const { recipeId } = await scheduleRecipe("Hirse");
     await db.update(schema.recipes).set({ archived: true }).where(eq(schema.recipes.id, recipeId)).run();
     await prepareList([], false);
-    expect(await addMeal(await activeList(), recipeId, null)).toEqual({ error: "That recipe is no longer available." });
+    expect(await addMeal(await activeList(), recipeId, null)).toEqual({ error: "Dieses Rezept gibt es nicht mehr." });
   });
 });
 

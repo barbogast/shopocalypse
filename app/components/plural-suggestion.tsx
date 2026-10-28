@@ -14,7 +14,7 @@ export function PluralSuggestion({ name, singular }: { name: string; singular: {
       <input type="hidden" name="itemId" value={singular.id} />
       <input type="hidden" name="plural" value={name} />
       <Button type="submit" size="compact-xs" variant="subtle" ml={4} loading={fetcher.state !== "idle"}>
-        Plural of {singular.name}?
+        Plural von {singular.name}?
       </Button>
       {fetcher.data?.error && <Text span size="xs" c="red" ml={4}>{fetcher.data.error}</Text>}
     </fetcher.Form>

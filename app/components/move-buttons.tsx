@@ -16,11 +16,11 @@ export function MoveButtons({ intent, fields, first, last }: {
         <input key={name} type="hidden" name={name} value={value} />
       ))}
       <Button type="submit" name="direction" value="up" disabled={first}
-        variant="subtle" color="gray" size="xs" px={6} aria-label="Move up">
+        variant="subtle" color="gray" size="xs" px={6} aria-label="Nach oben">
         <IconChevronUp size={14} />
       </Button>
       <Button type="submit" name="direction" value="down" disabled={last}
-        variant="subtle" color="gray" size="xs" px={6} aria-label="Move down">
+        variant="subtle" color="gray" size="xs" px={6} aria-label="Nach unten">
         <IconChevronDown size={14} />
       </Button>
     </Form>

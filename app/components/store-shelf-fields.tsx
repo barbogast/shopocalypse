@@ -25,7 +25,7 @@ export function StoreShelfFields({
     <>
       <Select
         name="storeId"
-        label="Store"
+        label="Laden"
         data={stores.map((s) => ({ value: String(s.id), label: s.name }))}
         value={storeId}
         onChange={(value) => {
@@ -33,17 +33,17 @@ export function StoreShelfFields({
           setShelfId(null);
         }}
         clearable
-        placeholder="None"
+        placeholder="Keiner"
       />
       <Select
         name="categoryId"
-        label="Shelf"
+        label="Regal"
         data={storeShelves.map((s) => ({ value: String(s.id), label: s.name }))}
         value={shelfId}
         onChange={setShelfId}
         disabled={!storeId}
         clearable
-        placeholder={!storeId ? "Pick a store first" : storeShelves.length ? "None" : "This store has no shelves yet"}
+        placeholder={!storeId ? "Zuerst einen Laden wählen" : storeShelves.length ? "Keins" : "Dieser Laden hat noch keine Regale"}
       />
     </>
   );

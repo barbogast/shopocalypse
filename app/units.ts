@@ -53,8 +53,8 @@ export function parseAmount(form: FormData): { amount: Amount } | { error: strin
   if (!rawQuantity) return { amount: { quantity: null, unit: null } };
   const quantity = Number(rawQuantity.replace(",", "."));
   const unit = form.get("unit");
-  if (!(quantity > 0)) return { error: "Quantity must be more than 0." };
-  if (!isUnitKey(unit)) return { error: "Pick a unit." };
+  if (!(quantity > 0)) return { error: "Die Menge muss größer als 0 sein." };
+  if (!isUnitKey(unit)) return { error: "Bitte eine Einheit wählen." };
   return { amount: { quantity, unit } };
 }
 

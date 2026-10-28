@@ -18,12 +18,12 @@ export function PrepareList({ scheduled }: { scheduled: { position: number; name
 
   return (
     <Container size="sm" py="xl">
-      <Title mb="lg">Shopping</Title>
-      <Text c="dimmed" mb="xl">No active shopping list.</Text>
+      <Title mb="lg">Einkaufen</Title>
+      <Text c="dimmed" mb="xl">Keine aktive Einkaufsliste.</Text>
       <Form method="post">
         <input type="hidden" name="intent" value="prepare" />
         <Stack maw={300}>
-          <Text size="sm" fw={500}>Meals to shop for</Text>
+          <Text size="sm" fw={500}>Mahlzeiten, für die eingekauft wird</Text>
           {scheduled.length > 0 ? (
             <Stack gap="xs">
               {scheduled.map((meal) => (
@@ -38,16 +38,16 @@ export function PrepareList({ scheduled }: { scheduled: { position: number; name
               ))}
             </Stack>
           ) : (
-            <Text size="sm" c="dimmed">No meals scheduled.</Text>
+            <Text size="sm" c="dimmed">Keine Mahlzeiten geplant.</Text>
           )}
           <Checkbox
             name="includeInStock"
-            label="Include items in stock"
-            description="Also add items marked as always available"
+            label="Vorrätige Artikel einbeziehen"
+            description="Auch Artikel hinzufügen, die als immer vorrätig markiert sind"
             mt="xs"
           />
           <SubmitButton leftSection={<IconShoppingCart size={16} />}>
-            {selected.size > 0 ? "Prepare list" : "Start empty list"}
+            {selected.size > 0 ? "Liste erstellen" : "Leere Liste beginnen"}
           </SubmitButton>
         </Stack>
       </Form>

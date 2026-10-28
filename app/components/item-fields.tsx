@@ -74,7 +74,7 @@ export function ItemFields({
           loading={suggest.loading}
           onClick={(e) => suggest.run(e, itemId)}
         >
-          Suggest
+          Vorschlagen
         </Button>
       </Group>
       {suggest.message && <Text size="sm" c={suggest.message.error ? "red" : "dimmed"} mt={-8}>{suggest.message.text}</Text>}
@@ -82,20 +82,20 @@ export function ItemFields({
         key={`plural-${version}`}
         name="plural"
         label="Plural"
-        description="Recipe imports match it too"
+        description="Wird beim Rezeptimport auch erkannt"
         defaultValue={base.plural ?? undefined}
       />
       {parents && (
         <Select
           name="parentId"
-          label="Variant of"
-          description="Listed under it, e.g. Berglinsen under Linsen"
+          label="Variante von"
+          description="Wird darunter aufgeführt, z. B. Berglinsen unter Linsen"
           data={parents.map((p) => ({ value: String(p.id), label: p.name }))}
           value={parentId}
           onChange={setParentId}
           searchable
           clearable
-          placeholder="None"
+          placeholder="Keine"
         />
       )}
       <StoreShelfFields
@@ -108,17 +108,17 @@ export function ItemFields({
       <Select
         key={`unit-${version}`}
         name="defaultUnit"
-        label="Default unit"
+        label="Standardeinheit"
         data={UNIT_OPTIONS}
         defaultValue={base.defaultUnit}
         clearable
-        placeholder="None"
+        placeholder="Keine"
       />
       <Checkbox
         key={`available-${version}`}
         name="alwaysAvailable"
-        label="Always available"
-        description="Assumed to be in stock, so it's left off new shopping lists"
+        label="Immer vorrätig"
+        description="Kommt nicht auf neue Einkaufslisten"
         defaultChecked={base.alwaysAvailable}
       />
     </>
@@ -133,7 +133,7 @@ function useSuggestion(
   apply: (filled: Values) => void,
 ) {
   const fetcher = useFetcher<typeof suggestAction>();
-  // The form's values when Suggest was clicked
+  // The form's values when Vorschlagen was clicked
   const current = useRef<Values>({});
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
 
@@ -141,7 +141,7 @@ function useSuggestion(
     const form = new FormData(e.currentTarget.form ?? undefined);
     const name = String(form.get("name") ?? "").trim();
     if (!name) {
-      setMessage({ text: "Enter a name first.", error: true });
+      setMessage({ text: "Bitte zuerst einen Namen eingeben.", error: true });
       return;
     }
     const id = (field: string) => Number(form.get(field)) || null;
@@ -178,21 +178,21 @@ function useSuggestion(
     const next: Values = {
       // A plural name is always replaced by its singular, and the plural field takes the name if it's empty
       name: suggestion.singular ?? was.name,
-      plural: pick(was.plural, suggestion.plural, "plural"),
-      parentId: pick(was.parentId, parentOk, "variant of"),
-      storeId: pick(was.storeId, storeOk, "store"),
+      plural: pick(was.plural, suggestion.plural, "Plural"),
+      parentId: pick(was.parentId, parentOk, "Variante von"),
+      storeId: pick(was.storeId, storeOk, "Laden"),
       categoryId: was.categoryId ?? null,
-      defaultUnit: pick(was.defaultUnit, suggestion.defaultUnit, "unit"),
+      defaultUnit: pick(was.defaultUnit, suggestion.defaultUnit, "Einheit"),
       alwaysAvailable: was.alwaysAvailable,
     };
     // A suggested shelf is in the suggested store, so it only fills in where that's the store now
-    if (next.storeId === suggestion.storeId) next.categoryId = pick(was.categoryId, suggestion.categoryId, "shelf");
+    if (next.storeId === suggestion.storeId) next.categoryId = pick(was.categoryId, suggestion.categoryId, "Regal");
     apply(next);
     const changes = [
-      suggestion.singular && `Renamed to ${suggestion.singular}`,
-      filled.length > 0 && `filled in ${filled.join(", ")}`,
-    ].filter(Boolean).join(", ");
-    setMessage({ text: changes ? changes[0].toUpperCase() + changes.slice(1) : "No suggestions for the empty fields.", error: false });
+      suggestion.singular && `Umbenannt in ${suggestion.singular}`,
+      filled.length > 0 && `ausgefüllt: ${filled.join(", ")}`,
+    ].filter(Boolean).join("; ");
+    setMessage({ text: changes ? changes[0].toUpperCase() + changes.slice(1) : "Keine Vorschläge für die leeren Felder.", error: false });
   }, [fetcher.data]);
 
   return { run, loading: fetcher.state !== "idle", message };

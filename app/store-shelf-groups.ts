@@ -2,7 +2,7 @@
 export function groupByStoreAndShelf<T extends { storeName: string | null; shelfName: string | null }>(listItems: T[]) {
   const groups = new Map<string, Map<string | null, T[]>>();
   for (const item of listItems) {
-    const storeKey = item.storeName ?? "Other";
+    const storeKey = item.storeName ?? "Sonstige";
     const shelfKey = item.shelfName;
     if (!groups.has(storeKey)) groups.set(storeKey, new Map());
     const shelves = groups.get(storeKey)!;

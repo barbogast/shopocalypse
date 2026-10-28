@@ -44,20 +44,20 @@ export async function parseItemForm(form: FormData, itemId?: number) {
   const defaultUnit = isUnitKey(rawUnit) ? rawUnit : null;
   const alwaysAvailable = form.get("alwaysAvailable") === "on";
 
-  if (!name) return { error: "Name is required." } as const;
+  if (!name) return { error: "Bitte einen Namen angeben." } as const;
   const clash = await nameClash([name, plural], itemId);
   if (clash) return { error: clash } as const;
   if (parentId != null) {
     const parent = await db.select().from(schema.items).where(eq(schema.items.id, parentId)).get();
-    if (!parent || parent.id === itemId) return { error: "Pick another item as the parent." } as const;
-    if (parent.parentId != null) return { error: `"${parent.name}" is a variant itself.` } as const;
+    if (!parent || parent.id === itemId) return { error: "Bitte einen anderen Artikel als Oberbegriff wählen." } as const;
+    if (parent.parentId != null) return { error: `„${parent.name}“ ist selbst eine Variante.` } as const;
     if (itemId != null && await db.select().from(schema.items).where(eq(schema.items.parentId, itemId)).limit(1).get()) {
-      return { error: "This item has variants, so it can't be a variant itself." } as const;
+      return { error: "Dieser Artikel hat Varianten und kann deshalb selbst keine sein." } as const;
     }
   }
   if (categoryId != null) {
     const shelf = await db.select().from(schema.itemCategories).where(eq(schema.itemCategories.id, categoryId)).get();
-    if (!shelf || shelf.storeId !== storeId) return { error: "That shelf isn't in the chosen store." } as const;
+    if (!shelf || shelf.storeId !== storeId) return { error: "Dieses Regal gehört nicht zum gewählten Laden." } as const;
   }
   return { values: { name, plural, parentId, storeId, categoryId, defaultUnit, alwaysAvailable } } as const;
 }
@@ -91,8 +91,8 @@ export async function nameClash(words: (string | null)[], itemId?: number) {
   for (const word of words) {
     const clash = word && others.find((i) => itemKeys(i).includes(itemKey(word)));
     if (!clash) continue;
-    if (itemKey(clash.name) === itemKey(word)) return `There's already an item called "${clash.name}".` as const;
-    return `"${word}" is already the plural of "${clash.name}".` as const;
+    if (itemKey(clash.name) === itemKey(word)) return `Es gibt schon einen Artikel namens „${clash.name}“.` as const;
+    return `„${word}“ ist schon der Plural von „${clash.name}“.` as const;
   }
   return null;
 }
@@ -172,7 +172,7 @@ export async function mergeItem(duplicateId: number, keepId: number) {
   return db.transaction(async (tx) => {
     const duplicate = await tx.select().from(schema.items).where(eq(schema.items.id, duplicateId)).get();
     const keep = await tx.select().from(schema.items).where(eq(schema.items.id, keepId)).get();
-    if (!duplicate || !keep || duplicateId === keepId) return { error: "Pick another item to merge into." } as const;
+    if (!duplicate || !keep || duplicateId === keepId) return { error: "Bitte einen anderen Artikel zum Zusammenführen wählen." } as const;
 
     // Recipes listing both: fold the duplicate's ingredient into the kept one
     const dupIngredients = await tx.select().from(schema.recipeIngredients).where(eq(schema.recipeIngredients.itemId, duplicateId)).all();
@@ -192,8 +192,8 @@ export async function mergeItem(duplicateId: number, keepId: number) {
       const amount = mergeAmounts(kept, dup);
       if (!amount) {
         return {
-          error: `"${recipeName}" has both, as ${formatAmount(dup)} and ${formatAmount(kept)}, which don't add up. ` +
-            "Change one of them in the recipe first.",
+          error: `„${recipeName}“ enthält beide, als ${formatAmount(dup)} und ${formatAmount(kept)}, was sich nicht addieren lässt. ` +
+            "Bitte zuerst eine davon im Rezept ändern.",
         } as const;
       }
       const note = [...new Set([kept.note, dup.note].filter(Boolean))].join(", ") || null;

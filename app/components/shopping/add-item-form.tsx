@@ -34,9 +34,9 @@ export function AddItemForm({ items, stores, shelves, parents }: {
       <Group align="flex-end" gap="xs">
         <ItemPicker
           name="itemId"
-          label="Add item"
+          label="Artikel hinzufügen"
           items={items}
-          optionLabel={(i) => (i.listed ? `${i.name} (on list)` : i.name)}
+          optionLabel={(i) => (i.listed ? `${i.name} (auf der Liste)` : i.name)}
           value={itemId}
           search={search}
           onSearchChange={setSearch}
@@ -50,10 +50,10 @@ export function AddItemForm({ items, stores, shelves, parents }: {
           shelves={shelves}
           parents={parents}
         />
-        <NumberInput ref={quantityRef} name="quantity" label="Qty" min={0} decimalScale={2} decimalSeparator=","
+        <NumberInput ref={quantityRef} name="quantity" label="Menge" min={0} decimalScale={2} decimalSeparator=","
           placeholder="—" style={{ width: 70 }} />
-        <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
-        <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
+        <Select name="unit" label="Einheit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
+        <SubmitButton leftSection={<IconPlus size={16} />}>Hinzufügen</SubmitButton>
       </Group>
       <FormError error={actionData && "addError" in actionData ? actionData.addError : null} mt="xs" />
     </Form>

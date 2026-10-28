@@ -21,7 +21,7 @@ export function IngredientName({ name, plural, quantity, unit, note, noteOnList,
       {note && (
         <Group gap="sm" wrap="nowrap">
           <Text size="sm" c="dimmed">
-            {noteOnList && <IconShoppingCart size={12} aria-label="On the shopping list" style={{ marginRight: 4 }} />}
+            {noteOnList && <IconShoppingCart size={12} aria-label="Auf der Einkaufsliste" style={{ marginRight: 4 }} />}
             {note}
           </Text>
           {noteControl}

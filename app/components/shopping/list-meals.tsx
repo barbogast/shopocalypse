@@ -29,7 +29,7 @@ export function ListMeals({ recipes, allRecipes }: { recipes: ListRecipe[]; allR
           onClick={() => setShown((s) => !s)}
           aria-expanded={shown}
         >
-          {mealCount === 0 ? "No meals" : mealCount === 1 ? "1 meal" : `${mealCount} meals`}
+          {mealCount === 0 ? "Keine Mahlzeiten" : mealCount === 1 ? "1 Mahlzeit" : `${mealCount} Mahlzeiten`}
         </Button>
         <Collapse expanded={shown}>
           <Stack gap="sm">
@@ -49,7 +49,7 @@ export function ListMeals({ recipes, allRecipes }: { recipes: ListRecipe[]; allR
                       <Form method="post">
                         <input type="hidden" name="intent" value="remove-recipe" />
                         <input type="hidden" name="id" value={r.listRecipeId} />
-                        <SubmitButton size="compact-xs" variant="subtle" color="red" px={4} aria-label={`Remove ${r.name}`}>
+                        <SubmitButton size="compact-xs" variant="subtle" color="red" px={4} aria-label={`${r.name} entfernen`}>
                           <IconTrash size={12} />
                         </SubmitButton>
                       </Form>
@@ -65,7 +65,7 @@ export function ListMeals({ recipes, allRecipes }: { recipes: ListRecipe[]; allR
 
       <RecipeDrawer
         recipe={open}
-        note={open && open.count > 1 ? `on this list ×${open.count}` : undefined}
+        note={open && open.count > 1 ? `auf dieser Liste ×${open.count}` : undefined}
         onClose={() => setOpenKey(null)}
       />
     </>
@@ -89,25 +89,25 @@ function AddRecipeForm({ recipes }: { recipes: ActiveListData["allRecipes"] }) {
       <Group align="flex-end" gap="xs">
         <Select
           name="recipeId"
-          label="Add meal"
+          label="Mahlzeit hinzufügen"
           data={recipes.map((r) => ({ value: String(r.id), label: r.name }))}
           value={recipeId}
           onChange={setRecipeId}
           searchable
-          placeholder="Pick a recipe…"
+          placeholder="Rezept wählen…"
           style={{ flex: 1, minWidth: 140 }}
         />
         {/* Empty uses the recipe's serving size */}
         <NumberInput
           key={recipeId}
           name="servings"
-          label="Servings"
+          label="Portionen"
           min={1}
           allowDecimal={false}
           placeholder={servingSize ? String(servingSize) : "—"}
           style={{ width: 80 }}
         />
-        <SubmitButton leftSection={<IconPlus size={16} />}>Add</SubmitButton>
+        <SubmitButton leftSection={<IconPlus size={16} />}>Hinzufügen</SubmitButton>
       </Group>
       <FormError error={actionData && "addRecipeError" in actionData ? actionData.addRecipeError : null} mt="xs" />
     </Form>

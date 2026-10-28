@@ -31,16 +31,16 @@ const PLACEHOLDER = `Spaghetti Carbonara
 4
 https://example.com/carbonara
 ---
-400 g spaghetti
-4 eggs
-salt
+400 g Spaghetti
+4 Eier
+Salz
 ---
-Boil the pasta…
+Nudeln kochen…
 ---
-Optional notes`;
+Optionale Anmerkungen`;
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: pageTitle("Import Recipe") }];
+  return [{ title: pageTitle("Rezept importieren") }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -65,7 +65,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (form.get("intent") === "set-plural") {
     const itemId = int(form, "itemId");
     const plural = text(form, "plural");
-    if (!itemId || !plural) return { error: "Pick an item and a plural.", imported: null };
+    if (!itemId || !plural) return { error: "Bitte einen Artikel und einen Plural angeben.", imported: null };
     return { ...(await setPlural(itemId, plural)), imported: null };
   }
 
@@ -77,7 +77,7 @@ export async function action({ request }: Route.ActionArgs) {
     } catch {
       accepted = null;
     }
-    if (!accepted?.success) return { error: "Those suggestions couldn't be read.", imported: null };
+    if (!accepted?.success) return { error: "Die Vorschläge konnten nicht gelesen werden.", imported: null };
     return { error: null, imported: null, shelved: await applySuggestions(accepted.data) };
   }
 
@@ -85,7 +85,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (form.get("intent") === "transcribe-photo") {
     const photos: Photo[] = [];
     for (const file of form.getAll("photo")) {
-      if (!(file instanceof File) || file.type !== "image/jpeg") return { error: "That photo couldn't be read.", imported: null };
+      if (!(file instanceof File) || file.type !== "image/jpeg") return { error: "Das Foto konnte nicht gelesen werden.", imported: null };
       photos.push({ mediaType: "image/jpeg", base64: Buffer.from(await file.arrayBuffer()).toString("base64") });
     }
     const result = await transcribeRecipe(photos);
@@ -111,7 +111,7 @@ export async function action({ request }: Route.ActionArgs) {
   // Parsed again here rather than trusting the preview
   const allItems = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
   const { recipe, errors } = parseRecipeText(text(form, "text"), allItems);
-  if (errors.length || recipe.servingSize == null) return { error: "Fix the errors in the text first.", imported: null };
+  if (errors.length || recipe.servingSize == null) return { error: "Bitte zuerst die Fehler im Text beheben.", imported: null };
 
   // Lines whose note was ticked in the preview to go on the shopping list
   const noteOnListLines = new Set(form.getAll("noteOnList").map(Number));
@@ -130,17 +130,17 @@ function FormatHelp() {
       <Code block mb="sm">{PLACEHOLDER}</Code>
       <List size="sm" spacing={4}>
         <List.Item>
-          The number is the servings; <Code>---</Code> separates ingredients, instructions and comments.
-          The headings <Code>Ingredients</Code>, <Code>Instructions</Code>, <Code>Comments</Code> work too, as do <Code>Serves 4</Code>, <Code>4 Personen</Code>, <Code>4 Portionen</Code> and <Code>für 4</Code>
+          Die Zahl sind die Portionen; <Code>---</Code> trennt Zutaten, Zubereitung und Anmerkungen.
+          Die Überschriften <Code>Zutaten</Code>, <Code>Zubereitung</Code>, <Code>Anmerkungen</Code> gehen auch, ebenso <Code>4 Personen</Code>, <Code>4 Portionen</Code> und <Code>für 4</Code>
         </List.Item>
-        <List.Item>The weblink below the name is optional; it must start with <Code>https://</Code> or <Code>www.</Code></List.Item>
-        <List.Item>Instructions and comments are optional; instructions support markdown</List.Item>
-        <List.Item>A quantity without a unit means pieces; a line without a quantity has none</List.Item>
-        <List.Item>Quantities: <Code>1.5</Code>, <Code>1,5</Code>, <Code>1/2</Code>, <Code>1 1/2</Code>, <Code>½</Code>; no ranges</List.Item>
-        <List.Item>Units: {UNITS.map((u) => u.label).join(", ")}, in English (<Code>tbsp</Code>) or spelled out (<Code>Esslöffel</Code>)</List.Item>
-        <List.Item>A note after <Code> - </Code>, a comma or in parentheses is kept with the ingredient: <Code>1 onion - diced</Code>. Tick it in the preview if it matters when buying, like <Code>mind. 30% Fett</Code></List.Item>
-        <List.Item>Quotes keep a comma, dash or parentheses in the name: <Code>"Salz, Pfeffer"</Code></List.Item>
-        <List.Item>Ingredients are matched to items by name or plural (without the note); unknown names become new items</List.Item>
+        <List.Item>Der Weblink unter dem Namen ist optional; er muss mit <Code>https://</Code> oder <Code>www.</Code> beginnen</List.Item>
+        <List.Item>Zubereitung und Anmerkungen sind optional; in der Zubereitung geht Markdown</List.Item>
+        <List.Item>Eine Menge ohne Einheit bedeutet Stück; eine Zeile ohne Menge hat keine</List.Item>
+        <List.Item>Mengen: <Code>1,5</Code>, <Code>1.5</Code>, <Code>1/2</Code>, <Code>1 1/2</Code>, <Code>½</Code>; keine Bereiche</List.Item>
+        <List.Item>Einheiten: {UNITS.map((u) => u.label).join(", ")}, auch ausgeschrieben (<Code>Esslöffel</Code>) oder auf Englisch (<Code>tbsp</Code>)</List.Item>
+        <List.Item>Eine Anmerkung nach <Code> - </Code>, einem Komma oder in Klammern bleibt bei der Zutat: <Code>1 Zwiebel - gewürfelt</Code>. In der Vorschau ankreuzen, wenn sie beim Einkaufen wichtig ist, wie <Code>mind. 30% Fett</Code></List.Item>
+        <List.Item>Anführungszeichen behalten Komma, Bindestrich oder Klammern im Namen: <Code>"Salz, Pfeffer"</Code></List.Item>
+        <List.Item>Zutaten werden über Name oder Plural (ohne Anmerkung) den Artikeln zugeordnet; unbekannte Namen werden neue Artikel</List.Item>
       </List>
     </Card>
   );
@@ -164,7 +164,7 @@ function PhotoButton({ hasUnsavedText }: { hasUnsavedText: boolean }) {
       for (const file of files) form.append("photo", await resizePhoto(file), "photo.jpg");
       fetcher.submit(form, { method: "post", encType: "multipart/form-data" });
     } catch {
-      setResizeError("That photo couldn't be opened.");
+      setResizeError("Das Foto konnte nicht geöffnet werden.");
     } finally {
       setResizing(false);
     }
@@ -190,11 +190,11 @@ function PhotoButton({ hasUnsavedText }: { hasUnsavedText: boolean }) {
         leftSection={<IconCamera size={16} />}
         loading={resizing || fetcher.state !== "idle"}
         onClick={() => {
-          if (hasUnsavedText && !confirm("Discard the text typed here for the one from the photo?")) return;
+          if (hasUnsavedText && !confirm("Den hier eingegebenen Text durch den vom Foto ersetzen?")) return;
           input.current?.click();
         }}
       >
-        From photo
+        Vom Foto
       </Button>
       {(resizeError ?? fetcher.data?.error) && <Text size="sm" c="red">{resizeError ?? fetcher.data?.error}</Text>}
     </Group>
@@ -208,7 +208,7 @@ function DraftList({ drafts }: { drafts: { id: number; name: string; updatedAt: 
   if (drafts.length === 0) return null;
   return (
     <Card withBorder radius="md" p="md">
-      <Title order={5} mb="xs">Drafts</Title>
+      <Title order={5} mb="xs">Entwürfe</Title>
       <Table>
         <Table.Tbody>
           {drafts.map((d) => <DraftRow key={d.id} {...d} />)}
@@ -224,16 +224,16 @@ function DraftRow({ id, name, updatedAt }: { id: number; name: string; updatedAt
   return (
     <Table.Tr>
       <Table.Td>
-        <Anchor component={Link} to={`/recipes/import?draft=${id}`} size="sm">{name || "Untitled"}</Anchor>
+        <Anchor component={Link} to={`/recipes/import?draft=${id}`} size="sm">{name || "Ohne Titel"}</Anchor>
       </Table.Td>
       <Table.Td c="dimmed" fz="sm"><LocalDateTime iso={updatedAt} /></Table.Td>
       <Table.Td style={{ width: 40 }}>
         <ActionIcon
           variant="subtle"
           color="red"
-          aria-label={`Discard ${name || "the untitled draft"}`}
+          aria-label={`${name || "Entwurf ohne Titel"} verwerfen`}
           onClick={() => {
-            if (confirm(`Discard the draft "${name || "Untitled"}"?`)) fetcher.submit({ intent: "discard-draft", draftId: id, from: "list" }, { method: "post" });
+            if (confirm(`Entwurf „${name || "Ohne Titel"}“ verwerfen?`)) fetcher.submit({ intent: "discard-draft", draftId: id, from: "list" }, { method: "post" });
           }}
         >
           <IconTrash size={16} />
@@ -254,10 +254,10 @@ function DiscardDraftButton({ id }: { id: number }) {
       leftSection={<IconTrash size={14} />}
       loading={fetcher.state !== "idle"}
       onClick={() => {
-        if (confirm("Discard this draft?")) fetcher.submit({ intent: "discard-draft", draftId: id }, { method: "post" });
+        if (confirm("Diesen Entwurf verwerfen?")) fetcher.submit({ intent: "discard-draft", draftId: id }, { method: "post" });
       }}
     >
-      Discard draft
+      Entwurf verwerfen
     </Button>
   );
 }
@@ -276,8 +276,8 @@ function useAutosave(draft: { id: number; text: string } | null, input: string) 
     return () => clearTimeout(timer);
   }, [input]);
 
-  if (fetcher.state !== "idle") return "Saving…";
-  return input === saved.current ? "Saved" : "Unsaved changes";
+  if (fetcher.state !== "idle") return "Speichert…";
+  return input === saved.current ? "Gespeichert" : "Ungespeicherte Änderungen";
 }
 
 // Autosaves don't change anything else on the page
@@ -316,23 +316,23 @@ function SuggestForNewItems({ newItems, names, onShelved }: {
     const store = item.storeId == null ? nameOf(names.stores, s.storeId) : undefined;
     const shelf = item.storeId == null || item.storeId === s.storeId ? nameOf(names.shelves, s.categoryId) : undefined;
     const changes = [
-      s.singular && `rename to ${s.singular}`,
+      s.singular && `umbenennen in ${s.singular}`,
       store && shelf ? `${store} › ${shelf}` : store ?? shelf,
       item.defaultUnit == null && s.defaultUnit && unitName(s.defaultUnit),
-      s.plural && `plural ${s.plural}`,
-      s.parentId != null && `variant of ${nameOf(names.items, s.parentId)}`,
+      s.plural && `Plural ${s.plural}`,
+      s.parentId != null && `Variante von ${nameOf(names.items, s.parentId)}`,
     ].filter(Boolean);
     return changes.length ? [{ item, suggestion: s, changes }] : [];
   });
   const accepted = rows.filter((r) => !unticked.has(r.item.id)).map((r) => ({ itemId: r.item.id, ...r.suggestion }));
 
   if (applied) {
-    return <Text size="sm" c="dimmed" mb="lg">Saved the suggestions.</Text>;
+    return <Text size="sm" c="dimmed" mb="lg">Vorschläge gespeichert.</Text>;
   }
   return (
     <Card withBorder radius="md" p="md" mb="lg">
       <Group justify="space-between" mb={suggestions ? "sm" : 0}>
-        <Text size="sm">Let Claude suggest a shelf, unit, plural and parent for the new items, and fix plural names.</Text>
+        <Text size="sm">Claude Regal, Einheit, Plural und Oberbegriff für die neuen Artikel vorschlagen und Pluralnamen korrigieren lassen.</Text>
         <suggest.Form method="post" action="/items/suggest">
           {newItems.map((item) => (
             <span key={item.id}>
@@ -341,12 +341,12 @@ function SuggestForNewItems({ newItems, names, onShelved }: {
             </span>
           ))}
           <Button type="submit" size="xs" variant="light" leftSection={<IconSparkles size={14} />} loading={suggest.state !== "idle"}>
-            Suggest
+            Vorschlagen
           </Button>
         </suggest.Form>
       </Group>
       {suggest.data && "error" in suggest.data && <Text size="sm" c="red">{suggest.data.error}</Text>}
-      {suggestions && rows.length === 0 && <Text size="sm" c="dimmed">No suggestions for these items.</Text>}
+      {suggestions && rows.length === 0 && <Text size="sm" c="dimmed">Keine Vorschläge für diese Artikel.</Text>}
       {rows.length > 0 && (
         <apply.Form method="post">
           <input type="hidden" name="intent" value="apply-suggestions" />
@@ -357,7 +357,7 @@ function SuggestForNewItems({ newItems, names, onShelved }: {
                 <Table.Tr key={item.id}>
                   <Table.Td style={{ width: 30 }}>
                     <Checkbox
-                      aria-label={`Use the suggestion for ${item.name}`}
+                      aria-label={`Vorschlag für ${item.name} übernehmen`}
                       checked={!unticked.has(item.id)}
                       onChange={(e) => {
                         const checked = e.currentTarget.checked;
@@ -378,7 +378,7 @@ function SuggestForNewItems({ newItems, names, onShelved }: {
           </Table>
           {apply.data?.error && <Text size="sm" c="red" mb="xs">{apply.data.error}</Text>}
           <Button type="submit" size="xs" disabled={accepted.length === 0} loading={apply.state !== "idle"}>
-            Apply {accepted.length} of {rows.length}
+            {accepted.length} von {rows.length} übernehmen
           </Button>
         </apply.Form>
       )}
@@ -403,13 +403,13 @@ function Imported({ id, name, newItems, storeName, names, onImportAnother }: {
 
   return (
     <Container size="sm" py="xl">
-      <Alert color="green" variant="light" icon={<IconCheck size={16} />} title={`Imported "${name}"`} mb="lg">
+      <Alert color="green" variant="light" icon={<IconCheck size={16} />} title={`„${name}“ importiert`} mb="lg">
         {unsorted.length > 0 && (
           <>
             <Text size="sm" mb="xs">
-              {unsorted.length === 1 ? "This new item has" : `These ${unsorted.length} new items have`}{" "}
-              {storeName ? `no shelf in ${storeName} yet` : "no store or shelf yet"},
-              so the shopping list can't sort {unsorted.length === 1 ? "it" : "them"}:
+              {unsorted.length === 1 ? "Dieser neue Artikel hat" : `Diese ${unsorted.length} neuen Artikel haben`}{" "}
+              {storeName ? `noch kein Regal in ${storeName}` : "noch keinen Laden und kein Regal"},
+              daher kann die Einkaufsliste {unsorted.length === 1 ? "ihn" : "sie"} nicht einsortieren:
             </Text>
             <List size="sm">
               {unsorted.map((item) => (
@@ -423,11 +423,11 @@ function Imported({ id, name, newItems, storeName, names, onImportAnother }: {
       </Alert>
       {newItems.length > 0 && <SuggestForNewItems newItems={newItems} names={names} onShelved={setShelved} />}
       <Group>
-        <Button component={Link} to={`/recipes/${id}`}>Open recipe</Button>
+        <Button component={Link} to={`/recipes/${id}`}>Rezept öffnen</Button>
         <Button component={Link} to="/recipes/import" onClick={onImportAnother} variant="light" leftSection={<IconFileImport size={16} />}>
-          Import another
+          Weiteres importieren
         </Button>
-        {newItems.length > 0 && <Button component={Link} to={NEWEST_ITEMS} variant="subtle">Newest items</Button>}
+        {newItems.length > 0 && <Button component={Link} to={NEWEST_ITEMS} variant="subtle">Neueste Artikel</Button>}
       </Group>
     </Container>
   );
@@ -472,16 +472,16 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
 
   return (
     <Container size="lg" py="xl">
-      <Title mb="lg">Import recipe</Title>
+      <Title mb="lg">Rezept importieren</Title>
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
         <Form method="post">
           <Stack>
             {draftGone && (
-              <Alert color="yellow" variant="light" py="xs">That draft is gone: it was imported or discarded.</Alert>
+              <Alert color="yellow" variant="light" py="xs">Diesen Entwurf gibt es nicht mehr: Er wurde importiert oder verworfen.</Alert>
             )}
             {draft ? (
               <Group justify="space-between">
-                <Text size="sm" c="dimmed">Draft · {saveStatus}</Text>
+                <Text size="sm" c="dimmed">Entwurf · {saveStatus}</Text>
                 <DiscardDraftButton id={draft.id} />
               </Group>
             ) : (
@@ -492,8 +492,8 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
             )}
             <Textarea
               name="text"
-              label="Recipe text"
-              description="See the format below"
+              label="Rezepttext"
+              description="Format siehe unten"
               placeholder={PLACEHOLDER}
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
@@ -514,10 +514,10 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
               .map((ing) => <input key={ing.line} type="hidden" name="noteOnList" value={ing.line} />)}
             <FormError error={actionData?.error} />
             <Group>
-              <SubmitButton disabled={!canImport}>Import</SubmitButton>
+              <SubmitButton disabled={!canImport}>Importieren</SubmitButton>
               {canImport && newItemCount > 0 && (
                 <Text size="sm" c="dimmed">
-                  Creates {newItemCount} new item{newItemCount === 1 ? "" : "s"}
+                  Legt {newItemCount} {newItemCount === 1 ? "neuen Artikel" : "neue Artikel"} an
                 </Text>
               )}
             </Group>
@@ -530,25 +530,25 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
             <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />} py="xs">
               <List size="sm">
                 {errors.map((e, i) => (
-                  <List.Item key={i}>{e.line != null && <b>Line {e.line}: </b>}{e.message}</List.Item>
+                  <List.Item key={i}>{e.line != null && <b>Zeile {e.line}: </b>}{e.message}</List.Item>
                 ))}
               </List>
             </Alert>
           )}
           {nameTaken && (
             <Alert color="yellow" variant="light" py="xs">
-              There's already a recipe called "{recipe.name}"; importing adds a second one.
+              Es gibt schon ein Rezept namens „{recipe.name}“; der Import legt ein zweites an.
             </Alert>
           )}
 
           <Card withBorder radius="md" p="md">
             <Title order={3}>{recipe.name || <Text span c="dimmed" inherit>Name</Text>}</Title>
             <Text size="sm" c="dimmed" mb="md">
-              {recipe.servingSize ? `Serves ${recipe.servingSize}` : "Serves —"}
+              {recipe.servingSize ? `Für ${recipe.servingSize} Portionen` : "Portionen —"}
               {recipe.weblink && <> · <Weblink href={recipe.weblink} size="sm" /></>}
             </Text>
 
-            <Title order={5} mb={4}>Ingredients</Title>
+            <Title order={5} mb={4}>Zutaten</Title>
             <Table mb="md">
               <Table.Tbody>
                 {recipe.ingredients.map((ing) => (
@@ -556,12 +556,12 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
                     <Table.Td c="dimmed" ta="right" style={{ width: 90, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
                     <Table.Td>
                       <IngredientName {...ing} noteControl={
-                        <Checkbox size="xs" label="Note on shopping list" checked={notesOnList.has(noteKey(ing))}
+                        <Checkbox size="xs" label="Anmerkung auf die Einkaufsliste" checked={notesOnList.has(noteKey(ing))}
                           onChange={(e) => toggleNoteOnList(ing, e.currentTarget.checked)} />
                       }>
                         {!knownItems.has(itemKey(ing.name)) && (
                           <>
-                            <Badge size="xs" variant="light" color="orange" ml={6}>new item</Badge>
+                            <Badge size="xs" variant="light" color="orange" ml={6}>neuer Artikel</Badge>
                             <PluralSuggestion name={ing.name} singular={likelySingular(ing.name, allItems)} />
                           </>
                         )}
@@ -571,16 +571,16 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
                 ))}
                 {recipe.ingredients.length === 0 && (
                   <Table.Tr>
-                    <Table.Td c="dimmed">None yet.</Table.Td>
+                    <Table.Td c="dimmed">Noch keine.</Table.Td>
                   </Table.Tr>
                 )}
               </Table.Tbody>
             </Table>
 
-            <Title order={5} mb={4}>Instructions</Title>
+            <Title order={5} mb={4}>Zubereitung</Title>
             {recipe.instructions ? <Markdown>{recipe.instructions}</Markdown> : <Text size="sm" c="dimmed" mb="md">—</Text>}
 
-            <Title order={5} mb={4}>Comments</Title>
+            <Title order={5} mb={4}>Anmerkungen</Title>
             {recipe.comments
               ? <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{recipe.comments}</Text>
               : <Text size="sm" c="dimmed">—</Text>}

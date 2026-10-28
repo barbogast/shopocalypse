@@ -44,8 +44,8 @@ export type Photo = { mediaType: "image/jpeg" | "image/png" | "image/webp" | "im
 
 // One request for all the photos of one recipe
 export async function transcribeRecipe(photos: Photo[]): Promise<{ text: string } | { error: string }> {
-  if (!process.env.ANTHROPIC_API_KEY) return { error: "Reading photos needs ANTHROPIC_API_KEY to be set." };
-  if (photos.length === 0) return { error: "Take or pick a photo first." };
+  if (!process.env.ANTHROPIC_API_KEY) return { error: "Zum Lesen von Fotos muss ANTHROPIC_API_KEY gesetzt sein." };
+  if (photos.length === 0) return { error: "Bitte zuerst ein Foto aufnehmen oder auswählen." };
 
   const client = new Anthropic();
   let response;
@@ -66,14 +66,14 @@ export async function transcribeRecipe(photos: Photo[]): Promise<{ text: string 
       }],
     });
   } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError) return { error: "The ANTHROPIC_API_KEY was refused." };
-    if (error instanceof Anthropic.RateLimitError) return { error: "Too many requests at once; try again in a minute." };
-    if (error instanceof Anthropic.BadRequestError) return { error: "That photo couldn't be read; try a smaller or sharper one." };
-    if (error instanceof Anthropic.APIError) return { error: `Reading the photo failed (${error.status ?? "no connection"}).` };
+    if (error instanceof Anthropic.AuthenticationError) return { error: "Der ANTHROPIC_API_KEY wurde abgelehnt." };
+    if (error instanceof Anthropic.RateLimitError) return { error: "Zu viele Anfragen auf einmal; bitte in einer Minute noch mal versuchen." };
+    if (error instanceof Anthropic.BadRequestError) return { error: "Das Foto ließ sich nicht lesen; bitte ein kleineres oder schärferes versuchen." };
+    if (error instanceof Anthropic.APIError) return { error: `Das Foto konnte nicht gelesen werden (${error.status ?? "keine Verbindung"}).` };
     // Anything else (an answer that doesn't parse, say) would replace the page with the error page
     console.error(error);
-    return { error: "Reading the photo failed; try again." };
+    return { error: "Das Foto konnte nicht gelesen werden; bitte noch mal versuchen." };
   }
-  if (response.stop_reason === "refusal" || !response.parsed_output) return { error: "No recipe found in the photo; try again." };
+  if (response.stop_reason === "refusal" || !response.parsed_output) return { error: "Auf dem Foto wurde kein Rezept gefunden; bitte noch mal versuchen." };
   return { text: response.parsed_output.text.trim() };
 }

@@ -10,7 +10,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes.new";
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: pageTitle("New Recipe") }];
+  return [{ title: pageTitle("Neues Rezept") }];
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -21,8 +21,8 @@ export async function action({ request }: Route.ActionArgs) {
   const comments = optionalText(form, "comments");
   const weblink = optionalUrl(form, "weblink");
 
-  if (!name || !servingSize) return { error: "Name and a whole-number serving size are required." };
-  if (weblink === undefined) return { error: "The weblink must be a web address, like https://example.com/recipe." };
+  if (!name || !servingSize) return { error: "Name und eine ganze Zahl als Portionen sind erforderlich." };
+  if (weblink === undefined) return { error: "Der Weblink muss eine Webadresse sein, z. B. https://example.com/rezept." };
 
   const [recipe] = await db.insert(schema.recipes).values({ name, servingSize, instructions, comments, weblink }).returning();
   await recordRecipeVersion(db, recipe.id);
@@ -32,16 +32,16 @@ export async function action({ request }: Route.ActionArgs) {
 export default function NewRecipe({ actionData }: Route.ComponentProps) {
   return (
     <Container size="sm" py="xl">
-      <Title mb="lg">New recipe</Title>
+      <Title mb="lg">Neues Rezept</Title>
       <Form method="post">
         <Stack>
           <TextInput name="name" label="Name" required autoFocus />
-          <NumberInput name="servingSize" label="Serving size" min={1} allowDecimal={false} defaultValue={4} required />
+          <NumberInput name="servingSize" label="Portionen" min={1} allowDecimal={false} defaultValue={4} required />
           <TextInput name="weblink" label="Weblink" placeholder="https://…" inputMode="url" />
-          <Textarea name="instructions" label="Cooking instructions" description="Supports markdown" autosize minRows={4} />
-          <Textarea name="comments" label="Comments" autosize minRows={2} />
+          <Textarea name="instructions" label="Zubereitung" description="Markdown möglich" autosize minRows={4} />
+          <Textarea name="comments" label="Anmerkungen" autosize minRows={2} />
           <FormError error={actionData?.error} />
-          <SubmitButton>Create</SubmitButton>
+          <SubmitButton>Anlegen</SubmitButton>
         </Stack>
       </Form>
     </Container>

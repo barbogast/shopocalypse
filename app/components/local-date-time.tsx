@@ -6,7 +6,7 @@ export function LocalDateTime({ iso }: { iso: string }) {
   const [formatted, setFormatted] = useState<string | null>(null);
 
   useEffect(() => {
-    setFormatted(new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }));
+    setFormatted(new Date(iso).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" }));
   }, [iso]);
 
   return <time dateTime={iso}>{formatted}</time>;

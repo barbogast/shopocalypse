@@ -8,8 +8,8 @@ const FAST_INTERVAL_MS = 1000;
 const WATCH_DURATION_MS = 5 * 60 * 1000;
 
 // Shows which commit is running and offers a reload once a newer one is deployed.
-// Checks every few minutes and whenever the tab comes back into view; "Watch for
-// deploy" checks every second for five minutes, for right after a push.
+// Checks every few minutes and whenever the tab comes back into view; "Auf neue
+// Version warten" checks every second for five minutes, for right after a push.
 export function VersionFooter() {
   const [deployed, setDeployed] = useState<Version | null>(null);
   const [watchUntil, setWatchUntil] = useState<number | null>(null);
@@ -65,7 +65,7 @@ export function VersionFooter() {
       <Container py="md">
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <Text size="xs" c="dimmed" truncate>
-            {VERSION.sha ? `${VERSION.sha.slice(0, 7)} · ${VERSION.message}` : "Development build"}
+            {VERSION.sha ? `${VERSION.sha.slice(0, 7)} · ${VERSION.message}` : "Entwicklungsversion"}
           </Text>
           {enabled && (
             <Button
@@ -81,8 +81,8 @@ export function VersionFooter() {
               }}
             >
               {watching
-                ? `Watching… ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`
-                : "Watch for deploy"}
+                ? `Warte… ${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`
+                : "Auf neue Version warten"}
             </Button>
           )}
         </Group>
@@ -93,7 +93,7 @@ export function VersionFooter() {
           <Paper shadow="md" p="sm" withBorder>
             <Group justify="space-between" wrap="nowrap" gap="xs">
               <div style={{ minWidth: 0 }}>
-                <Text size="sm" fw={500}>New version deployed</Text>
+                <Text size="sm" fw={500}>Neue Version verfügbar</Text>
                 <Text size="xs" c="dimmed" truncate>{deployed.message}</Text>
               </div>
               <Button
@@ -102,7 +102,7 @@ export function VersionFooter() {
                 style={{ flexShrink: 0 }}
                 onClick={() => window.location.reload()}
               >
-                Reload
+                Neu laden
               </Button>
             </Group>
           </Paper>

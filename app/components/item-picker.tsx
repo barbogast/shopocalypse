@@ -57,7 +57,7 @@ export function ItemPicker<T extends PickerItem>({
   const searchName = search.trim();
   const canCreate = searchName !== "" && !items.some((i) => itemKeys(i).includes(itemKey(searchName)));
   const options = items.filter((i) => !hidden?.(i)).map((i) => ({ value: String(i.id), label: optionLabel(i) }));
-  if (canCreate) options.push({ value: "__create__", label: `+ Create "${searchName}"` });
+  if (canCreate) options.push({ value: "__create__", label: `+ „${searchName}“ anlegen` });
 
   // Arrives before the page's loader reruns, so the new item isn't in items yet
   useEffect(() => {
@@ -73,7 +73,7 @@ export function ItemPicker<T extends PickerItem>({
       <Select
         name={name}
         label={label}
-        placeholder="Search or create…"
+        placeholder="Suchen oder anlegen…"
         data={options}
         value={value}
         searchable
@@ -94,7 +94,7 @@ export function ItemPicker<T extends PickerItem>({
 
       {/* No returnFocus: it would take focus back from the next field to the item picker.
           The modal sits in a portal, but React still bubbles its submit to a form around the picker */}
-      <Modal opened={opened} onClose={modal.close} title="New item" returnFocus={false}>
+      <Modal opened={opened} onClose={modal.close} title="Neuer Artikel" returnFocus={false}>
         <fetcher.Form method="post" action="/items/create" onSubmit={(e) => e.stopPropagation()}>
           <Stack>
             <ItemFields
@@ -106,8 +106,8 @@ export function ItemPicker<T extends PickerItem>({
             />
             <FormError error={error} />
             <Group justify="flex-end">
-              <Button variant="subtle" onClick={modal.close}>Cancel</Button>
-              <Button type="submit" loading={fetcher.state !== "idle"}>Create</Button>
+              <Button variant="subtle" onClick={modal.close}>Abbrechen</Button>
+              <Button type="submit" loading={fetcher.state !== "idle"}>Anlegen</Button>
             </Group>
           </Stack>
         </fetcher.Form>

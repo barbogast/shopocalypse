@@ -62,7 +62,7 @@ export async function loadCatalog(exceptIds: number[] = []): Promise<Catalog> {
 // One request for all the names; suggestions come back in the same order.
 // Pass the ids of the items when they already exist.
 export async function suggestItems(names: string[], itemIds: number[] = []): Promise<{ suggestions: Suggestion[] } | { error: string }> {
-  if (!process.env.ANTHROPIC_API_KEY) return { error: "Suggestions need ANTHROPIC_API_KEY to be set." };
+  if (!process.env.ANTHROPIC_API_KEY) return { error: "Für Vorschläge muss ANTHROPIC_API_KEY gesetzt sein." };
   if (names.length === 0) return { suggestions: [] };
 
   const catalog = await loadCatalog(itemIds);
@@ -82,14 +82,14 @@ export async function suggestItems(names: string[], itemIds: number[] = []): Pro
       }],
     });
   } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError) return { error: "The ANTHROPIC_API_KEY was refused." };
-    if (error instanceof Anthropic.RateLimitError) return { error: "Too many suggestions at once; try again in a minute." };
-    if (error instanceof Anthropic.APIError) return { error: `Suggestions failed (${error.status ?? "no connection"}).` };
+    if (error instanceof Anthropic.AuthenticationError) return { error: "Der ANTHROPIC_API_KEY wurde abgelehnt." };
+    if (error instanceof Anthropic.RateLimitError) return { error: "Zu viele Vorschläge auf einmal; bitte in einer Minute noch mal versuchen." };
+    if (error instanceof Anthropic.APIError) return { error: `Vorschläge fehlgeschlagen (${error.status ?? "keine Verbindung"}).` };
     // Anything else (an answer that doesn't parse, say) would replace the page with the error page
     console.error(error);
-    return { error: "Suggestions failed; try again." };
+    return { error: "Vorschläge fehlgeschlagen; bitte noch mal versuchen." };
   }
-  if (response.stop_reason === "refusal" || !response.parsed_output) return { error: "No suggestions this time; try again." };
+  if (response.stop_reason === "refusal" || !response.parsed_output) return { error: "Diesmal keine Vorschläge; bitte noch mal versuchen." };
 
   // Matched by name, falling back to position if the model changed a name's spelling
   const answers = response.parsed_output.items;

@@ -176,7 +176,7 @@ type ActiveList = NonNullable<Awaited<ReturnType<typeof getActiveList>>>;
 // Adds a meal to the list, and what it needs to the items. Null servings means the recipe's serving size.
 export async function addMeal(list: ActiveList, recipeId: number, servings: number | null) {
   const recipe = await db.select().from(schema.recipes).where(eq(schema.recipes.id, recipeId)).get();
-  if (!recipe || recipe.archived) return { error: "That recipe is no longer available." };
+  if (!recipe || recipe.archived) return { error: "Dieses Rezept gibt es nicht mehr." };
 
   await db.transaction(async (tx) => {
     const before = await listMeals(tx, list.id);

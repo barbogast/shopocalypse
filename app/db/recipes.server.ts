@@ -9,7 +9,7 @@ import * as schema from "./schema";
 
 // Cook dates are stored as YYYY-MM-DD; format on the server so client and server render the same string
 export function formatCookedAt(cookedAt: string) {
-  return new Date(`${cookedAt}T00:00:00Z`).toLocaleDateString("en-GB", {
+  return new Date(`${cookedAt}T00:00:00Z`).toLocaleDateString("de-DE", {
     weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
   });
 }

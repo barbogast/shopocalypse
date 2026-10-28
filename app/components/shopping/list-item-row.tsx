@@ -26,7 +26,7 @@ export function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[]
           {usedIn && (
             <Popover position="bottom-start" shadow="sm">
               <Popover.Target>
-                <ActionIcon variant="subtle" color="gray" size="sm" aria-label={`Meals using ${item.itemName}`}>
+                <ActionIcon variant="subtle" color="gray" size="sm" aria-label={`Mahlzeiten mit ${item.itemName}`}>
                   <IconChefHat size={14} />
                 </ActionIcon>
               </Popover.Target>
@@ -42,7 +42,7 @@ export function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[]
           </Text>
         ))}
         {item.source === "manual" && (
-          <Badge size="xs" variant="outline" color="gray">manual</Badge>
+          <Badge size="xs" variant="outline" color="gray">manuell</Badge>
         )}
         <FormError error={fetcher.data && "removeError" in fetcher.data ? fetcher.data.removeError : null} mt="xs" />
       </Table.Td>
@@ -50,11 +50,11 @@ export function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[]
         <fetcher.Form method="post">
           <input type="hidden" name="id" value={item.id} />
           {!ticked ? (
-            <Button type="submit" name="intent" value="tick" size="xs" color="green" px={6} aria-label={`Tick off ${item.itemName}`}>
+            <Button type="submit" name="intent" value="tick" size="xs" color="green" px={6} aria-label={`${item.itemName} abhaken`}>
               <IconCheck size={14} />
             </Button>
           ) : (
-            <Button type="submit" name="intent" value="untick" size="xs" variant="subtle">Undo</Button>
+            <Button type="submit" name="intent" value="untick" size="xs" variant="subtle">Zurück</Button>
           )}
         </fetcher.Form>
       </Table.Td>
@@ -62,7 +62,7 @@ export function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[]
         <fetcher.Form method="post">
           <input type="hidden" name="intent" value="remove-item" />
           <input type="hidden" name="id" value={item.id} />
-          <Button type="submit" size="xs" variant="subtle" color="red" px={4} aria-label={`Remove ${item.itemName}`}>
+          <Button type="submit" size="xs" variant="subtle" color="red" px={4} aria-label={`${item.itemName} entfernen`}>
             <IconTrash size={12} />
           </Button>
         </fetcher.Form>

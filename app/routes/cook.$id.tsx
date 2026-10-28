@@ -18,7 +18,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/cook.$id";
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: pageTitle(`Cooking ${data?.recipe.name ?? ""}`) }];
+  return [{ title: pageTitle(`Kochen: ${data?.recipe.name ?? ""}`) }];
 }
 
 // Returns the schedule entry from ?position=, if it refers to an entry for this recipe
@@ -100,16 +100,16 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
       <Group justify="space-between" align="baseline" mb="lg">
         <Title>{recipe.name}</Title>
         <Group gap="xs">
-          <Badge variant="light" color={servings === recipe.servingSize ? "gray" : "blue"}>serves {servings}</Badge>
+          <Badge variant="light" color={servings === recipe.servingSize ? "gray" : "blue"}>für {servings}</Badge>
           <Button component={Link} to={`/recipes/${recipe.id}`} variant="subtle" size="xs"
             leftSection={<IconPencil size={14} />}>
-            Edit
+            Bearbeiten
           </Button>
         </Group>
       </Group>
       {recipe.weblink && <Weblink href={recipe.weblink} display="block" mt="-sm" mb="lg" />}
 
-      <Title order={3} mb="sm">Ingredients</Title>
+      <Title order={3} mb="sm">Zutaten</Title>
       <Table mb="xl" fz="lg">
         <Table.Tbody>
           {ingredients.map((ing) => (
@@ -120,19 +120,19 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
           ))}
           {ingredients.length === 0 && (
             <Table.Tr>
-              <Table.Td c="dimmed">No ingredients.</Table.Td>
+              <Table.Td c="dimmed">Keine Zutaten.</Table.Td>
             </Table.Tr>
           )}
         </Table.Tbody>
       </Table>
 
-      <Title order={3} mb="sm">Instructions</Title>
+      <Title order={3} mb="sm">Zubereitung</Title>
       {recipe.instructions ? (
         <Box fz="lg" mb="xl">
           <Markdown>{recipe.instructions}</Markdown>
         </Box>
       ) : (
-        <Text size="lg" mb="xl" c="dimmed">No instructions.</Text>
+        <Text size="lg" mb="xl" c="dimmed">Keine Zubereitung.</Text>
       )}
 
       {/* Read at submit time: the page may stay open past midnight */}
@@ -141,22 +141,22 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
         <Stack>
           <Textarea
             name="comments"
-            label="Comments"
-            description="Saved when you finish cooking"
+            label="Anmerkungen"
+            description="Werden beim Abschließen gespeichert"
             defaultValue={recipe.comments ?? ""}
             autosize
             minRows={2}
           />
           <Group>
             <SubmitButton color="green" leftSection={<IconCheck size={16} />}>
-              Done cooking
+              Fertig gekocht
             </SubmitButton>
             <Button variant="subtle" color="gray" onClick={() => (cameFromApp ? navigate(-1) : navigate("/"))}>
-              Cancel
+              Abbrechen
             </Button>
           </Group>
           {!scheduled && (
-            <Text size="xs" c="dimmed">Not from the schedule: finishing records it as cooked, the schedule stays unchanged.</Text>
+            <Text size="xs" c="dimmed">Nicht aus dem Speiseplan: Wird als gekocht eingetragen, der Speiseplan bleibt unverändert.</Text>
           )}
         </Stack>
       </Form>

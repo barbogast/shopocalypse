@@ -41,7 +41,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes.$id";
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: pageTitle(data?.recipe.name ?? "Recipe") }];
+  return [{ title: pageTitle(data?.recipe.name ?? "Rezept") }];
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
@@ -87,8 +87,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       const comments = optionalText(form, "comments");
       const weblink = optionalUrl(form, "weblink");
       const autoFill = form.get("autoFill") === "on";
-      if (!name || !servingSize) return { error: "Name and a whole-number serving size are required." };
-      if (weblink === undefined) return { error: "The weblink must be a web address, like https://example.com/recipe." };
+      if (!name || !servingSize) return { error: "Name und eine ganze Zahl als Portionen sind erforderlich." };
+      if (weblink === undefined) return { error: "Der Weblink muss eine Webadresse sein, z. B. https://example.com/rezept." };
       await db.update(schema.recipes).set({ name, servingSize, instructions, comments, weblink, autoFill }).where(eq(schema.recipes.id, id));
       await recordRecipeVersion(db, id);
       return { saved: true };
@@ -96,7 +96,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     case "add-ingredient": {
       const itemId = int(form, "itemId");
-      if (!itemId) return { ingredientError: "Select an item." };
+      if (!itemId) return { ingredientError: "Bitte einen Artikel wählen." };
       const parsed = parseAmount(form);
       if ("error" in parsed) return { ingredientError: parsed.error };
       const { quantity, unit } = parsed.amount;
@@ -149,11 +149,11 @@ function SaveButton({ saved }: { saved: boolean }) {
 
   return (
     <Group gap="xs">
-      <Button type="submit" form="recipe-form" loading={saving}>Save</Button>
+      <Button type="submit" form="recipe-form" loading={saving}>Speichern</Button>
       {saved && !saving && (
         <Group gap={4} c="green">
           <IconCheck size={16} />
-          <Text size="sm">Saved</Text>
+          <Text size="sm">Gespeichert</Text>
         </Group>
       )}
     </Group>
@@ -214,47 +214,47 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   return (
     <Container size="sm" py="xl">
       {/* Kept outside the save form: forms can't be nested */}
-      <Form method="post" id="recipe-status-form" onSubmit={recipe.archived ? undefined : confirmFirst(`Delete ${recipe.name}?`)}>
+      <Form method="post" id="recipe-status-form" onSubmit={recipe.archived ? undefined : confirmFirst(`${recipe.name} löschen?`)}>
         <input type="hidden" name="intent" value={recipe.archived ? "restore" : "delete"} />
       </Form>
       <Group justify="space-between" mb="md">
-        {recipe.archived ? <Badge color="gray">Archived</Badge> : <span />}
+        {recipe.archived ? <Badge color="gray">Archiviert</Badge> : <span />}
         <Button component={Link} to={`/cook/${recipe.id}`} color="green" leftSection={<IconPlayerPlay size={16} />}>
-          Cook now
+          Jetzt kochen
         </Button>
       </Group>
       <Form method="post" id="recipe-form" onChange={markUnsaved}>
         <input type="hidden" name="intent" value="save" />
         <Stack mb="xl">
           <TextInput name="name" label="Name" defaultValue={recipe.name} required />
-          <NumberInput name="servingSize" label="Serving size" defaultValue={recipe.servingSize} min={1} allowDecimal={false} required />
+          <NumberInput name="servingSize" label="Portionen" defaultValue={recipe.servingSize} min={1} allowDecimal={false} required />
           <TextInput name="weblink" label="Weblink" placeholder="https://…" inputMode="url" defaultValue={recipe.weblink ?? ""} />
-          <Checkbox name="autoFill" label="Include in auto-fill" defaultChecked={recipe.autoFill}
-            description="Off for occasional dishes: they're then only scheduled by hand" />
+          <Checkbox name="autoFill" label="Beim Auffüllen berücksichtigen" defaultChecked={recipe.autoFill}
+            description="Aus für gelegentliche Gerichte: Die kommen dann nur von Hand auf den Speiseplan" />
           <FormError error={actionData && "error" in actionData ? actionData.error : null} />
           <Group>
             <SaveButton saved={saved} />
             {recipe.archived ? (
               <Button type="submit" form="recipe-status-form" variant="subtle" ml="auto"
                 leftSection={<IconArchiveOff size={16} />}>
-                Restore recipe
+                Rezept wiederherstellen
               </Button>
             ) : cooked ? (
               <Button type="submit" form="recipe-status-form" variant="subtle" color="gray" ml="auto"
                 leftSection={<IconArchive size={16} />}>
-                Archive recipe
+                Rezept archivieren
               </Button>
             ) : (
               <Button type="submit" form="recipe-status-form" variant="subtle" color="red" ml="auto"
                 leftSection={<IconTrash size={16} />}>
-                Delete recipe
+                Rezept löschen
               </Button>
             )}
           </Group>
         </Stack>
       </Form>
 
-      <Title order={3} mb="sm">Ingredients</Title>
+      <Title order={3} mb="sm">Zutaten</Title>
 
       <Table mb="md">
         <Table.Tbody>
@@ -268,7 +268,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
               <Table.Td c="dimmed" ta="right" style={{ width: 90, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
               <Table.Td><IngredientName {...ing} /></Table.Td>
               <Table.Td style={{ width: 40 }}>
-                <ActionIcon variant="subtle" onClick={() => editIngredient(ing)} aria-label={`Edit ${ing.name}`}>
+                <ActionIcon variant="subtle" onClick={() => editIngredient(ing)} aria-label={`${ing.name} bearbeiten`}>
                   <IconPencil size={16} />
                 </ActionIcon>
               </Table.Td>
@@ -276,7 +276,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
                 <Form method="post">
                   <input type="hidden" name="intent" value="remove-ingredient" />
                   <input type="hidden" name="itemId" value={ing.itemId} />
-                  <ActionIcon variant="subtle" color="red" type="submit">
+                  <ActionIcon variant="subtle" color="red" type="submit" aria-label={`${ing.name} entfernen`}>
                     <IconTrash size={16} />
                   </ActionIcon>
                 </Form>
@@ -285,7 +285,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           ))}
           {ingredients.length === 0 && (
             <Table.Tr>
-              <Table.Td c="dimmed">No ingredients yet.</Table.Td>
+              <Table.Td c="dimmed">Noch keine Zutaten.</Table.Td>
             </Table.Tr>
           )}
         </Table.Tbody>
@@ -296,7 +296,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <Group align="flex-end" gap="xs">
           <ItemPicker
             name="itemId"
-            label={editingId ? "Edit ingredient" : "Add ingredient"}
+            label={editingId ? "Zutat bearbeiten" : "Zutat hinzufügen"}
             items={allItems}
             // The ingredient being edited stays selectable
             hidden={(i) => usedItemIds.has(i.id) && i.id !== editingId}
@@ -314,18 +314,18 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
             parents={parents}
           />
           {/* Leave the quantity empty for ingredients without one, like spices */}
-          <NumberInput ref={quantityRef} name="quantity" label="Qty" min={0} decimalScale={2} decimalSeparator="," placeholder="—"
+          <NumberInput ref={quantityRef} name="quantity" label="Menge" min={0} decimalScale={2} decimalSeparator="," placeholder="—"
             value={quantity} onChange={setQuantity} style={{ width: 70 }} />
-          <Select name="unit" label="Unit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
+          <Select name="unit" label="Einheit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
         </Group>
         <Group align="flex-end" gap="xs" mt="xs">
-          <TextInput name="note" placeholder="Note, e.g. finely chopped" value={note}
+          <TextInput name="note" placeholder="Anmerkung, z. B. fein gehackt" value={note}
             onChange={(e) => setNote(e.currentTarget.value)} style={{ flex: 1 }} />
           {/* For notes that matter when buying, like "mind. 30% Fett" */}
-          <Checkbox name="noteOnList" label="Note on shopping list" mb={8} disabled={!note.trim()}
+          <Checkbox name="noteOnList" label="Anmerkung auf die Einkaufsliste" mb={8} disabled={!note.trim()}
             checked={noteOnList && !!note.trim()} onChange={(e) => setNoteOnList(e.currentTarget.checked)} />
-          {editingId && <Button variant="subtle" onClick={resetForm}>Cancel</Button>}
-          <SubmitButton>{editingId ? "Save" : "Add"}</SubmitButton>
+          {editingId && <Button variant="subtle" onClick={resetForm}>Abbrechen</Button>}
+          <SubmitButton>{editingId ? "Speichern" : "Hinzufügen"}</SubmitButton>
         </Group>
         <FormError error={actionData && "ingredientError" in actionData ? actionData.ingredientError : null} mt="xs" />
       </Form>
@@ -336,8 +336,8 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           form="recipe-form"
           name="instructions"
           onChange={markUnsaved}
-          label="Cooking instructions"
-          description="Supports markdown"
+          label="Zubereitung"
+          description="Markdown möglich"
           defaultValue={recipe.instructions ?? ""}
           autosize
           minRows={4}
@@ -346,7 +346,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           form="recipe-form"
           name="comments"
           onChange={markUnsaved}
-          label="Comments"
+          label="Anmerkungen"
           defaultValue={recipe.comments ?? ""}
           autosize
           minRows={2}
@@ -354,19 +354,19 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
         <SaveButton saved={saved} />
       </Stack>
 
-      <Title order={3} mt="xl" mb="sm">Cooked</Title>
+      <Title order={3} mt="xl" mb="sm">Gekocht</Title>
       {cooked ? (
         <Stack gap={2}>
-          <Text size="sm" c="dimmed" mb={4}>{cookedDates.length === 1 ? "Once" : `${cookedDates.length} times`}</Text>
+          <Text size="sm" c="dimmed" mb={4}>{cookedDates.length === 1 ? "Einmal" : `${cookedDates.length}-mal`}</Text>
           {cookedDates.map((d) => <Text key={d.id} size="sm">{d.cookedAt}</Text>)}
         </Stack>
       ) : (
-        <Text size="sm" c="dimmed">Not cooked yet.</Text>
+        <Text size="sm" c="dimmed">Noch nie gekocht.</Text>
       )}
 
       <Button component={Link} to={`/recipes/${recipe.id}/history`} variant="subtle" size="xs" px={0} mt="xl"
         leftSection={<IconHistory size={14} />}>
-        Edit history ({versionCount === 1 ? "1 version" : `${versionCount} versions`})
+        Änderungsverlauf ({versionCount === 1 ? "1 Version" : `${versionCount} Versionen`})
       </Button>
     </Container>
   );

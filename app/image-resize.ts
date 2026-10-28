@@ -12,6 +12,6 @@ export async function resizePhoto(file: File): Promise<Blob> {
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
   return new Promise((resolve, reject) =>
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("The photo couldn't be converted."))), "image/jpeg", 0.85),
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Das Foto konnte nicht umgewandelt werden."))), "image/jpeg", 0.85),
   );
 }

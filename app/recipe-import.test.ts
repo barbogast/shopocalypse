@@ -82,8 +82,8 @@ describe("parseIngredient", () => {
   });
 
   it("rejects unclosed or partial quotes and empty quoted names", () => {
-    expect(parseIngredient('"Salz, Pfeffer')).toEqual({ error: expect.stringContaining("closing quote") });
-    expect(parseIngredient('"Salz" Pfeffer')).toEqual({ error: expect.stringContaining("whole name") });
+    expect(parseIngredient('"Salz, Pfeffer')).toEqual({ error: expect.stringContaining("schließende Anführungszeichen") });
+    expect(parseIngredient('"Salz" Pfeffer')).toEqual({ error: expect.stringContaining("ganzen Namen") });
     expect(parseIngredient('200 g ""')).toHaveProperty("error");
     expect(parseIngredient('"", chopped')).toHaveProperty("error");
   });
@@ -137,35 +137,44 @@ describe("parseRecipeText", () => {
     expect(recipe).toMatchObject({ name: "Soup", servingSize: 2, instructions: null, comments: null });
   });
 
+  it("reads German headings, and English ones alike", () => {
+    const { recipe, errors } = parseRecipeText("Suppe\nfür 2\nZutaten:\nWasser\n## Zubereitung\nKochen.\nAnmerkungen\nWärmt");
+    expect(errors).toEqual([]);
+    expect(recipe).toMatchObject({ servingSize: 2, instructions: "Kochen.", comments: "Wärmt" });
+    expect(recipe.ingredients.map((i) => i.name)).toEqual(["Wasser"]);
+    expect(parseRecipeText("Suppe\n2\nZutaten\nWasser\nIngredients\nSalz").errors)
+      .toEqual([{ line: 5, message: expect.stringContaining("doppelt") }]);
+  });
+
   it("reports errors with their line numbers", () => {
     const { errors } = parseRecipeText("Soup\nServes four\nfor a cold day\nIngredients\n2-3 carrots\n1 carrot\n1 Carrot");
     expect(errors).toEqual([
-      { line: 2, message: expect.stringContaining("whole number") },
-      { line: 3, message: expect.stringContaining("servings") },
-      { line: 5, message: expect.stringContaining("Ranges") },
-      { line: 7, message: expect.stringContaining("line 6") },
+      { line: 2, message: expect.stringContaining("ganze Zahl") },
+      { line: 3, message: expect.stringContaining("Portionen") },
+      { line: 5, message: expect.stringContaining("Bereiche") },
+      { line: 7, message: expect.stringContaining("Zeile 6") },
     ]);
   });
 
   it("reports ingredients that are the same existing item", () => {
     const { errors } = parseRecipeText("Soup\n2\n---\n1 Zwiebel\n2 Zwiebeln - in Ringen", [{ name: "Zwiebel", plural: "Zwiebeln" }]);
-    expect(errors).toEqual([{ line: 5, message: expect.stringContaining('same item as "Zwiebel" in line 4') }]);
+    expect(errors).toEqual([{ line: 5, message: expect.stringContaining("derselbe Artikel wie „Zwiebel“ in Zeile 4") }]);
   });
 
   it("reports missing parts", () => {
     expect(parseRecipeText("").errors.map((e) => e.message)).toEqual([
-      expect.stringContaining("recipe name"),
-      expect.stringContaining("Ingredients"),
+      expect.stringContaining("Name des Rezepts"),
+      expect.stringContaining("Zutaten"),
     ]);
     expect(parseRecipeText("Soup\nIngredients\n\nInstructions\nCook.").errors.map((e) => e.message)).toEqual([
-      expect.stringContaining("servings"),
-      expect.stringContaining("at least one ingredient"),
+      expect.stringContaining("Portionen"),
+      expect.stringContaining("Mindestens eine Zutat"),
     ]);
   });
 
   it("reports a section that appears twice", () => {
     const { errors } = parseRecipeText("Soup\nServes 2\nIngredients\nwater\nIngredients\nsalt");
-    expect(errors).toEqual([{ line: 5, message: expect.stringContaining("twice") }]);
+    expect(errors).toEqual([{ line: 5, message: expect.stringContaining("doppelt") }]);
   });
 
   it("parses the short form with a bare servings number and separators", () => {
@@ -186,8 +195,8 @@ describe("parseRecipeText", () => {
 
   it("accepts only whole servings numbers of at least 1", () => {
     expect(parseRecipeText("Soup\n2\n---\nwater").errors).toEqual([]);
-    expect(parseRecipeText("Soup\n0\n---\nwater").errors).toEqual([{ line: 2, message: expect.stringContaining("whole number") }]);
-    expect(parseRecipeText("Soup\n2.5\n---\nwater").errors).toEqual([{ line: 2, message: expect.stringContaining("whole number") }]);
+    expect(parseRecipeText("Soup\n0\n---\nwater").errors).toEqual([{ line: 2, message: expect.stringContaining("ganze Zahl") }]);
+    expect(parseRecipeText("Soup\n2.5\n---\nwater").errors).toEqual([{ line: 2, message: expect.stringContaining("ganze Zahl") }]);
   });
 
   it("accepts the servings in German", () => {
@@ -198,7 +207,7 @@ describe("parseRecipeText", () => {
     }
     expect(parseRecipeText("Soup\n1 Person\n---\nwater").recipe.servingSize).toBe(1);
     expect(parseRecipeText("Soup\nfür vier Personen\n---\nwater").errors)
-      .toEqual([{ line: 2, message: expect.stringContaining("whole number") }]);
+      .toEqual([{ line: 2, message: expect.stringContaining("ganze Zahl") }]);
   });
 
   it("mixes separators with headings", () => {
@@ -206,7 +215,7 @@ describe("parseRecipeText", () => {
     expect(errors).toEqual([]);
     expect(recipe).toMatchObject({ instructions: "Cook.", comments: "Warming" });
     expect(parseRecipeText("Soup\n2\n---\nwater\n---\nCook.\nInstructions\nAgain").errors)
-      .toEqual([{ line: 7, message: expect.stringContaining("twice") }]);
+      .toEqual([{ line: 7, message: expect.stringContaining("doppelt") }]);
   });
 
   it("allows empty sections and stopping early", () => {
@@ -217,7 +226,7 @@ describe("parseRecipeText", () => {
 
   it("reports a separator after the comments", () => {
     const { errors } = parseRecipeText("Soup\n2\n---\nwater\n---\nCook.\n---\nWarming\n---");
-    expect(errors).toEqual([{ line: 9, message: expect.stringContaining("after the comments") }]);
+    expect(errors).toEqual([{ line: 9, message: expect.stringContaining("Nach den Anmerkungen") }]);
   });
 
   it("reads an optional weblink before or after the servings", () => {
@@ -231,9 +240,9 @@ describe("parseRecipeText", () => {
 
   it("reports an invalid or second weblink", () => {
     expect(parseRecipeText("Soup\n2\nhttps://exa mple.com\n---\nwater").errors)
-      .toEqual([{ line: 3, message: expect.stringContaining("valid web address") }]);
+      .toEqual([{ line: 3, message: expect.stringContaining("gültige Webadresse") }]);
     expect(parseRecipeText("Soup\nhttps://a.com\n2\nhttps://b.com\n---\nwater").errors)
-      .toEqual([{ line: 4, message: expect.stringContaining("line 2") }]);
+      .toEqual([{ line: 4, message: expect.stringContaining("Zeile 2") }]);
   });
 });
 
@@ -251,15 +260,15 @@ describe("parseItemsText", () => {
 
   it("reports bad lines and repeated items by line", () => {
     expect(parseItemsText("2 Zwiebeln\n0 g Mehl\n1 zwiebeln").errors).toEqual([
-      { line: 2, message: "Quantity must be more than 0." },
-      { line: 3, message: '"zwiebeln" is already listed in line 1; combine them into one line.' },
+      { line: 2, message: "Die Menge muss größer als 0 sein." },
+      { line: 3, message: "„zwiebeln“ steht schon in Zeile 1; bitte zu einer Zeile zusammenfassen." },
     ]);
   });
 
   it("reports an existing item's name and plural as the same item", () => {
     const items = [{ name: "Zwiebel", plural: "Zwiebeln" }];
     expect(parseItemsText("1 Zwiebel\n2 Zwiebeln - in Ringen", items).errors).toEqual([
-      { line: 2, message: '"Zwiebeln" is the same item as "Zwiebel" in line 1; combine them into one line.' },
+      { line: 2, message: "„Zwiebeln“ ist derselbe Artikel wie „Zwiebel“ in Zeile 1; bitte zu einer Zeile zusammenfassen." },
     ]);
     // Without the item, they're two new ones
     expect(parseItemsText("1 Zwiebel\n2 Zwiebeln").errors).toEqual([]);
@@ -310,18 +319,18 @@ describe("recipeToText", () => {
 4
 https://example.com/carbonara
 
-Ingredients
+Zutaten
 400 g Spaghetti
 4 Eier
 "Salz, grob" - to taste
 0,5 Packungen Pecorino - fein gerieben; oder Parmesan
 
-Instructions
+Zubereitung
 Boil the pasta.
 
 **Quickly** mix in the eggs.
 
-Comments
+Anmerkungen
 From Nonna`);
   });
 
@@ -336,7 +345,7 @@ From Nonna`);
 
   it("leaves out empty parts", () => {
     const text = recipeToText({ ...recipe, weblink: null, instructions: null, comments: "Warming" });
-    expect(text).not.toContain("Instructions");
+    expect(text).not.toContain("Zubereitung");
     expect(parseRecipeText(text).recipe).toMatchObject({ weblink: null, instructions: null, comments: "Warming" });
   });
 });
