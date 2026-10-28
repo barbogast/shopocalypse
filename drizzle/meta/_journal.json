@@ -183,6 +183,13 @@
       "when": 1793217754074,
       "tag": "0025_recipe_draft_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1793218525092,
+      "tag": "0026_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -158,3 +158,9 @@ export const shoppingListItems = sqliteTable("shopping_list_items", {
   bought: integer("bought", { mode: "boolean" }).notNull().default(false),
   source: text("source", { enum: ["meal_plan", "stock_deficit", "manual"] }).notNull(),
 }, (t) => [uniqueIndex("shopping_list_items_list_item").on(t.shoppingListId, t.itemId)]);
+
+// Household-wide settings by key, such as the recipe preferences the chat with Claude follows
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});

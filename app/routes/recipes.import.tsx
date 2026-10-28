@@ -1,5 +1,5 @@
-import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Code, Container, Group, List, Paper, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
-import { IconAlertCircle, IconCamera, IconCheck, IconFileImport, IconMessageCircle, IconSend, IconSparkles, IconTrash } from "@tabler/icons-react";
+import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Code, Collapse, Container, Group, List, Paper, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
+import { IconAlertCircle, IconCamera, IconCheck, IconFileImport, IconMessageCircle, IconSend, IconSettings, IconSparkles, IconTrash } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { eq } from "drizzle-orm";
 import { type FetcherWithComponents, Form, Link, redirect, type ShouldRevalidateFunctionArgs, useFetcher } from "react-router";
@@ -17,6 +17,7 @@ import { createDraft, deleteDraft, getDraft, listDrafts, saveChat, saveDraft } f
 import { AcceptedSchema, applySuggestions } from "~/item-suggest.server";
 import type { action as suggestAction } from "~/routes/items.suggest";
 import { importRecipe } from "~/db/recipes.server";
+import { getSetting, setSetting } from "~/db/settings.server";
 import * as schema from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
 import { resizePhoto } from "~/image-resize";
@@ -57,6 +58,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     allItems, recipeNames: recipeNames.map((r) => r.name), allStores, allShelves,
     draft, draftGone: draftParam != null && !draft, drafts: await listDrafts(),
+    preferences: await getSetting("recipePreferences"),
   };
 }
 
@@ -106,7 +108,8 @@ export async function action({ request }: Route.ActionArgs) {
     if (draftId && !draft) return { error: "Diesen Entwurf gibt es nicht mehr: Er wurde importiert oder verworfen.", imported: null };
     const draftText = String(form.get("text") ?? "");
     const items = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
-    const result = await chatRecipe({ chat: draft?.chat ?? [], draftText, message, items });
+    const preferences = await getSetting("recipePreferences");
+    const result = await chatRecipe({ chat: draft?.chat ?? [], draftText, message, items, preferences });
     if ("error" in result) return { error: result.error, imported: null };
     const chat: ChatMessage[] = [...(draft?.chat ?? []), { role: "user", content: message }, { role: "assistant", content: result.reply }];
     const newText = result.text ?? draftText;
@@ -115,6 +118,12 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: null, imported: null };
     }
     return redirect(`/recipes/import?draft=${await createDraft(newText, chat)}`);
+  }
+
+  // From the chat's preferences, through a fetcher
+  if (form.get("intent") === "save-preferences") {
+    await setSetting("recipePreferences", text(form, "preferences"));
+    return { error: null, imported: null };
   }
 
   // Autosaved while editing a draft, through a fetcher; not trimmed, so the text stays as typed
@@ -228,11 +237,12 @@ function PhotoButton({ hasUnsavedText }: { hasUnsavedText: boolean }) {
 
 // Asks Claude for a recipe or a change to the draft. Sends the text as it stands, which Claude's answer
 // may replace; the form then starts afresh from the draft, so the textarea is read-only meanwhile.
-function RecipeChat({ fetcher, draftId, chat, text }: {
+function RecipeChat({ fetcher, draftId, chat, text, preferences }: {
   fetcher: FetcherWithComponents<Awaited<ReturnType<typeof action>>>;
   draftId: number | null;
   chat: ChatMessage[];
   text: string;
+  preferences: string | null;
 }) {
   const [message, setMessage] = useState("");
   const busy = fetcher.state !== "idle";
@@ -283,8 +293,49 @@ function RecipeChat({ fetcher, draftId, chat, text }: {
             <IconSend size={16} />
           </ActionIcon>
         </Group>
+        <Preferences saved={preferences} />
       </Stack>
     </Card>
+  );
+}
+
+// The household's general preferences for the chat ("viel Gemüse, wenig Fleisch"), for all drafts
+function Preferences({ saved }: { saved: string | null }) {
+  const fetcher = useFetcher<typeof action>();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(saved ?? "");
+  const changed = value.trim() !== (saved ?? "");
+
+  return (
+    <div>
+      <Button size="compact-xs" variant="subtle" color="gray" leftSection={<IconSettings size={14} />} onClick={() => setOpen((o) => !o)}>
+        {saved ? "Vorlieben" : "Vorlieben festlegen"}
+      </Button>
+      <Collapse expanded={open}>
+        <Stack gap="xs" mt="xs">
+          <Textarea
+            aria-label="Vorlieben"
+            description="Gelten für alle Rezepte, die Claude hier schreibt, solange im Chat nichts anderes gewünscht wird."
+            placeholder="Wir essen gerne gesund, mit viel Gemüse und natürlichen Zutaten. Fleisch ja, aber nicht oft."
+            value={value}
+            onChange={(e) => setValue(e.currentTarget.value)}
+            autosize
+            minRows={2}
+          />
+          <Group>
+            <Button
+              size="xs"
+              disabled={!changed}
+              loading={fetcher.state !== "idle"}
+              onClick={() => fetcher.submit({ intent: "save-preferences", preferences: value }, { method: "post" })}
+            >
+              Speichern
+            </Button>
+            {!changed && fetcher.data && <Text size="sm" c="dimmed">Gespeichert</Text>}
+          </Group>
+        </Stack>
+      </Collapse>
+    </div>
   );
 }
 
@@ -528,7 +579,7 @@ export default function ImportRecipe(props: Route.ComponentProps) {
 }
 
 function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
-  const { allItems, recipeNames, allStores, allShelves, draft, draftGone, drafts } = loaderData;
+  const { allItems, recipeNames, allStores, allShelves, draft, draftGone, drafts, preferences } = loaderData;
   const [input, setInput] = useState(draft?.text ?? "");
   const saveStatus = useAutosave(draft, input);
   const chatFetcher = useFetcher<typeof action>();
@@ -589,7 +640,7 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
                 {input.trim() === "" && !chatOpen && <DraftList drafts={drafts} />}
               </>
             )}
-            {chatOpen && <RecipeChat fetcher={chatFetcher} draftId={draft?.id ?? null} chat={draft?.chat ?? []} text={input} />}
+            {chatOpen && <RecipeChat fetcher={chatFetcher} draftId={draft?.id ?? null} chat={draft?.chat ?? []} text={input} preferences={preferences} />}
             <Textarea
               name="text"
               label="Rezepttext"

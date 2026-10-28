@@ -17,7 +17,8 @@ The recipe is in this plain-text format, which the app imports:
 ${FORMAT_RULES}
 
 - Write the recipe in German, unless asked otherwise.
-- Keep everything about the draft they didn't ask to change, including their own edits.`;
+- Keep everything about the draft they didn't ask to change, including their own edits.
+- If they've written down general preferences below, follow them in the recipes you suggest, unless they ask for something else.`;
 
 const ResponseSchema = z.object({ reply: z.string(), text: z.string().nullable() });
 
@@ -33,18 +34,24 @@ function itemsBlock(items: Item[]) {
   };
 }
 
+// The household's own words on how they like to eat; in the cached part, as it rarely changes
+function preferencesBlock(preferences: string | null) {
+  return preferences ? [{ type: "text" as const, text: `Their general preferences, in their words:\n${preferences}` }] : [];
+}
+
 // One chat turn: `chat` is the conversation so far, `draftText` the draft as it stands now.
 // The draft goes into the latest message only, so earlier turns stay as written and the history caches.
-export async function chatRecipe({ chat, draftText, message, items }: {
+export async function chatRecipe({ chat, draftText, message, items, preferences }: {
   chat: ChatMessage[];
   draftText: string;
   message: string;
   items: Item[];
+  preferences: string | null;
 }): Promise<{ reply: string; text: string | null } | { error: string }> {
   if (!process.env.ANTHROPIC_API_KEY) return { error: "Für den Chat muss ANTHROPIC_API_KEY gesetzt sein." };
 
   const client = new Anthropic();
-  const system = [{ type: "text" as const, text: SYSTEM }, itemsBlock(items)];
+  const system = [{ type: "text" as const, text: SYSTEM }, ...preferencesBlock(preferences), itemsBlock(items)];
   const messages: Anthropic.Beta.BetaMessageParam[] = [
     ...chat.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: chatUserTurn(message, draftText) },
