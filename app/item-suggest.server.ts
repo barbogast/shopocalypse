@@ -85,7 +85,9 @@ export async function suggestItems(names: string[], itemIds: number[] = []): Pro
     if (error instanceof Anthropic.AuthenticationError) return { error: "The ANTHROPIC_API_KEY was refused." };
     if (error instanceof Anthropic.RateLimitError) return { error: "Too many suggestions at once; try again in a minute." };
     if (error instanceof Anthropic.APIError) return { error: `Suggestions failed (${error.status ?? "no connection"}).` };
-    throw error;
+    // Anything else (an answer that doesn't parse, say) would replace the page with the error page
+    console.error(error);
+    return { error: "Suggestions failed; try again." };
   }
   if (response.stop_reason === "refusal" || !response.parsed_output) return { error: "No suggestions this time; try again." };
 

@@ -70,7 +70,9 @@ export async function transcribeRecipe(photos: Photo[]): Promise<{ text: string 
     if (error instanceof Anthropic.RateLimitError) return { error: "Too many requests at once; try again in a minute." };
     if (error instanceof Anthropic.BadRequestError) return { error: "That photo couldn't be read; try a smaller or sharper one." };
     if (error instanceof Anthropic.APIError) return { error: `Reading the photo failed (${error.status ?? "no connection"}).` };
-    throw error;
+    // Anything else (an answer that doesn't parse, say) would replace the page with the error page
+    console.error(error);
+    return { error: "Reading the photo failed; try again." };
   }
   if (response.stop_reason === "refusal" || !response.parsed_output) return { error: "No recipe found in the photo; try again." };
   return { text: response.parsed_output.text.trim() };
