@@ -184,7 +184,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                 </Button>
               </Group>
             </Group>
-            <ThawWarning ingredients={next.ingredients} mt="md" />
+            <ThawWarning ingredients={next.ingredients} mt="xs" />
           </Card>
 
           {upcoming.length > 0 && (

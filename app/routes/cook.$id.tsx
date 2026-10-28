@@ -110,7 +110,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
       </Group>
       {recipe.weblink && <Weblink href={recipe.weblink} display="block" mt="-sm" mb="lg" />}
 
-      <ThawWarning ingredients={ingredients} mb="lg" />
+      <ThawWarning ingredients={ingredients} mb="md" />
 
       <Title order={3} mb="sm">Zutaten</Title>
       <Table mb="xl" fz="lg">
