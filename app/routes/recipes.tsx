@@ -70,7 +70,7 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
             Mit Claude
           </Button>
           <Button component={Link} to="/recipes/import" variant="light" leftSection={<IconFileImport size={16} />}>
-            Importieren
+            Aus Text
           </Button>
           <Button component={Link} to="/recipes/new" leftSection={<IconPlus size={16} />}>
             Neu
