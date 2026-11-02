@@ -17,7 +17,7 @@ import {
 } from "react-router";
 import { checkPassword } from "./auth.server";
 import { DevMarker } from "./components/dev-marker";
-import { VersionFooter } from "./components/version-footer";
+import { NewVersionBar, VersionCheckProvider, VersionFooter } from "./components/version-footer";
 import type { Route } from "./+types/root";
 
 const NAV_ITEMS = [
@@ -51,32 +51,35 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         <MantineProvider>
           <DevMarker />
-          <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-            {/* The safe-area inset keeps the nav clear of the phone's home bar when installed */}
-            <main style={{ flex: 1, paddingBottom: "calc(70px + env(safe-area-inset-bottom))" }}>
-              {children}
-              <VersionFooter />
-            </main>
-            <nav style={{
-              position: "fixed", bottom: 0, left: 0, right: 0,
-              height: "calc(64px + env(safe-area-inset-bottom))",
-              paddingBottom: "env(safe-area-inset-bottom)",
-              display: "flex", borderTop: "1px solid var(--mantine-color-gray-3)",
-              background: "var(--mantine-color-body)", zIndex: 100,
-            }}>
-              {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-                <NavLink key={to} to={to} end={end} style={({ isActive }) => ({
-                  flex: 1, display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", gap: 2,
-                  fontSize: 11, textDecoration: "none",
-                  color: isActive ? "var(--mantine-color-blue-6)" : "var(--mantine-color-gray-6)",
-                })}>
-                  <Icon size={24} stroke={1.5} />
-                  <span>{label}</span>
-                </NavLink>
-              ))}
-            </nav>
-          </div>
+          <VersionCheckProvider>
+            <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
+              <NewVersionBar />
+              {/* The safe-area inset keeps the nav clear of the phone's home bar when installed */}
+              <main style={{ flex: 1, paddingBottom: "calc(70px + env(safe-area-inset-bottom))" }}>
+                {children}
+                <VersionFooter />
+              </main>
+              <nav style={{
+                position: "fixed", bottom: 0, left: 0, right: 0,
+                height: "calc(64px + env(safe-area-inset-bottom))",
+                paddingBottom: "env(safe-area-inset-bottom)",
+                display: "flex", borderTop: "1px solid var(--mantine-color-gray-3)",
+                background: "var(--mantine-color-body)", zIndex: 100,
+              }}>
+                {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+                  <NavLink key={to} to={to} end={end} style={({ isActive }) => ({
+                    flex: 1, display: "flex", flexDirection: "column",
+                    alignItems: "center", justifyContent: "center", gap: 2,
+                    fontSize: 11, textDecoration: "none",
+                    color: isActive ? "var(--mantine-color-blue-6)" : "var(--mantine-color-gray-6)",
+                  })}>
+                    <Icon size={24} stroke={1.5} />
+                    <span>{label}</span>
+                  </NavLink>
+                ))}
+              </nav>
+            </div>
+          </VersionCheckProvider>
         </MantineProvider>
         <ScrollRestoration />
         <Scripts />
