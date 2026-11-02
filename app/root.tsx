@@ -23,8 +23,8 @@ import type { Route } from "./+types/root";
 const NAV_ITEMS = [
   { to: "/", label: "Speiseplan", icon: IconCalendarEvent, end: true },
   { to: "/recipes", label: "Rezepte", icon: IconChefHat, end: false },
-  { to: "/shopping", label: "Einkaufen", icon: IconShoppingCart, end: false },
-  { to: "/items", label: "Artikel", icon: IconListDetails, end: false },
+  { to: "/shopping", label: "Einkaufsliste", icon: IconShoppingCart, end: false },
+  { to: "/items", label: "Zutaten", icon: IconListDetails, end: false },
 ];
 
 // Runs before every loader and action, so no request gets past without the password

@@ -18,7 +18,7 @@ export function PrepareList({ scheduled }: { scheduled: { position: number; name
 
   return (
     <Container size="sm" py="xl">
-      <Title mb="lg">Einkaufen</Title>
+      <Title mb="lg">Einkaufsliste</Title>
       <Text c="dimmed" mb="xl">Keine aktive Einkaufsliste.</Text>
       <Form method="post">
         <input type="hidden" name="intent" value="prepare" />

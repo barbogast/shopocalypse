@@ -32,7 +32,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items";
 
 export function meta() {
-  return [{ title: pageTitle("Artikel") }];
+  return [{ title: pageTitle("Zutaten") }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -319,7 +319,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="md">
         <Group gap="xs" align="baseline">
-          <Title>Artikel</Title>
+          <Title>Zutaten</Title>
           <Text c="dimmed" size="sm">{allItems.length}</Text>
         </Group>
         <Button component={Link} to="/items/new" leftSection={<IconPlus size={16} />}>

@@ -38,7 +38,7 @@ import { parseAmount } from "~/units";
 import type { Route } from "./+types/shopping";
 
 export function meta() {
-  return [{ title: pageTitle("Einkaufen") }];
+  return [{ title: pageTitle("Einkaufsliste") }];
 }
 
 export async function loader() {
@@ -292,7 +292,7 @@ function ListView({
   return (
     <Container size="sm" py="xl">
       <Group justify="space-between" mb="xs">
-        <Title>Einkaufen</Title>
+        <Title>Einkaufsliste</Title>
         <Group gap="sm">
           {unsentCount > 0 && <Text c="orange" size="sm">{unsentCount} noch nicht gespeichert</Text>}
           <Text c="dimmed" size="sm">{tickedCount}/{listItems.length}</Text>
