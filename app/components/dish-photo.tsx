@@ -1,12 +1,13 @@
 import { Button, Group, Image, Stack, Text } from "@mantine/core";
 import { IconPhoto, IconPhotoX } from "@tabler/icons-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { resizePhoto } from "~/image-resize";
 import { confirmFirst } from "~/forms";
 
 // The photo of the dish on the recipe page, with buttons to add, replace or remove it.
 // Not the photos a recipe is read from: those aren't kept.
+// An image pasted on the page (outside text fields) is uploaded too.
 export function DishPhoto({ recipeId, url }: { recipeId: number; url: string | null }) {
   const fetcher = useFetcher<{ photoError?: string } | null>();
   const input = useRef<HTMLInputElement>(null);
@@ -16,6 +17,22 @@ export function DishPhoto({ recipeId, url }: { recipeId: number; url: string | n
   const uploading = resizing || (fetcher.state !== "idle" && fetcher.formData?.get("intent") === "set-photo");
   const removing = fetcher.state !== "idle" && fetcher.formData?.get("intent") === "remove-photo";
   const error = resizeError ?? fetcher.data?.photoError;
+
+  // Pasting an image anywhere on the page uploads it, e.g. one copied from a recipe website.
+  // Pastes into text fields are left alone, as are pastes without an image
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable]")) return;
+      const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+      if (!file) return;
+      e.preventDefault();
+      if (url && !confirm("Das Foto durch das eingefügte ersetzen?")) return;
+      upload(file);
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  });
 
   async function upload(file: File | undefined) {
     if (!file) return;
