@@ -1,6 +1,8 @@
 import {
   ActionIcon,
+  Anchor,
   Badge,
+  Box,
   Button,
   Checkbox,
   Container,
@@ -14,7 +16,7 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconCheck, IconHistory, IconPencil, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconCalendarPlus, IconCheck, IconHistory, IconPencil, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
@@ -34,6 +36,7 @@ import {
   upsertIngredient,
   withIngredients,
 } from "~/db/recipes.server";
+import { scheduleRecipe } from "~/db/schedule.server";
 import * as schema from "~/db/schema";
 import { confirmFirst, int, optionalText, optionalUrl, text } from "~/forms";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
@@ -69,8 +72,15 @@ export async function loader({ params }: Route.LoaderArgs) {
     .where(eq(schema.recipeVersions.recipeId, id))
     .get() ?? { versionCount: 0 };
 
+  // How often the recipe is already on the schedule, so adding it again is a conscious choice
+  const { scheduledCount } = await db
+    .select({ scheduledCount: count() })
+    .from(schema.mealSchedule)
+    .where(eq(schema.mealSchedule.recipeId, id))
+    .get() ?? { scheduledCount: 0 };
+
   return {
-    recipe, ingredients, allItems, ...await loadItemFormOptions(), cookedDates, versionCount,
+    recipe, ingredients, allItems, ...await loadItemFormOptions(), cookedDates, versionCount, scheduledCount,
   };
 }
 
@@ -131,6 +141,13 @@ export async function action({ request, params }: Route.ActionArgs) {
       return redirect("/recipes");
     }
 
+    case "schedule": {
+      // Null servings: the recipe's own serving size, adjustable on the schedule
+      const { error } = await scheduleRecipe(id, null);
+      if (error) return { scheduleError: error };
+      break;
+    }
+
     case "restore": {
       await restoreRecipe(id);
       break;
@@ -161,7 +178,7 @@ function SaveButton({ saved }: { saved: boolean }) {
 }
 
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { recipe, ingredients, allItems, allStores, allShelves, parents, cookedDates, versionCount } = loaderData;
+  const { recipe, ingredients, allItems, allStores, allShelves, parents, cookedDates, versionCount, scheduledCount } = loaderData;
   const cooked = cookedDates.length > 0;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   // The ingredient loaded into the form for editing, which stays selectable
@@ -219,10 +236,29 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
       </Form>
       <Group justify="space-between" mb="md">
         {recipe.archived ? <Badge color="gray">Archiviert</Badge> : <span />}
-        <Button component={Link} to={`/cook/${recipe.id}`} color="green" leftSection={<IconPlayerPlay size={16} />}>
-          Jetzt kochen
-        </Button>
+        <Group gap="xs">
+          {/* Archived recipes can't be scheduled (scheduleRecipe refuses them) */}
+          {!recipe.archived && (
+            <Form method="post">
+              <input type="hidden" name="intent" value="schedule" />
+              <SubmitButton variant="light" leftSection={<IconCalendarPlus size={16} />}>Zum Speiseplan</SubmitButton>
+            </Form>
+          )}
+          <Button component={Link} to={`/cook/${recipe.id}`} color="green" leftSection={<IconPlayerPlay size={16} />}>
+            Jetzt kochen
+          </Button>
+        </Group>
       </Group>
+      {scheduledCount > 0 && (
+        <Text size="sm" c="dimmed" ta="right" mt={-8} mb="md">
+          <Anchor component={Link} to="/" inherit>
+            {scheduledCount === 1 ? "Steht auf dem Speiseplan" : `Steht ${scheduledCount}-mal auf dem Speiseplan`}
+          </Anchor>
+        </Text>
+      )}
+      {actionData && "scheduleError" in actionData && (
+        <Box mb="md"><FormError error={actionData.scheduleError} /></Box>
+      )}
       <Form method="post" id="recipe-form" onChange={markUnsaved}>
         <input type="hidden" name="intent" value="save" />
         <Stack mb="xl">
