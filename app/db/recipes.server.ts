@@ -29,6 +29,7 @@ export async function deleteOrArchiveRecipe(recipeId: number) {
     } else {
       await tx.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, recipeId)).run();
       await tx.delete(schema.recipeVersions).where(eq(schema.recipeVersions.recipeId, recipeId)).run();
+      await tx.delete(schema.recipePhotos).where(eq(schema.recipePhotos.recipeId, recipeId)).run();
       // A rework still open becomes a draft for a new recipe
       await tx.update(schema.recipeDrafts).set({ recipeId: null }).where(eq(schema.recipeDrafts.recipeId, recipeId)).run();
       await tx.delete(schema.recipes).where(eq(schema.recipes.id, recipeId)).run();

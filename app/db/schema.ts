@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { type AnySQLiteColumn, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { type AnySQLiteColumn, blob, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { ListNote } from "../shopping-list";
 import type { Amount, UnitKey } from "../units";
 
@@ -52,6 +52,17 @@ export const recipes = sqliteTable("recipes", {
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
   // Picked by the meal schedule's auto-fill; off for occasional dishes, which are then only added by hand
   autoFill: integer("auto_fill", { mode: "boolean" }).notNull().default(true),
+});
+
+// A recipe's photo of the dish, as a JPEG resized in the browser. Kept apart from recipes, so
+// queries for recipes don't load it, and not versioned
+export const recipePhotos = sqliteTable("recipe_photos", {
+  recipeId: integer("recipe_id")
+    .primaryKey()
+    .references(() => recipes.id),
+  data: blob("data", { mode: "buffer" }).notNull(),
+  // ISO timestamp of the upload; part of the photo's URL, so a new photo isn't hidden by the cached old one
+  updatedAt: text("updated_at").notNull(),
 });
 
 // Earlier states of a recipe, written out in the import format (recipeToText). Edits within

@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Container, Group, Stack, Table, Text, Textarea, Title } from "@mantine/core";
+import { Badge, Box, Button, Container, Group, Image, Stack, Table, Text, Textarea, Title } from "@mantine/core";
 import { IconCheck, IconPencil } from "@tabler/icons-react";
 import { and, eq } from "drizzle-orm";
 import { useEffect, useRef } from "react";
@@ -11,6 +11,7 @@ import { ThawWarning } from "~/components/thaw-warning";
 import { Weblink } from "~/components/weblink";
 import { isDateString, localDate } from "~/dates";
 import { db } from "~/db/client";
+import { recipePhotoUrl } from "~/db/recipe-photos.server";
 import { recordRecipeVersion } from "~/db/recipe-versions";
 import { withIngredients } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
@@ -45,7 +46,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!meal && new URL(request.url).searchParams.has("position")) return redirect(`/cook/${id}`);
   const servings = meal?.servings ?? recipe.servingSize;
   const [{ ingredients }] = await withIngredients([{ ...recipe, servings }]);
-  return { recipe, servings, ingredients, scheduled: meal != null };
+  return { recipe, servings, ingredients, scheduled: meal != null, photoUrl: await recipePhotoUrl(id) };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -90,7 +91,7 @@ function useWakeLock() {
 }
 
 export default function Cook({ loaderData }: Route.ComponentProps) {
-  const { recipe, servings, ingredients, scheduled } = loaderData;
+  const { recipe, servings, ingredients, scheduled, photoUrl } = loaderData;
   const navigate = useNavigate();
   // "default" means this is the first page of the visit (opened from a link or bookmark)
   const cameFromApp = useLocation().key !== "default";
@@ -112,6 +113,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
         </Group>
       </Group>
       {recipe.weblink && <Weblink href={recipe.weblink} display="block" mt="-sm" mb="lg" />}
+      {photoUrl && <Image src={photoUrl} alt="" radius="md" mah={240} fit="cover" mb="lg" />}
 
       <ThawWarning ingredients={ingredients} mb="md" />
 

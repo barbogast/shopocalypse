@@ -19,6 +19,7 @@ import { IconArchive, IconArchiveOff, IconCalendarPlus, IconCheck, IconHistory, 
 import { useEffect, useRef, useState } from "react";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
+import { DishPhoto } from "~/components/dish-photo";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { ItemPicker, type PickerItem } from "~/components/item-picker";
@@ -27,6 +28,7 @@ import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { loadItemFormOptions } from "~/db/items.server";
 import { createDraft, draftForRecipe } from "~/db/recipe-drafts.server";
+import { deleteRecipePhoto, MAX_PHOTO_BYTES, recipePhotoUrl, setRecipePhoto } from "~/db/recipe-photos.server";
 import { recipeText, recordRecipeVersion } from "~/db/recipe-versions";
 import {
   deleteOrArchiveRecipe,
@@ -82,6 +84,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 
   return {
     recipe, ingredients, allItems, ...await loadItemFormOptions(), cookedDates, versionCount, scheduledCount,
+    photoUrl: await recipePhotoUrl(id),
   };
 }
 
@@ -143,6 +146,20 @@ export async function action({ request, params }: Route.ActionArgs) {
       return redirect(`/recipes/import?draft=${draftId}&chat`);
     }
 
+    // From DishPhoto, through a fetcher; already resized to a JPEG in the browser
+    case "set-photo": {
+      const photo = form.get("photo");
+      if (!(photo instanceof File) || photo.type !== "image/jpeg" || photo.size === 0) return { photoError: "Das Foto konnte nicht gelesen werden." };
+      if (photo.size > MAX_PHOTO_BYTES) return { photoError: "Das Foto ist zu groß." };
+      await setRecipePhoto(id, Buffer.from(await photo.arrayBuffer()));
+      break;
+    }
+
+    case "remove-photo": {
+      await deleteRecipePhoto(id);
+      break;
+    }
+
     case "delete": {
       await deleteOrArchiveRecipe(id);
       return redirect("/recipes");
@@ -185,7 +202,7 @@ function SaveButton({ saved }: { saved: boolean }) {
 }
 
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { recipe, ingredients, allItems, allStores, allShelves, parents, cookedDates, versionCount, scheduledCount } = loaderData;
+  const { recipe, ingredients, allItems, allStores, allShelves, parents, cookedDates, versionCount, scheduledCount, photoUrl } = loaderData;
   const cooked = cookedDates.length > 0;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   const [orderedIngredients, saveIngredientOrder] = useReorder(ingredients, (i) => i.itemId, "reorder-ingredients");
@@ -271,6 +288,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
       {actionData && "scheduleError" in actionData && (
         <Box mb="md"><FormError error={actionData.scheduleError} /></Box>
       )}
+      <DishPhoto recipeId={recipe.id} url={photoUrl} />
       <Form method="post" id="recipe-form" onChange={markUnsaved}>
         <input type="hidden" name="intent" value="save" />
         <Stack mb="xl">
