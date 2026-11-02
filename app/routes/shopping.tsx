@@ -1,8 +1,9 @@
 import { Button, Container, CopyButton, Divider, Group, Stack, Table, Text, Title } from "@mantine/core";
 import { IconCheck, IconCopy } from "@tabler/icons-react";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { eq, sql } from "drizzle-orm";
-import { Form, type ShouldRevalidateFunctionArgs, useFetchers, useSubmit } from "react-router";
+import { Form, type ShouldRevalidateFunctionArgs, useActionData, useFetchers, useRevalidator, useSubmit } from "react-router";
+import { FormError } from "~/components/form-error";
 import { LocalDateTime } from "~/components/local-date-time";
 import { AddItemForm } from "~/components/shopping/add-item-form";
 import { ImportItemsButton } from "~/components/shopping/import-items-button";
@@ -149,15 +150,15 @@ export async function action({ request }: Route.ActionArgs) {
       break;
     }
 
-    case "finish": {
-      const activeList = await getActiveList();
-      if (activeList) await finishList(activeList.id);
-      break;
-    }
-
+    // Only the list the page showed: a page left open on another phone may
+    // still show a list that has since been replaced
+    case "finish":
     case "discard": {
       const activeList = await getActiveList();
-      if (activeList) await discardList(activeList.id);
+      if (!activeList || activeList.id !== int(form, "listId")) {
+        return { listError: "Die Liste hat sich inzwischen geändert. Hier ist die aktuelle." };
+      }
+      await (intent === "finish" ? finishList : discardList)(activeList.id);
       break;
     }
     default:
@@ -165,6 +166,21 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   return null;
+}
+
+// The last list that loaded, kept for when a reload fails
+let lastLoaded: Awaited<ReturnType<Route.ClientLoaderArgs["serverLoader"]>> | undefined;
+
+// A failed reload, often just poor reception in the shop, keeps showing the
+// last list instead of replacing it with the error page
+export async function clientLoader({ serverLoader }: Route.ClientLoaderArgs) {
+  try {
+    lastLoaded = await serverLoader();
+    return lastLoaded;
+  } catch (error) {
+    if (lastLoaded) return lastLoaded;
+    throw error;
+  }
 }
 
 // Ticks go to the outbox first, and the fetcher actions never throw: a thrown
@@ -197,8 +213,8 @@ export async function clientAction({ request, serverAction }: Route.ClientAction
 }
 
 // The outbox keeps ticks showing, so reloading the whole list after each one
-// would only cost round trips in the shop. Changes made on another device show
-// on the next visit to the page.
+// would only cost round trips in the shop. Changes made on another device come
+// in through useReloadList.
 export function shouldRevalidate({ formData, actionResult, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
   const intent = formData?.get("intent");
   if (intent === "tick" || intent === "untick") return false;
@@ -233,6 +249,31 @@ function useFlushOutbox() {
   }, [submit]);
 }
 
+// Reloads the list when the page comes back into view and every 30 seconds
+// while it's open, so changes made on another phone show up. Skipped while
+// something is being sent, so a reload can't overtake it.
+function useReloadList() {
+  const revalidator = useRevalidator();
+  const fetchers = useFetchers();
+  const latest = useRef({ revalidator, busy: false });
+  latest.current = { revalidator, busy: fetchers.some((f) => f.state !== "idle") };
+
+  useEffect(() => {
+    const reload = () => {
+      const { revalidator, busy } = latest.current;
+      if (document.visibilityState === "visible" && revalidator.state === "idle" && !busy) revalidator.revalidate();
+    };
+    document.addEventListener("visibilitychange", reload);
+    window.addEventListener("online", reload);
+    const timer = setInterval(reload, 30_000);
+    return () => {
+      document.removeEventListener("visibilitychange", reload);
+      window.removeEventListener("online", reload);
+      clearInterval(timer);
+    };
+  }, []);
+}
+
 export type ActiveListData = Extract<Awaited<ReturnType<typeof loader>>, { activeList: object }>;
 export type ListRecipe = ActiveListData["listRecipes"][number];
 export type ListItem = ActiveListData["listItems"][number];
@@ -252,6 +293,12 @@ function withPendingChanges(listItems: ListItem[], fetchers: ReturnType<typeof u
 }
 
 export default function Shopping({ loaderData }: Route.ComponentProps) {
+  // The first load comes with the page, past clientLoader
+  useEffect(() => {
+    lastLoaded = loaderData;
+  }, [loaderData]);
+  useReloadList();
+
   if (!loaderData.activeList) return <PrepareList scheduled={loaderData.scheduled} />;
   return <ListView {...loaderData} />;
 }
@@ -273,6 +320,7 @@ function ListView({
   const sending = new Set(fetchers.filter((f) => f.formData).map((f) => Number(f.formData!.get("id"))));
   const unsentCount = outbox.unsynced(entries).filter((e) => !sending.has(e.id)).length;
   useFlushOutbox();
+  const actionData = useActionData<typeof action>();
 
   // Each fresh load of the list has what the server already got
   useEffect(() => outbox.settle(loadedItems), [loadedItems]);
@@ -351,15 +399,18 @@ function ListView({
       <ImportItemsButton items={allItems} />
 
       <Divider my="lg" />
-      <Group>
+      <FormError error={actionData && "listError" in actionData ? actionData.listError : null} mt="xs" />
+      <Group mt="xs">
         <Form method="post">
           <input type="hidden" name="intent" value="finish" />
+          <input type="hidden" name="listId" value={activeList.id} />
           <SubmitButton color="green" disabled={tickedCount === 0}>
             Einkauf abschließen
           </SubmitButton>
         </Form>
         <Form method="post" onSubmit={confirmFirst("Diese Einkaufsliste mit allem darauf verwerfen?")}>
           <input type="hidden" name="intent" value="discard" />
+          <input type="hidden" name="listId" value={activeList.id} />
           <SubmitButton variant="subtle" color="red">Liste verwerfen</SubmitButton>
         </Form>
       </Group>
