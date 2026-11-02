@@ -1,7 +1,7 @@
 import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Code, Collapse, Container, Group, List, Paper, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
 import { IconAlertCircle, IconCheck, IconFileImport, IconMessageCircle, IconSend, IconSettings, IconSparkles, IconTrash } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { type FetcherWithComponents, Form, Link, redirect, type ShouldRevalidateFunctionArgs, useFetcher, useSearchParams } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
@@ -22,7 +22,7 @@ import { getSetting, setSetting } from "~/db/settings.server";
 import * as schema from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
 import type { ChatMessage } from "~/recipe-chat";
-import { chatRecipe } from "~/recipe-chat.server";
+import { chatRecipe, type KnownRecipe } from "~/recipe-chat.server";
 import { type Photo, transcribeRecipe } from "~/recipe-photo.server";
 import { itemKey, itemKeys, likelySingular } from "~/item-names";
 import { type ParsedIngredient, parseRecipeText } from "~/recipe-import";
@@ -60,6 +60,23 @@ export async function loader({ request }: Route.LoaderArgs) {
     draft, draftGone: draftParam != null && !draft, drafts: await listDrafts(),
     preferences: await getSetting("recipePreferences"),
   };
+}
+
+// The recipes in use, with their ingredients in order, so the chat suggests something else; archived ones may come back
+async function knownRecipes(): Promise<KnownRecipe[]> {
+  const rows = await db
+    .select({ id: schema.recipes.id, name: schema.recipes.name, ingredient: schema.items.name })
+    .from(schema.recipes)
+    .leftJoin(schema.recipeIngredients, eq(schema.recipeIngredients.recipeId, schema.recipes.id))
+    .leftJoin(schema.items, eq(schema.items.id, schema.recipeIngredients.itemId))
+    .where(eq(schema.recipes.archived, false))
+    .orderBy(asc(schema.recipes.name), asc(schema.recipeIngredients.position));
+  const recipes = new Map<number, KnownRecipe>();
+  for (const { id, name, ingredient } of rows) {
+    if (!recipes.has(id)) recipes.set(id, { name, ingredients: [] });
+    if (ingredient) recipes.get(id)!.ingredients.push(ingredient);
+  }
+  return [...recipes.values()];
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -109,7 +126,7 @@ export async function action({ request }: Route.ActionArgs) {
     const draftText = String(form.get("text") ?? "");
     const items = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
     const preferences = await getSetting("recipePreferences");
-    const result = await chatRecipe({ chat: draft?.chat ?? [], draftText, message, items, preferences });
+    const result = await chatRecipe({ chat: draft?.chat ?? [], draftText, message, items, recipes: await knownRecipes(), preferences });
     if ("error" in result) return { error: result.error, imported: null };
     const chat: ChatMessage[] = [...(draft?.chat ?? []), { role: "user", content: message }, { role: "assistant", content: result.reply }];
     const newText = result.text ?? draftText;

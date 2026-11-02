@@ -18,11 +18,13 @@ ${FORMAT_RULES}
 
 - Write the recipe in German, unless asked otherwise.
 - Keep everything about the draft they didn't ask to change, including their own edits.
-- If they've written down general preferences below, follow them in the recipes you suggest, unless they ask for something else.`;
+- If they've written down general preferences below, follow them in the recipes you suggest, unless they ask for something else.
+- When you suggest a new dish, make it something other than the recipes they already have (listed below), unless they ask for a variation of one.`;
 
 const ResponseSchema = z.object({ reply: z.string(), text: z.string().nullable() });
 
 type Item = { name: string; plural: string | null };
+export type KnownRecipe = { name: string; ingredients: string[] };
 
 // The household's items, so ingredients match them rather than becoming new items. Cached, as it's the same every turn.
 function itemsBlock(items: Item[]) {
@@ -39,19 +41,27 @@ function preferencesBlock(preferences: string | null) {
   return preferences ? [{ type: "text" as const, text: `Their general preferences, in their words:\n${preferences}` }] : [];
 }
 
+// The recipes they already have, so new suggestions differ from them; in the cached part, as it rarely changes
+function recipesBlock(recipes: KnownRecipe[]) {
+  if (recipes.length === 0) return [];
+  const lines = recipes.map((r) => (r.ingredients.length ? `${r.name}: ${r.ingredients.join(", ")}` : r.name));
+  return [{ type: "text" as const, text: `The recipes they already have, with their ingredients:\n${lines.join("\n")}` }];
+}
+
 // One chat turn: `chat` is the conversation so far, `draftText` the draft as it stands now.
 // The draft goes into the latest message only, so earlier turns stay as written and the history caches.
-export async function chatRecipe({ chat, draftText, message, items, preferences }: {
+export async function chatRecipe({ chat, draftText, message, items, recipes, preferences }: {
   chat: ChatMessage[];
   draftText: string;
   message: string;
   items: Item[];
+  recipes: KnownRecipe[];
   preferences: string | null;
 }): Promise<{ reply: string; text: string | null } | { error: string }> {
   if (!process.env.ANTHROPIC_API_KEY) return { error: "Für den Chat muss ANTHROPIC_API_KEY gesetzt sein." };
 
   const client = new Anthropic();
-  const system = [{ type: "text" as const, text: SYSTEM }, ...preferencesBlock(preferences), itemsBlock(items)];
+  const system = [{ type: "text" as const, text: SYSTEM }, ...preferencesBlock(preferences), ...recipesBlock(recipes), itemsBlock(items)];
   const messages: Anthropic.Beta.BetaMessageParam[] = [
     ...chat.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: chatUserTurn(message, draftText) },
