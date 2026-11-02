@@ -19,17 +19,18 @@ import { asc, desc, eq } from "drizzle-orm";
 import { useEffect, useState } from "react";
 import { Form, Link } from "react-router";
 import { FormError } from "~/components/form-error";
-import { MoveButtons } from "~/components/move-buttons";
 import { ServingsControl } from "~/components/servings";
 import { RecipeDrawer } from "~/components/recipe-drawer";
+import { SortableList, useReorder } from "~/components/sortable-list";
 import { SubmitButton } from "~/components/submit-button";
 import { ThawWarning } from "~/components/thaw-warning";
 import { db } from "~/db/client";
 import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
-import { autoFill, moveScheduledMeal, scheduleRecipe } from "~/db/schedule.server";
+import { autoFill, reorderSchedule, scheduleRecipe } from "~/db/schedule.server";
 import * as schema from "~/db/schema";
 import { confirmFirst, int, text } from "~/forms";
 import { pageTitle } from "~/page-title";
+import { parseOrder } from "~/reorder";
 import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
@@ -83,8 +84,9 @@ export async function action({ request }: Route.ActionArgs) {
   const position = int(form, "position");
 
   switch (intent) {
-    case "move": {
-      if (position) await moveScheduledMeal(position, form.get("direction") === "up");
+    case "reorder": {
+      const order = parseOrder(form.get("order"));
+      if (order) await reorderSchedule(order);
       break;
     }
 
@@ -131,7 +133,8 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Home({ loaderData, actionData }: Route.ComponentProps) {
-  const { scheduled, allRecipes, recentlyCooked } = loaderData;
+  const { allRecipes, recentlyCooked } = loaderData;
+  const [scheduled, reorder] = useReorder(loaderData.scheduled, (m) => m.position, "reorder");
   const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
   // Shared by the add and auto-fill forms
   const [newServings, setNewServings] = useState<string | number>(4);
@@ -152,48 +155,53 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
         <Text c="dimmed" mb="xl">Keine Mahlzeiten geplant.</Text>
       ) : (
         <Stack gap="xs" mb="xl">
-          {scheduled.map((meal, i) => {
-            // The next meal gets the same row, marked and with the thaw warning and a prominent cook button
-            const isNext = i === 0;
-            return (
-              <Card key={meal.position} withBorder radius="md" p="md"
-                style={isNext ? { borderColor: "var(--mantine-color-green-6)" } : undefined}>
-                <Group justify="space-between">
-                  <Stack gap={0}>
-                    <Anchor component="button" type="button" c="inherit" ta="left" onClick={() => setOpenPosition(meal.position)}>
-                      {meal.name}
-                    </Anchor>
-                    <ServingsControl position={meal.position} servings={meal.servings} />
-                  </Stack>
-                  <Group gap="xs">
-                    {isNext
-                      ? <Badge color="green" variant="light">Als Nächstes</Badge>
-                      : <Badge variant="outline" color="gray">#{i + 1}</Badge>}
-                    <MoveButtons intent="move" fields={{ position: meal.position }} first={isNext} last={i === scheduled.length - 1} />
-                    {isNext ? (
-                      <Button component={Link} to={`/cook/${meal.id}?position=${meal.position}`} color="green"
-                        leftSection={<IconPlayerPlay size={16} />}>
-                        Kochen
-                      </Button>
-                    ) : (
-                      <Button component={Link} to={`/cook/${meal.id}?position=${meal.position}`}
-                        variant="subtle" color="green" size="xs" px={6} aria-label={`${meal.name} kochen`}>
-                        <IconPlayerPlay size={14} />
-                      </Button>
-                    )}
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="remove" />
-                      <input type="hidden" name="position" value={meal.position} />
-                      <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`${meal.name} aus dem Speiseplan entfernen`}>
-                        <IconX size={14} />
-                      </Button>
-                    </Form>
+          <SortableList items={scheduled} idOf={(m) => m.position} onReorder={reorder}>
+            {(meal, i, grip) => {
+              // The next meal gets the same row, marked and with the thaw warning and a prominent cook button
+              const isNext = i === 0;
+              return (
+                <Card withBorder radius="md" p="md"
+                  style={isNext ? { borderColor: "var(--mantine-color-green-6)" } : undefined}>
+                  {/* Other rows keep their buttons beside the name; the next meal's larger ones wrap below it on phones */}
+                  <Group justify="space-between" wrap={isNext ? "wrap" : "nowrap"}>
+                    <Group gap="xs" wrap="nowrap" style={isNext ? { flex: "1 1 220px" } : { flex: 1, minWidth: 0 }}>
+                      {grip}
+                      <Stack gap={0}>
+                        <Anchor component="button" type="button" c="inherit" ta="left" onClick={() => setOpenPosition(meal.position)}>
+                          {meal.name}
+                        </Anchor>
+                        <ServingsControl position={meal.position} servings={meal.servings} />
+                      </Stack>
+                    </Group>
+                    <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                      {isNext
+                        ? <Badge color="green" variant="light">Als Nächstes</Badge>
+                        : <Badge variant="outline" color="gray">#{i + 1}</Badge>}
+                      {isNext ? (
+                        <Button component={Link} to={`/cook/${meal.id}?position=${meal.position}`} color="green"
+                          leftSection={<IconPlayerPlay size={16} />}>
+                          Kochen
+                        </Button>
+                      ) : (
+                        <Button component={Link} to={`/cook/${meal.id}?position=${meal.position}`}
+                          variant="subtle" color="green" size="xs" px={6} aria-label={`${meal.name} kochen`}>
+                          <IconPlayerPlay size={14} />
+                        </Button>
+                      )}
+                      <Form method="post">
+                        <input type="hidden" name="intent" value="remove" />
+                        <input type="hidden" name="position" value={meal.position} />
+                        <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`${meal.name} aus dem Speiseplan entfernen`}>
+                          <IconX size={14} />
+                        </Button>
+                      </Form>
+                    </Group>
                   </Group>
-                </Group>
-                {isNext && <ThawWarning ingredients={meal.ingredients} mt="xs" />}
-              </Card>
-            );
-          })}
+                  {isNext && <ThawWarning ingredients={meal.ingredients} mt="xs" />}
+                </Card>
+              );
+            }}
+          </SortableList>
         </Stack>
       )}
 

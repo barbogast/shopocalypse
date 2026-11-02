@@ -1,28 +1,25 @@
-import { and, asc, desc, eq, gt, lt, max } from "drizzle-orm";
+import { and, asc, eq, max } from "drizzle-orm";
 import { rotationOrder } from "~/meal-schedule";
+import { sameIds } from "~/reorder";
 import { db } from "./client";
 import * as schema from "./schema";
 
-// Swaps a scheduled meal with the one before or after it (positions may have gaps)
-export async function moveScheduledMeal(position: number, up: boolean) {
+// Puts the scheduled meals in the given order of their positions. The positions stay
+// (cook links refer to them); the meals move between them. Ignored when the positions
+// aren't exactly the scheduled ones, e.g. because the schedule changed on another phone.
+export async function reorderSchedule(order: number[]) {
   await db.transaction(async (tx) => {
-    const current = await tx.select().from(schema.mealSchedule).where(eq(schema.mealSchedule.position, position)).get();
-    const neighbour = await tx
-      .select()
-      .from(schema.mealSchedule)
-      .where(up ? lt(schema.mealSchedule.position, position) : gt(schema.mealSchedule.position, position))
-      .orderBy(up ? desc(schema.mealSchedule.position) : asc(schema.mealSchedule.position))
-      .limit(1)
-      .get();
-    if (!current || !neighbour) return;
-    await tx.update(schema.mealSchedule)
-      .set({ recipeId: neighbour.recipeId, servings: neighbour.servings })
-      .where(eq(schema.mealSchedule.position, current.position))
-      .run();
-    await tx.update(schema.mealSchedule)
-      .set({ recipeId: current.recipeId, servings: current.servings })
-      .where(eq(schema.mealSchedule.position, neighbour.position))
-      .run();
+    const meals = await tx.select().from(schema.mealSchedule).orderBy(asc(schema.mealSchedule.position));
+    if (!sameIds(meals.map((m) => m.position), order)) return;
+    const byPosition = new Map(meals.map((m) => [m.position, m]));
+    for (const [i, { position }] of meals.entries()) {
+      const meal = byPosition.get(order[i])!;
+      if (meal.position === position) continue;
+      await tx.update(schema.mealSchedule)
+        .set({ recipeId: meal.recipeId, servings: meal.servings })
+        .where(eq(schema.mealSchedule.position, position))
+        .run();
+    }
   });
 }
 

@@ -2,7 +2,7 @@ import "./test-db";
 import { asc } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "./client";
-import { autoFill, scheduleRecipe } from "./schedule.server";
+import { autoFill, reorderSchedule, scheduleRecipe } from "./schedule.server";
 import * as schema from "./schema";
 
 const schedule = () => db.select().from(schema.mealSchedule).orderBy(asc(schema.mealSchedule.position));
@@ -30,5 +30,34 @@ describe("scheduleRecipe", () => {
   it("won't add an archived recipe", async () => {
     const [r] = await db.insert(schema.recipes).values({ name: "Archived", servingSize: 2, archived: true }).returning();
     expect(await scheduleRecipe(r.id, null)).toEqual({ error: "Dieses Rezept gibt es nicht mehr." });
+  });
+});
+
+describe("reorderSchedule", () => {
+  // Earlier tests leave meals on the schedule; positions continue after theirs
+  async function scheduleThree() {
+    await db.delete(schema.mealSchedule);
+    const recipes = await db.insert(schema.recipes).values([{ name: "A", servingSize: 2 }, { name: "B", servingSize: 2 }, { name: "C", servingSize: 2 }]).returning();
+    await scheduleRecipe(recipes[0].id, 3);
+    await scheduleRecipe(recipes[1].id, null);
+    await scheduleRecipe(recipes[2].id, 5);
+    return [recipes.map((r) => r.id), (await schedule()).map((m) => m.position)] as const;
+  }
+
+  it("moves the meals with their servings, keeping the positions", async () => {
+    const [[a, b, c], [p1, p2, p3]] = await scheduleThree();
+    await reorderSchedule([p3, p1, p2]);
+    expect((await schedule()).map((m) => [m.position, m.recipeId, m.servings])).toEqual([
+      [p1, c, 5],
+      [p2, a, 3],
+      [p3, b, null],
+    ]);
+  });
+
+  it("ignores an order made before the schedule changed", async () => {
+    const [[a, b, c], [p1, p2, p3]] = await scheduleThree();
+    await reorderSchedule([p2, p1]);
+    await reorderSchedule([p3 + 1, p3, p2, p1]);
+    expect((await schedule()).map((m) => m.recipeId)).toEqual([a, b, c]);
   });
 });
