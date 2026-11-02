@@ -22,7 +22,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { ItemPicker, type PickerItem } from "~/components/item-picker";
-import { MoveButtons } from "~/components/move-buttons";
+import { SortableList, useReorder } from "~/components/sortable-list";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { loadItemFormOptions } from "~/db/items.server";
@@ -30,7 +30,7 @@ import { recordRecipeVersion } from "~/db/recipe-versions";
 import {
   deleteOrArchiveRecipe,
   formatCookedAt,
-  moveIngredient,
+  reorderIngredients,
   restoreRecipe,
   upsertIngredient,
   withIngredients,
@@ -40,6 +40,7 @@ import * as schema from "~/db/schema";
 import { confirmFirst, int, optionalText, optionalUrl, text } from "~/forms";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import { pageTitle } from "~/page-title";
+import { parseOrder } from "~/reorder";
 import type { Route } from "./+types/recipes.$id";
 
 export function meta({ data }: Route.MetaArgs) {
@@ -117,11 +118,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       break;
     }
 
-    case "move-ingredient": {
-      const itemId = int(form, "itemId");
-      if (!itemId) return null;
-      await moveIngredient(id, itemId, form.get("direction") === "up");
-      await recordRecipeVersion(db, id);
+    case "reorder-ingredients": {
+      const order = parseOrder(form.get("order"));
+      if (order && await reorderIngredients(id, order)) await recordRecipeVersion(db, id);
       break;
     }
 
@@ -180,6 +179,7 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
   const { recipe, ingredients, allItems, allStores, allShelves, parents, cookedDates, versionCount, scheduledCount } = loaderData;
   const cooked = cookedDates.length > 0;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
+  const [orderedIngredients, saveIngredientOrder] = useReorder(ingredients, (i) => i.itemId, "reorder-ingredients");
   // The ingredient loaded into the form for editing, which stays selectable
   const [editingId, setEditingId] = useState<number | null>(null);
   const [itemId, setItemId] = useState<string | null>(null);
@@ -293,32 +293,31 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
 
       {/* Rows rather than a table, so they can be dragged; spaced and bordered like Mantine's table */}
       <Box fz="sm" mb="md">
-        {ingredients.map((ing, index) => (
-          // Top-aligned, so the amount stays level with the name when a note makes the row taller
-          <Group key={ing.itemId} gap={0} wrap="nowrap" align="flex-start" py={7}
-            style={index < ingredients.length - 1 ? { borderBottom: "1px solid var(--mantine-color-default-border)" } : undefined}>
-            <Box w={56} style={{ flexShrink: 0 }}>
-              <MoveButtons intent="move-ingredient" fields={{ itemId: ing.itemId }}
-                first={index === 0} last={index === ingredients.length - 1} />
-            </Box>
-            <Box w={90} px="xs" c="dimmed" ta="right" style={{ flexShrink: 0 }}>{formatAmount(ing)}</Box>
-            <Box px="xs" style={{ flex: 1, minWidth: 0 }}><IngredientName {...ing} /></Box>
-            <Box w={48} px="xs" style={{ flexShrink: 0 }}>
-              <ActionIcon variant="subtle" onClick={() => editIngredient(ing)} aria-label={`${ing.name} bearbeiten`}>
-                <IconPencil size={16} />
-              </ActionIcon>
-            </Box>
-            <Box w={48} px="xs" style={{ flexShrink: 0 }}>
-              <Form method="post">
-                <input type="hidden" name="intent" value="remove-ingredient" />
-                <input type="hidden" name="itemId" value={ing.itemId} />
-                <ActionIcon variant="subtle" color="red" type="submit" aria-label={`${ing.name} entfernen`}>
-                  <IconTrash size={16} />
+        <SortableList items={orderedIngredients} idOf={(i) => i.itemId} onReorder={saveIngredientOrder}>
+          {(ing, index, grip) => (
+            // Top-aligned, so the amount stays level with the name when a note makes the row taller
+            <Group gap={0} wrap="nowrap" align="flex-start" py={7}
+              style={index < ingredients.length - 1 ? { borderBottom: "1px solid var(--mantine-color-default-border)" } : undefined}>
+              <Box w={36} style={{ flexShrink: 0 }}>{grip}</Box>
+              <Box w={90} px="xs" c="dimmed" ta="right" style={{ flexShrink: 0 }}>{formatAmount(ing)}</Box>
+              <Box px="xs" style={{ flex: 1, minWidth: 0 }}><IngredientName {...ing} /></Box>
+              <Box w={48} px="xs" style={{ flexShrink: 0 }}>
+                <ActionIcon variant="subtle" onClick={() => editIngredient(ing)} aria-label={`${ing.name} bearbeiten`}>
+                  <IconPencil size={16} />
                 </ActionIcon>
-              </Form>
-            </Box>
-          </Group>
-        ))}
+              </Box>
+              <Box w={48} px="xs" style={{ flexShrink: 0 }}>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="remove-ingredient" />
+                  <input type="hidden" name="itemId" value={ing.itemId} />
+                  <ActionIcon variant="subtle" color="red" type="submit" aria-label={`${ing.name} entfernen`}>
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </Form>
+              </Box>
+            </Group>
+          )}
+        </SortableList>
         {ingredients.length === 0 && <Text size="sm" c="dimmed" py={7} px="xs">Noch keine Zutaten.</Text>}
       </Box>
 

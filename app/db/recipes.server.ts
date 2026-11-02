@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { itemKey, itemKeys } from "~/item-names";
 import { type ParsedIngredient, type ParsedRecipe } from "~/recipe-import";
+import { sameIds } from "~/reorder";
 import { scaleAmount, type UnitKey } from "~/units";
 import { db } from "./client";
 import { recordRecipeVersion } from "./recipe-versions";
@@ -84,25 +85,22 @@ export async function upsertIngredient(
     .run();
 }
 
-// Swap positions with the neighbouring ingredient in the same recipe
-export async function moveIngredient(recipeId: number, itemId: number, up: boolean) {
-  await db.transaction(async (tx) => {
-    const ofItem = (id: number) => and(eq(schema.recipeIngredients.recipeId, recipeId), eq(schema.recipeIngredients.itemId, id));
-    const current = await tx.select().from(schema.recipeIngredients).where(ofItem(itemId)).get();
-    if (!current) return;
-    const neighbour = await tx
-      .select()
+// Puts a recipe's ingredients in the given order of item ids. Returns false and changes
+// nothing when the ids aren't exactly the recipe's ingredients (e.g. one was added meanwhile).
+export async function reorderIngredients(recipeId: number, itemIds: number[]) {
+  return await db.transaction(async (tx) => {
+    const current = await tx
+      .select({ itemId: schema.recipeIngredients.itemId })
       .from(schema.recipeIngredients)
-      .where(and(
-        eq(schema.recipeIngredients.recipeId, recipeId),
-        up ? lt(schema.recipeIngredients.position, current.position) : gt(schema.recipeIngredients.position, current.position),
-      ))
-      .orderBy(up ? desc(schema.recipeIngredients.position) : asc(schema.recipeIngredients.position))
-      .limit(1)
-      .get();
-    if (!neighbour) return;
-    await tx.update(schema.recipeIngredients).set({ position: neighbour.position }).where(ofItem(current.itemId)).run();
-    await tx.update(schema.recipeIngredients).set({ position: current.position }).where(ofItem(neighbour.itemId)).run();
+      .where(eq(schema.recipeIngredients.recipeId, recipeId));
+    if (!sameIds(current.map((i) => i.itemId), itemIds)) return false;
+    for (const [index, itemId] of itemIds.entries()) {
+      await tx.update(schema.recipeIngredients)
+        .set({ position: index + 1 })
+        .where(and(eq(schema.recipeIngredients.recipeId, recipeId), eq(schema.recipeIngredients.itemId, itemId)))
+        .run();
+    }
+    return true;
   });
 }
 
