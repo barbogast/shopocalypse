@@ -1,4 +1,5 @@
-import { Button, Container, Group, Text } from "@mantine/core";
+import { Anchor, Button, Container, Group, Text } from "@mantine/core";
+import { Link } from "react-router";
 import { IconRefresh } from "@tabler/icons-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { VERSION, type Version } from "~/version";
@@ -127,9 +128,12 @@ export function VersionFooter() {
   return (
     <Container py="md">
       <Group justify="space-between" wrap="nowrap" gap="xs">
-        <Text size="xs" c="dimmed" truncate>
-          {VERSION.sha ? `${VERSION.sha.slice(0, 7)} · ${VERSION.message}` : "Entwicklungsversion"}
-        </Text>
+        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+          <Anchor component={Link} to="/changelog" size="xs" style={{ flexShrink: 0 }}>Neuigkeiten</Anchor>
+          <Text size="xs" c="dimmed" truncate>
+            {VERSION.sha ? `${VERSION.sha.slice(0, 7)} · ${VERSION.message}` : "Entwicklungsversion"}
+          </Text>
+        </Group>
         {enabled && (
           <Button
             size="compact-xs"

@@ -14,5 +14,6 @@ export default [
   route("items/suggest", "routes/items.suggest.ts"),
   route("items/:id", "routes/items.$id.tsx"),
   route("shopping", "routes/shopping.tsx"),
+  route("changelog", "routes/changelog.tsx"),
   route("version", "routes/version.ts"),
 ] satisfies RouteConfig;
