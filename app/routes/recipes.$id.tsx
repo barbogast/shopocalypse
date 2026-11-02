@@ -146,12 +146,14 @@ export async function action({ request, params }: Route.ActionArgs) {
       return redirect(`/recipes/import?draft=${draftId}&chat`);
     }
 
-    // From DishPhoto, through a fetcher; already resized to a JPEG in the browser
+    // From DishPhoto, through a fetcher; the photo and its thumbnail already resized to JPEGs in the browser
     case "set-photo": {
       const photo = form.get("photo");
-      if (!(photo instanceof File) || photo.type !== "image/jpeg" || photo.size === 0) return { photoError: "Das Foto konnte nicht gelesen werden." };
-      if (photo.size > MAX_PHOTO_BYTES) return { photoError: "Das Foto ist zu groß." };
-      await setRecipePhoto(id, Buffer.from(await photo.arrayBuffer()));
+      const thumbnail = form.get("thumbnail");
+      const isJpeg = (file: FormDataEntryValue | null): file is File => file instanceof File && file.type === "image/jpeg" && file.size > 0;
+      if (!isJpeg(photo) || !isJpeg(thumbnail)) return { photoError: "Das Foto konnte nicht gelesen werden." };
+      if (photo.size + thumbnail.size > MAX_PHOTO_BYTES) return { photoError: "Das Foto ist zu groß." };
+      await setRecipePhoto(id, Buffer.from(await photo.arrayBuffer()), Buffer.from(await thumbnail.arrayBuffer()));
       break;
     }
 

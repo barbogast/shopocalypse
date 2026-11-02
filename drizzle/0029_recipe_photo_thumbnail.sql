@@ -1,0 +1,1 @@
+ALTER TABLE `recipe_photos` ADD `thumbnail` blob;

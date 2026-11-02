@@ -4,17 +4,20 @@ import {
   Badge,
   Button,
   Card,
+  Center,
   Container,
   Divider,
   Group,
+  Image,
   NumberInput,
   Select,
   Stack,
   Table,
   Text,
   Title,
+  UnstyledButton,
 } from "@mantine/core";
-import { IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
+import { IconPhoto, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
 import { asc, desc, eq } from "drizzle-orm";
 import { useEffect, useState } from "react";
 import { Form, Link } from "react-router";
@@ -25,6 +28,7 @@ import { SortableList, useReorder } from "~/components/sortable-list";
 import { SubmitButton } from "~/components/submit-button";
 import { ThawWarning } from "~/components/thaw-warning";
 import { db } from "~/db/client";
+import { photoUrl } from "~/db/recipe-photos.server";
 import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
 import { autoFill, reorderSchedule, scheduleRecipe } from "~/db/schedule.server";
 import * as schema from "~/db/schema";
@@ -48,11 +52,14 @@ export async function loader() {
       instructions: schema.recipes.instructions,
       comments: schema.recipes.comments,
       weblink: schema.recipes.weblink,
+      photoUpdatedAt: schema.recipePhotos.updatedAt,
     })
     .from(schema.mealSchedule)
     .innerJoin(schema.recipes, eq(schema.mealSchedule.recipeId, schema.recipes.id))
+    .leftJoin(schema.recipePhotos, eq(schema.recipePhotos.recipeId, schema.recipes.id))
     .orderBy(asc(schema.mealSchedule.position))
-    .then(withIngredients);
+    .then(withIngredients)
+    .then((meals) => meals.map(({ photoUpdatedAt, ...m }) => ({ ...m, thumbnailUrl: photoUrl(m.id, photoUpdatedAt, "thumbnail") })));
 
   const allRecipes = await db
     .select({ id: schema.recipes.id, name: schema.recipes.name })
@@ -132,6 +139,18 @@ export async function action({ request }: Route.ActionArgs) {
   return null;
 }
 
+const THUMBNAIL_SIZE = 44;
+
+function MealThumbnail({ url }: { url: string | null }) {
+  return url ? (
+    <Image src={url} alt="" w={THUMBNAIL_SIZE} h={THUMBNAIL_SIZE} radius="sm" />
+  ) : (
+    <Center w={THUMBNAIL_SIZE} h={THUMBNAIL_SIZE} bg="var(--mantine-color-default-hover)" style={{ borderRadius: "var(--mantine-radius-sm)" }}>
+      <IconPhoto size={18} color="var(--mantine-color-dimmed)" />
+    </Center>
+  );
+}
+
 export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   const { allRecipes, recentlyCooked } = loaderData;
   const [scheduled, reorder] = useReorder(loaderData.scheduled, (m) => m.position, "reorder");
@@ -146,6 +165,8 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   // Tapping a meal's name opens its recipe details
   const [openPosition, setOpenPosition] = useState<number | null>(null);
   const open = scheduled.find((m) => m.position === openPosition);
+  // Rows without a photo get an empty square, so the names stay aligned; none at all when no meal has one
+  const showThumbnails = scheduled.some((m) => m.thumbnailUrl);
 
   return (
     <Container size="sm" py="xl">
@@ -166,6 +187,11 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                   <Group justify="space-between" wrap={isNext ? "wrap" : "nowrap"}>
                     <Group gap="xs" wrap="nowrap" style={isNext ? { flex: "1 1 220px" } : { flex: 1, minWidth: 0 }}>
                       {grip}
+                      {showThumbnails && (
+                        <UnstyledButton onClick={() => setOpenPosition(meal.position)} aria-hidden tabIndex={-1} style={{ flexShrink: 0 }}>
+                          <MealThumbnail url={meal.thumbnailUrl} />
+                        </UnstyledButton>
+                      )}
                       <Stack gap={0}>
                         <Anchor component="button" type="button" c="inherit" ta="left" onClick={() => setOpenPosition(meal.position)}>
                           {meal.name}

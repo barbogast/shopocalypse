@@ -6,7 +6,7 @@ heading per day.
 
 ## 2026-11-02
 
-- Rezepte können ein Foto vom Gericht haben: „Foto hinzufügen“ oben auf der Rezeptseite, oder ein Bild auf der Seite einfügen. Es erscheint auch beim Kochen.
+- Rezepte können ein Foto vom Gericht haben: „Foto hinzufügen“ oben auf der Rezeptseite, oder ein Bild auf der Seite einfügen. Es erscheint auch beim Kochen und klein im Speiseplan.
 - Rezepte lassen sich mit „Mit AI überarbeiten“ im Chat ändern: speichern ersetzt das Rezept, „Als neues Rezept speichern“ legt eine Variante an. „Änderungen“ zeigt den Unterschied zum gespeicherten Rezept.
 - Im Chat mit Claude zeigt jede Antwort, was sie am Rezept geändert hat. Im Änderungsverlauf sind geänderte Wörter jetzt hervorgehoben.
 - Neu: diese Seite. Ganz unten auf jeder Seite führt „Neuigkeiten“ hierher.

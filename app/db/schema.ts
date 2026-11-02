@@ -61,6 +61,8 @@ export const recipePhotos = sqliteTable("recipe_photos", {
     .primaryKey()
     .references(() => recipes.id),
   data: blob("data", { mode: "buffer" }).notNull(),
+  // A small square of it for lists; null for photos uploaded before thumbnails, which then use data
+  thumbnail: blob("thumbnail", { mode: "buffer" }),
   // ISO timestamp of the upload; part of the photo's URL, so a new photo isn't hidden by the cached old one
   updatedAt: text("updated_at").notNull(),
 });

@@ -2,7 +2,7 @@ import { Button, Group, Image, Stack, Text } from "@mantine/core";
 import { IconPhoto, IconPhotoX } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
-import { resizePhoto } from "~/image-resize";
+import { photoThumbnail, resizePhoto } from "~/image-resize";
 import { confirmFirst } from "~/forms";
 
 // The photo of the dish on the recipe page, with buttons to add, replace or remove it.
@@ -42,6 +42,7 @@ export function DishPhoto({ recipeId, url }: { recipeId: number; url: string | n
       const form = new FormData();
       form.set("intent", "set-photo");
       form.set("photo", await resizePhoto(file), "photo.jpg");
+      form.set("thumbnail", await photoThumbnail(file), "thumbnail.jpg");
       fetcher.submit(form, { method: "post", action, encType: "multipart/form-data" });
     } catch {
       setResizeError("Das Foto konnte nicht geöffnet werden.");
