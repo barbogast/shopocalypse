@@ -7,7 +7,7 @@ import type { action } from "~/routes/recipes.import";
 
 // Reads a recipe from photos through the import page, which then opens it as a draft.
 // Posts there explicitly, so it also works from the list of recipes.
-export function RecipePhotoButton({ hasUnsavedText = false }: { hasUnsavedText?: boolean }) {
+export function RecipePhotoButton() {
   const fetcher = useFetcher<typeof action>();
   const input = useRef<HTMLInputElement>(null);
   const [resizing, setResizing] = useState(false);
@@ -48,10 +48,7 @@ export function RecipePhotoButton({ hasUnsavedText = false }: { hasUnsavedText?:
         variant="light"
         leftSection={<IconCamera size={16} />}
         loading={resizing || fetcher.state !== "idle"}
-        onClick={() => {
-          if (hasUnsavedText && !confirm("Den hier eingegebenen Text durch den vom Foto ersetzen?")) return;
-          input.current?.click();
-        }}
+        onClick={() => input.current?.click()}
       >
         Vom Foto
       </Button>

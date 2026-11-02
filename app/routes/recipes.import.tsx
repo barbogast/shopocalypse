@@ -7,7 +7,6 @@ import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { LineGutter, TEXT_METRICS } from "~/components/line-gutter";
 import { PluralSuggestion } from "~/components/plural-suggestion";
-import { RecipePhotoButton } from "~/components/recipe-photo-button";
 import { LocalDateTime } from "~/components/local-date-time";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
@@ -550,11 +549,6 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
   // ?chat, from the list of recipes, starts with the chat open
   const openChat = useSearchParams()[0].has("chat");
   const [chatOpen, setChatOpen] = useState(() => (draft?.chat.length ?? 0) > 0 || openChat);
-  const chatButton = !chatOpen && (
-    <Button variant="light" size={draft ? "xs" : "sm"} leftSection={<IconMessageCircle size={16} />} onClick={() => setChatOpen(true)}>
-      {draft ? "Mit AI überarbeiten" : "Mit Claude"}
-    </Button>
-  );
   const [notesOnList, setNotesOnList] = useState(() => new Set<string>());
   const toggleNoteOnList = (ing: ParsedIngredient, checked: boolean) =>
     setNotesOnList((prev) => {
@@ -593,18 +587,16 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
               <Group justify="space-between">
                 <Text size="sm" c="dimmed">Entwurf · {saveStatus}</Text>
                 <Group gap="xs">
-                  {chatButton}
+                  {!chatOpen && (
+                    <Button variant="light" size="xs" leftSection={<IconMessageCircle size={16} />} onClick={() => setChatOpen(true)}>
+                      Mit AI überarbeiten
+                    </Button>
+                  )}
                   <DiscardDraftButton id={draft.id} />
                 </Group>
               </Group>
             ) : (
-              <>
-                <Group gap="sm">
-                  <RecipePhotoButton hasUnsavedText={input.trim() !== ""} />
-                  {chatButton}
-                </Group>
-                {input.trim() === "" && !chatOpen && <DraftList drafts={drafts} />}
-              </>
+              input.trim() === "" && !chatOpen && <DraftList drafts={drafts} />
             )}
             {chatOpen && <RecipeChat fetcher={chatFetcher} draftId={draft?.id ?? null} chat={draft?.chat ?? []} text={input} preferences={preferences} />}
             <Textarea
