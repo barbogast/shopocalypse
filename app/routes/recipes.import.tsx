@@ -552,7 +552,7 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
   const [chatOpen, setChatOpen] = useState(() => (draft?.chat.length ?? 0) > 0 || openChat);
   const chatButton = !chatOpen && (
     <Button variant="light" size={draft ? "xs" : "sm"} leftSection={<IconMessageCircle size={16} />} onClick={() => setChatOpen(true)}>
-      {draft ? "Mit Claude überarbeiten" : "Mit Claude"}
+      {draft ? "Mit AI überarbeiten" : "Mit Claude"}
     </Button>
   );
   const [notesOnList, setNotesOnList] = useState(() => new Set<string>());

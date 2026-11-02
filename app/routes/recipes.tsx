@@ -67,7 +67,7 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
         <Group gap="xs">
           <RecipePhotoButton />
           <Button component={Link} to="/recipes/import?chat" variant="light" leftSection={<IconMessageCircle size={16} />}>
-            Mit Claude
+            Mit AI
           </Button>
           <Button component={Link} to="/recipes/import" variant="light" leftSection={<IconFileImport size={16} />}>
             Aus Text
