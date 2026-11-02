@@ -1,12 +1,13 @@
 import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Code, Collapse, Container, Group, List, Paper, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
-import { IconAlertCircle, IconCamera, IconCheck, IconFileImport, IconMessageCircle, IconSend, IconSettings, IconSparkles, IconTrash } from "@tabler/icons-react";
+import { IconAlertCircle, IconCheck, IconFileImport, IconMessageCircle, IconSend, IconSettings, IconSparkles, IconTrash } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { eq } from "drizzle-orm";
-import { type FetcherWithComponents, Form, Link, redirect, type ShouldRevalidateFunctionArgs, useFetcher } from "react-router";
+import { type FetcherWithComponents, Form, Link, redirect, type ShouldRevalidateFunctionArgs, useFetcher, useSearchParams } from "react-router";
 import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { LineGutter, TEXT_METRICS } from "~/components/line-gutter";
 import { PluralSuggestion } from "~/components/plural-suggestion";
+import { RecipePhotoButton } from "~/components/recipe-photo-button";
 import { LocalDateTime } from "~/components/local-date-time";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
@@ -20,7 +21,6 @@ import { importRecipe } from "~/db/recipes.server";
 import { getSetting, setSetting } from "~/db/settings.server";
 import * as schema from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
-import { resizePhoto } from "~/image-resize";
 import type { ChatMessage } from "~/recipe-chat";
 import { chatRecipe } from "~/recipe-chat.server";
 import { type Photo, transcribeRecipe } from "~/recipe-photo.server";
@@ -180,59 +180,6 @@ function FormatHelp() {
 
 // Opens the camera on a phone (or a file picker elsewhere) and lets Claude write the recipe text from the
 // photos; several photos are pages of one recipe. The text is saved as a new draft, which then opens.
-function PhotoButton({ hasUnsavedText }: { hasUnsavedText: boolean }) {
-  const fetcher = useFetcher<typeof action>();
-  const input = useRef<HTMLInputElement>(null);
-  const [resizing, setResizing] = useState(false);
-  const [resizeError, setResizeError] = useState<string | null>(null);
-
-  async function upload(files: File[]) {
-    if (files.length === 0) return;
-    setResizing(true);
-    setResizeError(null);
-    try {
-      const form = new FormData();
-      form.set("intent", "transcribe-photo");
-      for (const file of files) form.append("photo", await resizePhoto(file), "photo.jpg");
-      fetcher.submit(form, { method: "post", encType: "multipart/form-data" });
-    } catch {
-      setResizeError("Das Foto konnte nicht geöffnet werden.");
-    } finally {
-      setResizing(false);
-    }
-  }
-
-  return (
-    <Group gap="sm">
-      <input
-        ref={input}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        multiple
-        hidden
-        onChange={(e) => {
-          const files = [...(e.currentTarget.files ?? [])];
-          e.currentTarget.value = "";
-          upload(files);
-        }}
-      />
-      <Button
-        variant="light"
-        leftSection={<IconCamera size={16} />}
-        loading={resizing || fetcher.state !== "idle"}
-        onClick={() => {
-          if (hasUnsavedText && !confirm("Den hier eingegebenen Text durch den vom Foto ersetzen?")) return;
-          input.current?.click();
-        }}
-      >
-        Vom Foto
-      </Button>
-      {(resizeError ?? fetcher.data?.error) && <Text size="sm" c="red">{resizeError ?? fetcher.data?.error}</Text>}
-    </Group>
-  );
-}
-
 // Buttons rather than forms, since they sit inside the import form
 
 // Asks Claude for a recipe or a change to the draft. Sends the text as it stands, which Claude's answer
@@ -583,7 +530,9 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
   const [input, setInput] = useState(draft?.text ?? "");
   const saveStatus = useAutosave(draft, input);
   const chatFetcher = useFetcher<typeof action>();
-  const [chatOpen, setChatOpen] = useState((draft?.chat.length ?? 0) > 0);
+  // ?chat, from the list of recipes, starts with the chat open
+  const openChat = useSearchParams()[0].has("chat");
+  const [chatOpen, setChatOpen] = useState(() => (draft?.chat.length ?? 0) > 0 || openChat);
   const chatButton = !chatOpen && (
     <Button variant="light" size={draft ? "xs" : "sm"} leftSection={<IconMessageCircle size={16} />} onClick={() => setChatOpen(true)}>
       {draft ? "Mit Claude überarbeiten" : "Mit Claude"}
@@ -634,7 +583,7 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
             ) : (
               <>
                 <Group gap="sm">
-                  <PhotoButton hasUnsavedText={input.trim() !== ""} />
+                  <RecipePhotoButton hasUnsavedText={input.trim() !== ""} />
                   {chatButton}
                 </Group>
                 {input.trim() === "" && !chatOpen && <DraftList drafts={drafts} />}

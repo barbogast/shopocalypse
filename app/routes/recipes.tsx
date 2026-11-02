@@ -1,7 +1,8 @@
 import { ActionIcon, Badge, Button, Container, Group, SegmentedControl, Switch, Table, Text, Title, Tooltip } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconFileImport, IconPlayerPlay, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconFileImport, IconMessageCircle, IconPlayerPlay, IconPlus, IconTrash } from "@tabler/icons-react";
 import { desc, eq } from "drizzle-orm";
 import { Form, Link, useSearchParams } from "react-router";
+import { RecipePhotoButton } from "~/components/recipe-photo-button";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
@@ -64,6 +65,10 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
           <Text c="dimmed" size="sm">{all.length}</Text>
         </Group>
         <Group gap="xs">
+          <RecipePhotoButton />
+          <Button component={Link} to="/recipes/import?chat" variant="light" leftSection={<IconMessageCircle size={16} />}>
+            Mit Claude
+          </Button>
           <Button component={Link} to="/recipes/import" variant="light" leftSection={<IconFileImport size={16} />}>
             Importieren
           </Button>
