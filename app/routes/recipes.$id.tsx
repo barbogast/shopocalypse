@@ -15,7 +15,7 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { IconArchive, IconArchiveOff, IconCalendarPlus, IconCheck, IconHistory, IconPencil, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
+import { IconArchive, IconArchiveOff, IconCalendarPlus, IconCheck, IconHistory, IconMessageCircle, IconPencil, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Form, Link, redirect, useNavigation } from "react-router";
@@ -26,7 +26,8 @@ import { SortableList, useReorder } from "~/components/sortable-list";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
 import { loadItemFormOptions } from "~/db/items.server";
-import { recordRecipeVersion } from "~/db/recipe-versions";
+import { createDraft, draftForRecipe } from "~/db/recipe-drafts.server";
+import { recipeText, recordRecipeVersion } from "~/db/recipe-versions";
 import {
   deleteOrArchiveRecipe,
   formatCookedAt,
@@ -132,6 +133,14 @@ export async function action({ request, params }: Route.ActionArgs) {
         .where(and(eq(schema.recipeIngredients.recipeId, id), eq(schema.recipeIngredients.itemId, itemId)));
       await recordRecipeVersion(db, id);
       break;
+    }
+
+    // Opens the recipe in the chat with Claude, as a draft saved over it; picks up a rework already open
+    case "ai-edit": {
+      const [recipe] = await db.select().from(schema.recipes).where(eq(schema.recipes.id, id));
+      if (!recipe) throw new Response("Not found", { status: 404 });
+      const draftId = await draftForRecipe(id) ?? await createDraft(await recipeText(db, recipe), [], id);
+      return redirect(`/recipes/import?draft=${draftId}&chat`);
     }
 
     case "delete": {
@@ -243,6 +252,10 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
               <SubmitButton variant="light" leftSection={<IconCalendarPlus size={16} />}>Zum Speiseplan</SubmitButton>
             </Form>
           )}
+          <Form method="post">
+            <input type="hidden" name="intent" value="ai-edit" />
+            <SubmitButton variant="light" leftSection={<IconMessageCircle size={16} />}>Mit AI überarbeiten</SubmitButton>
+          </Form>
           <Button component={Link} to={`/cook/${recipe.id}`} color="green" leftSection={<IconPlayerPlay size={16} />}>
             Jetzt kochen
           </Button>

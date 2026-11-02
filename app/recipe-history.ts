@@ -25,8 +25,8 @@ function markWords(removed: ChangedLine, added: ChangedLine) {
 // The line changes from one recipe version's text to the next, with long unchanged
 // stretches cut down to the lines around the changes
 export function diffVersions(older: string, newer: string) {
-  // Trailing newlines, so a line added at the end doesn't also change the line before it
-  const lines: DiffLine[] = diffLines(`${older}\n`, `${newer}\n`).flatMap((part) => {
+  // Trailing newlines, so a line added at the end doesn't also change the line before it; blank lines at the end don't count
+  const lines: DiffLine[] = diffLines(`${older.trimEnd()}\n`, `${newer.trimEnd()}\n`).flatMap((part) => {
     const kind = part.added ? "added" : part.removed ? "removed" : "same";
     return part.value.replace(/\n$/, "").split("\n").map((text) => ({ kind, text }) as DiffLine);
   });

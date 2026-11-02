@@ -29,6 +29,8 @@ export async function deleteOrArchiveRecipe(recipeId: number) {
     } else {
       await tx.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, recipeId)).run();
       await tx.delete(schema.recipeVersions).where(eq(schema.recipeVersions.recipeId, recipeId)).run();
+      // A rework still open becomes a draft for a new recipe
+      await tx.update(schema.recipeDrafts).set({ recipeId: null }).where(eq(schema.recipeDrafts.recipeId, recipeId)).run();
       await tx.delete(schema.recipes).where(eq(schema.recipes.id, recipeId)).run();
     }
   });
@@ -129,26 +131,49 @@ export async function findOrCreateItems(tx: Tx, ingredients: Pick<ParsedIngredie
   return { idsByKey, newItems, storeName: store?.name ?? null };
 }
 
+type RecipeFromText = Omit<ParsedRecipe, "ingredients"> & {
+  servingSize: number;
+  ingredients: (ParsedIngredient & { noteOnList: boolean })[];
+};
+
+// The ingredient rows for a recipe from text, in the text's order
+function ingredientRows(recipeId: number, ingredients: RecipeFromText["ingredients"], idsByKey: Map<string, number>) {
+  return ingredients.map((ing, index) => ({
+    recipeId,
+    position: index + 1,
+    itemId: idsByKey.get(itemKey(ing.name))!,
+    quantity: ing.quantity,
+    unit: ing.unit,
+    note: ing.note,
+    noteOnList: ing.noteOnList,
+  }));
+}
+
 // Creates a parsed recipe in one go, with the notes ticked to go on the shopping list. Ingredients are
 // matched to items, or new ones created, by findOrCreateItems.
 // Returns the recipe id, the items it created and the store they were put in.
-export async function importRecipe({ ingredients, ...recipe }: Omit<ParsedRecipe, "ingredients"> & {
-  servingSize: number;
-  ingredients: (ParsedIngredient & { noteOnList: boolean })[];
-}) {
+export async function importRecipe({ ingredients, ...recipe }: RecipeFromText) {
   return db.transaction(async (tx) => {
     const { idsByKey, newItems, storeName } = await findOrCreateItems(tx, ingredients);
 
     const [{ id }] = await tx.insert(schema.recipes).values(recipe).returning({ id: schema.recipes.id });
-    await tx.insert(schema.recipeIngredients).values(ingredients.map((ing, index) => ({
-      recipeId: id,
-      position: index + 1,
-      itemId: idsByKey.get(itemKey(ing.name))!,
-      quantity: ing.quantity,
-      unit: ing.unit,
-      note: ing.note,
-      noteOnList: ing.noteOnList,
-    }))).run();
+    if (ingredients.length) await tx.insert(schema.recipeIngredients).values(ingredientRows(id, ingredients, idsByKey)).run();
+    await recordRecipeVersion(tx, id);
+
+    return { id, newItems, storeName };
+  });
+}
+
+// Saves a reworked recipe over the existing one, which keeps its id, and with it its meal history,
+// schedule and shopping list entries; what the text doesn't hold (auto-fill, archived) stays as it was.
+// Returns the items it created and the store they were put in, as importRecipe does.
+export async function updateRecipeFromText(id: number, { ingredients, ...recipe }: RecipeFromText) {
+  return db.transaction(async (tx) => {
+    const { idsByKey, newItems, storeName } = await findOrCreateItems(tx, ingredients);
+
+    await tx.update(schema.recipes).set(recipe).where(eq(schema.recipes.id, id)).run();
+    await tx.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, id)).run();
+    if (ingredients.length) await tx.insert(schema.recipeIngredients).values(ingredientRows(id, ingredients, idsByKey)).run();
     await recordRecipeVersion(tx, id);
 
     return { id, newItems, storeName };

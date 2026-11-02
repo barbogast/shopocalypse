@@ -72,6 +72,8 @@ export const recipeDrafts = sqliteTable("recipe_drafts", {
   text: text("text").notNull(),
   // The chat with Claude that wrote it, as JSON [{ role, content }]; null for drafts typed or made from a photo
   chat: text("chat"),
+  // The recipe this draft reworks, saved over it unless saved as a new recipe; null for a new recipe
+  recipeId: integer("recipe_id").references(() => recipes.id),
   // ISO timestamp of the last save
   updatedAt: text("updated_at").notNull(),
 });

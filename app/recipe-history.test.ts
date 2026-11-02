@@ -66,4 +66,8 @@ describe("diffVersions", () => {
       { kind: "added", text: "Pfeffer" },
     ]);
   });
+
+  it("ignores blank lines at the end", () => {
+    expect(diffVersions("a\nb", "a\nb\n\n").added).toBe(0);
+  });
 });

@@ -25,7 +25,7 @@ export function RecipeDiff({ lines }: { lines: DiffLine[] }) {
         const words = "words" in line ? line.words : undefined;
         return (
           <Group key={i} gap={6} wrap="nowrap" align="flex-start" bg={style.bg} c={style.c} px={4}>
-            <Box component="span" ff="monospace" aria-hidden>{style.marker}</Box>
+            <Box component="span" ff="monospace" style={{ flexShrink: 0 }} aria-hidden>{style.marker}</Box>
             <Box component="span" td={line.kind === "removed" && !words ? "line-through" : undefined}>
               {words
                 ? words.map((w, j) => w.changed

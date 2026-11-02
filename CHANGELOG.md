@@ -6,6 +6,7 @@ heading per day.
 
 ## 2026-11-02
 
+- Rezepte lassen sich mit „Mit AI überarbeiten“ im Chat ändern: speichern ersetzt das Rezept, „Als neues Rezept speichern“ legt eine Variante an. „Änderungen“ zeigt den Unterschied zum gespeicherten Rezept.
 - Im Chat mit Claude zeigt jede Antwort, was sie am Rezept geändert hat. Im Änderungsverlauf sind geänderte Wörter jetzt hervorgehoben.
 - Neu: diese Seite. Ganz unten auf jeder Seite führt „Neuigkeiten“ hierher.
 - Speiseplan und Zutaten eines Rezepts lassen sich per Ziehen umsortieren.

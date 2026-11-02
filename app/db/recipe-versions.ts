@@ -28,11 +28,16 @@ async function ingredientsOf(db: Db, recipeIds: number[]) {
     .all();
 }
 
+// A recipe written out in the import format, as its versions are
+export async function recipeText(db: Db, recipe: typeof schema.recipes.$inferSelect) {
+  return recipeToText({ ...recipe, ingredients: await ingredientsOf(db, [recipe.id]) });
+}
+
 // Call after changing a recipe's name, servings, weblink, ingredients, instructions or comments
 export async function recordRecipeVersion(db: Db, recipeId: number, now = new Date()) {
   const recipe = await db.select().from(schema.recipes).where(eq(schema.recipes.id, recipeId)).get();
   if (!recipe) return;
-  const text = recipeToText({ ...recipe, ingredients: await ingredientsOf(db, [recipeId]) });
+  const text = await recipeText(db, recipe);
 
   const [latest, previous] = await db
     .select()

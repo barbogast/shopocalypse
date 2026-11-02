@@ -1,4 +1,4 @@
-import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Code, Collapse, Container, Group, List, Paper, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
+import { ActionIcon, Alert, Anchor, Badge, Button, Card, Checkbox, Code, Collapse, Container, Group, List, Paper, SegmentedControl, SimpleGrid, Stack, Table, Text, Textarea, Title } from "@mantine/core";
 import { IconAlertCircle, IconCheck, IconFileImport, IconMessageCircle, IconSend, IconSettings, IconSparkles, IconTrash } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { asc, eq } from "drizzle-orm";
@@ -17,7 +17,8 @@ import { setPlural } from "~/db/items.server";
 import { createDraft, deleteDraft, getDraft, listDrafts, saveChat, saveDraft } from "~/db/recipe-drafts.server";
 import { AcceptedSchema, applySuggestions } from "~/item-suggest.server";
 import type { action as suggestAction } from "~/routes/items.suggest";
-import { importRecipe } from "~/db/recipes.server";
+import { recipeText } from "~/db/recipe-versions";
+import { importRecipe, updateRecipeFromText } from "~/db/recipes.server";
 import { getSetting, setSetting } from "~/db/settings.server";
 import * as schema from "~/db/schema";
 import { editItemPath, int, text } from "~/forms";
@@ -59,8 +60,22 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     allItems, recipeNames: recipeNames.map((r) => r.name), allStores, allShelves,
     draft, draftGone: draftParam != null && !draft, drafts: await listDrafts(),
+    original: draft?.recipeId ? await originalRecipe(draft.recipeId, allItems) : null,
     preferences: await getSetting("recipePreferences"),
   };
+}
+
+// The recipe a draft reworks: its text as saved, to show what changed, and the notes it puts on the shopping list,
+// which the text leaves out. Those are found by position, since the text lists the ingredients in recipe order.
+async function originalRecipe(id: number, allItems: { name: string; plural: string | null }[]) {
+  const recipe = await db.select().from(schema.recipes).where(eq(schema.recipes.id, id)).get();
+  if (!recipe) return null;
+  const savedText = await recipeText(db, recipe);
+  const rows = await db.select({ noteOnList: schema.recipeIngredients.noteOnList }).from(schema.recipeIngredients)
+    .where(eq(schema.recipeIngredients.recipeId, id)).orderBy(asc(schema.recipeIngredients.position));
+  const parsed = parseRecipeText(savedText, allItems).recipe.ingredients;
+  const notesOnList = parsed.filter((ing, i) => ing.note && rows[i]?.noteOnList).map(noteKey);
+  return { id, name: recipe.name, savedText, notesOnList };
 }
 
 // The recipes in use, with their ingredients in order, so the chat suggests something else; archived ones may come back
@@ -167,10 +182,20 @@ export async function action({ request }: Route.ActionArgs) {
   // Lines whose note was ticked in the preview to go on the shopping list
   const noteOnListLines = new Set(form.getAll("noteOnList").map(Number));
   const ingredients = recipe.ingredients.map((ing) => ({ ...ing, noteOnList: ing.note !== null && noteOnListLines.has(ing.line) }));
-  const { id, newItems, storeName } = await importRecipe({ ...recipe, servingSize: recipe.servingSize, ingredients });
+  const parsed = { ...recipe, servingSize: recipe.servingSize, ingredients };
   const draftId = int(form, "draftId");
+
+  // "Änderungen speichern" on a draft reworking a recipe; "Als neues Rezept speichern" imports it like any other
+  let saved;
+  if (form.get("intent") === "update") {
+    const recipeId = draftId ? (await getDraft(draftId))?.recipeId : null;
+    if (!recipeId) return { error: "Diesen Entwurf gibt es nicht mehr: Er wurde gespeichert oder verworfen.", imported: null };
+    saved = { ...await updateRecipeFromText(recipeId, parsed), updated: true };
+  } else {
+    saved = { ...await importRecipe(parsed), updated: false };
+  }
   if (draftId) await deleteDraft(draftId);
-  return { error: null, imported: { id, name: recipe.name, newItems, storeName } };
+  return { error: null, imported: { ...saved, name: recipe.name } };
 }
 
 // The text format, kept in view while typing (the placeholder disappears)
@@ -322,7 +347,7 @@ function Preferences({ saved }: { saved: string | null }) {
 }
 
 // Drafts to pick up, shown while not editing one
-function DraftList({ drafts }: { drafts: { id: number; name: string; updatedAt: string }[] }) {
+function DraftList({ drafts }: { drafts: { id: number; name: string; updatedAt: string; recipeId: number | null }[] }) {
   if (drafts.length === 0) return null;
   return (
     <Card withBorder radius="md" p="md">
@@ -336,13 +361,14 @@ function DraftList({ drafts }: { drafts: { id: number; name: string; updatedAt: 
   );
 }
 
-function DraftRow({ id, name, updatedAt }: { id: number; name: string; updatedAt: string }) {
+function DraftRow({ id, name, updatedAt, recipeId }: { id: number; name: string; updatedAt: string; recipeId: number | null }) {
   const fetcher = useFetcher<typeof action>();
   if (fetcher.state !== "idle") return null;
   return (
     <Table.Tr>
       <Table.Td>
         <Anchor component={Link} to={`/recipes/import?draft=${id}`} size="sm">{name || "Ohne Titel"}</Anchor>
+        {recipeId != null && <Badge size="xs" variant="light" ml={6}>Überarbeitung</Badge>}
       </Table.Td>
       <Table.Td c="dimmed" fz="sm"><LocalDateTime iso={updatedAt} /></Table.Td>
       <Table.Td style={{ width: 40 }}>
@@ -507,9 +533,10 @@ function SuggestForNewItems({ newItems, names, onShelved }: {
 // Shown instead of the form once a recipe is imported
 // Navigating to this same route keeps the component mounted, so the caller
 // clears its text through onImportAnother
-function Imported({ id, name, newItems, storeName, names, onImportAnother }: {
+function Imported({ id, name, updated, newItems, storeName, names, onImportAnother }: {
   id: number;
   name: string;
+  updated: boolean;
   newItems: NewItem[];
   storeName: string | null;
   names: Names;
@@ -521,7 +548,7 @@ function Imported({ id, name, newItems, storeName, names, onImportAnother }: {
 
   return (
     <Container size="sm" py="xl">
-      <Alert color="green" variant="light" icon={<IconCheck size={16} />} title={`„${name}“ importiert`} mb="lg">
+      <Alert color="green" variant="light" icon={<IconCheck size={16} />} title={`„${name}“ ${updated ? "gespeichert" : "importiert"}`} mb="lg">
         {unsorted.length > 0 && (
           <>
             <Text size="sm" mb="xs">
@@ -561,14 +588,18 @@ export default function ImportRecipe(props: Route.ComponentProps) {
 }
 
 function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
-  const { allItems, recipeNames, allStores, allShelves, draft, draftGone, drafts, preferences } = loaderData;
+  const { allItems, recipeNames, allStores, allShelves, draft, draftGone, drafts, preferences, original } = loaderData;
   const [input, setInput] = useState(draft?.text ?? "");
   const saveStatus = useAutosave(draft, input);
   const chatFetcher = useFetcher<typeof action>();
   // ?chat, from the list of recipes, starts with the chat open
   const openChat = useSearchParams()[0].has("chat");
   const [chatOpen, setChatOpen] = useState(() => (draft?.chat.length ?? 0) > 0 || openChat);
-  const [notesOnList, setNotesOnList] = useState(() => new Set<string>());
+  // A reworked recipe starts with the notes it puts on the shopping list ticked
+  const [notesOnList, setNotesOnList] = useState(() => new Set<string>(original?.notesOnList));
+  // Reworking a recipe, the preview can show what changed instead
+  const [view, setView] = useState<"preview" | "changes">("preview");
+  const changes = useMemo(() => (original && view === "changes" ? diffVersions(original.savedText, input) : null), [original, view, input]);
   const toggleNoteOnList = (ing: ParsedIngredient, checked: boolean) =>
     setNotesOnList((prev) => {
       const next = new Set(prev);
@@ -590,12 +621,14 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
   }
 
   const newItemCount = recipe.ingredients.filter((ing) => !knownItems.has(itemKey(ing.name))).length;
-  const nameTaken = recipe.name !== "" && recipeNames.some((n) => itemKey(n) === itemKey(recipe.name));
+  // Keeping a reworked recipe's own name is fine
+  const nameTaken = recipe.name !== "" && itemKey(recipe.name) !== itemKey(original?.name ?? "")
+    && recipeNames.some((n) => itemKey(n) === itemKey(recipe.name));
   const canImport = input.trim() !== "" && errors.length === 0;
 
   return (
     <Container size="lg" py="xl">
-      <Title mb="lg">Rezept importieren</Title>
+      <Title mb="lg">{original ? `„${original.name}“ überarbeiten` : "Rezept importieren"}</Title>
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
         <Form method="post">
           <Stack>
@@ -643,7 +676,14 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
               .map((ing) => <input key={ing.line} type="hidden" name="noteOnList" value={ing.line} />)}
             <FormError error={actionData?.error} />
             <Group>
-              <SubmitButton disabled={!canImport}>Importieren</SubmitButton>
+              {original ? (
+                <>
+                  <SubmitButton name="intent" value="update" disabled={!canImport}>Änderungen speichern</SubmitButton>
+                  <SubmitButton variant="light" disabled={!canImport}>Als neues Rezept speichern</SubmitButton>
+                </>
+              ) : (
+                <SubmitButton disabled={!canImport}>Importieren</SubmitButton>
+              )}
               {canImport && newItemCount > 0 && (
                 <Text size="sm" c="dimmed">
                   Legt {newItemCount} {newItemCount === 1 ? "neue Zutat" : "neue Zutaten"} an
@@ -666,54 +706,69 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
           )}
           {nameTaken && (
             <Alert color="yellow" variant="light" py="xs">
-              Es gibt schon ein Rezept namens „{recipe.name}“; der Import legt ein zweites an.
+              Es gibt schon ein Rezept namens „{recipe.name}“; {original ? "„Als neues Rezept speichern“" : "der Import"} legt ein zweites an.
             </Alert>
           )}
 
-          <Card withBorder radius="md" p="md">
-            <Title order={3}>{recipe.name || <Text span c="dimmed" inherit>Name</Text>}</Title>
-            <Text size="sm" c="dimmed" mb="md">
-              {recipe.servingSize ? `Für ${recipe.servingSize} Portionen` : "Portionen —"}
-              {recipe.weblink && <> · <Weblink href={recipe.weblink} size="sm" /></>}
-            </Text>
+          {original && (
+            <SegmentedControl
+              value={view}
+              onChange={(v) => setView(v as typeof view)}
+              data={[{ value: "preview", label: "Vorschau" }, { value: "changes", label: "Änderungen" }]}
+            />
+          )}
+          {changes ? (
+            <Card withBorder radius="md" p="md">
+              {changes.added + changes.removed === 0
+                ? <Text size="sm" c="dimmed">Noch keine Änderungen gegenüber dem gespeicherten Rezept.</Text>
+                : <RecipeDiff lines={changes.lines} />}
+            </Card>
+          ) : (
+            <Card withBorder radius="md" p="md">
+              <Title order={3}>{recipe.name || <Text span c="dimmed" inherit>Name</Text>}</Title>
+              <Text size="sm" c="dimmed" mb="md">
+                {recipe.servingSize ? `Für ${recipe.servingSize} Portionen` : "Portionen —"}
+                {recipe.weblink && <> · <Weblink href={recipe.weblink} size="sm" /></>}
+              </Text>
 
-            <Title order={5} mb={4}>Zutaten</Title>
-            <Table mb="md">
-              <Table.Tbody>
-                {recipe.ingredients.map((ing) => (
-                  <Table.Tr key={ing.line}>
-                    <Table.Td c="dimmed" ta="right" style={{ width: 90, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
-                    <Table.Td>
-                      <IngredientName {...ing} noteControl={
-                        <Checkbox size="xs" label="Anmerkung auf die Einkaufsliste" checked={notesOnList.has(noteKey(ing))}
-                          onChange={(e) => toggleNoteOnList(ing, e.currentTarget.checked)} />
-                      }>
-                        {!knownItems.has(itemKey(ing.name)) && (
-                          <>
-                            <Badge size="xs" variant="light" color="orange" ml={6}>neue Zutat</Badge>
-                            <PluralSuggestion name={ing.name} singular={likelySingular(ing.name, allItems)} />
-                          </>
-                        )}
-                      </IngredientName>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-                {recipe.ingredients.length === 0 && (
-                  <Table.Tr>
-                    <Table.Td c="dimmed">Noch keine.</Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
+              <Title order={5} mb={4}>Zutaten</Title>
+              <Table mb="md">
+                <Table.Tbody>
+                  {recipe.ingredients.map((ing) => (
+                    <Table.Tr key={ing.line}>
+                      <Table.Td c="dimmed" ta="right" style={{ width: 90, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
+                      <Table.Td>
+                        <IngredientName {...ing} noteControl={
+                          <Checkbox size="xs" label="Anmerkung auf die Einkaufsliste" checked={notesOnList.has(noteKey(ing))}
+                            onChange={(e) => toggleNoteOnList(ing, e.currentTarget.checked)} />
+                        }>
+                          {!knownItems.has(itemKey(ing.name)) && (
+                            <>
+                              <Badge size="xs" variant="light" color="orange" ml={6}>neue Zutat</Badge>
+                              <PluralSuggestion name={ing.name} singular={likelySingular(ing.name, allItems)} />
+                            </>
+                          )}
+                        </IngredientName>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                  {recipe.ingredients.length === 0 && (
+                    <Table.Tr>
+                      <Table.Td c="dimmed">Noch keine.</Table.Td>
+                    </Table.Tr>
+                  )}
+                </Table.Tbody>
+              </Table>
 
-            <Title order={5} mb={4}>Zubereitung</Title>
-            {recipe.instructions ? <Markdown>{recipe.instructions}</Markdown> : <Text size="sm" c="dimmed" mb="md">—</Text>}
+              <Title order={5} mb={4}>Zubereitung</Title>
+              {recipe.instructions ? <Markdown>{recipe.instructions}</Markdown> : <Text size="sm" c="dimmed" mb="md">—</Text>}
 
-            <Title order={5} mb={4}>Anmerkungen</Title>
-            {recipe.comments
-              ? <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{recipe.comments}</Text>
-              : <Text size="sm" c="dimmed">—</Text>}
-          </Card>
+              <Title order={5} mb={4}>Anmerkungen</Title>
+              {recipe.comments
+                ? <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{recipe.comments}</Text>
+                : <Text size="sm" c="dimmed">—</Text>}
+            </Card>
+          )}
         </Stack>
       </SimpleGrid>
     </Container>
