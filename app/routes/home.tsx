@@ -132,8 +132,6 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   const { scheduled, allRecipes, recentlyCooked } = loaderData;
-  const [next, ...upcoming] = scheduled;
-
   const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
   // Shared by the add and auto-fill forms
   const [newServings, setNewServings] = useState<string | number>(4);
@@ -150,82 +148,52 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
     <Container size="sm" py="xl">
       <Title mb="lg">Speiseplan</Title>
 
-      {!next ? (
+      {scheduled.length === 0 ? (
         <Text c="dimmed" mb="xl">Keine Mahlzeiten geplant.</Text>
       ) : (
-        <Stack mb="xl">
-          <Card withBorder shadow="sm" radius="md" p="lg">
-            <Group justify="space-between" align="center">
-              <Stack gap={4}>
-                <Badge color="green" variant="light">Als Nächstes</Badge>
-                <Title order={2}>
-                  <Anchor component="button" type="button" inherit c="inherit" ta="left" onClick={() => setOpenPosition(next.position)}>
-                    {next.name}
-                  </Anchor>
-                </Title>
-                <ServingsControl position={next.position} servings={next.servings} />
-              </Stack>
-              <Group gap="xs">
-                <MoveButtons intent="move" fields={{ position: next.position }} first last={upcoming.length === 0} />
-                <Form method="post">
-                  <input type="hidden" name="intent" value="remove" />
-                  <input type="hidden" name="position" value={next.position} />
-                  <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`${next.name} aus dem Speiseplan entfernen`}>
-                    <IconX size={14} />
-                  </Button>
-                </Form>
-                <Button
-                  component={Link}
-                  to={`/cook/${next.id}?position=${next.position}`}
-                  color="green"
-                  leftSection={<IconPlayerPlay size={16} />}
-                >
-                  Kochen
-                </Button>
-              </Group>
-            </Group>
-            <ThawWarning ingredients={next.ingredients} mt="xs" />
-          </Card>
-
-          {upcoming.length > 0 && (
-            <Stack gap="xs">
-              <Text size="sm" fw={500} c="dimmed">Danach</Text>
-              {upcoming.map((meal, i) => (
-                <Card key={meal.position} withBorder radius="md" p="md">
-                  <Group justify="space-between">
-                    <Stack gap={0}>
-                      <Anchor component="button" type="button" c="inherit" ta="left" onClick={() => setOpenPosition(meal.position)}>
-                        {meal.name}
-                      </Anchor>
-                      <ServingsControl position={meal.position} servings={meal.servings} />
-                    </Stack>
-                    <Group gap="xs">
-                      <Badge variant="outline" color="gray">#{i + 2}</Badge>
-                      <MoveButtons intent="move" fields={{ position: meal.position }} first={false} last={i === upcoming.length - 1} />
-                      <Button
-                        component={Link}
-                        to={`/cook/${meal.id}?position=${meal.position}`}
-                        variant="subtle"
-                        color="green"
-                        size="xs"
-                        px={6}
-                        aria-label={`${meal.name} kochen`}
-                      >
+        <Stack gap="xs" mb="xl">
+          {scheduled.map((meal, i) => {
+            // The next meal gets the same row, marked and with the thaw warning and a prominent cook button
+            const isNext = i === 0;
+            return (
+              <Card key={meal.position} withBorder radius="md" p="md"
+                style={isNext ? { borderColor: "var(--mantine-color-green-6)" } : undefined}>
+                <Group justify="space-between">
+                  <Stack gap={0}>
+                    <Anchor component="button" type="button" c="inherit" ta="left" onClick={() => setOpenPosition(meal.position)}>
+                      {meal.name}
+                    </Anchor>
+                    <ServingsControl position={meal.position} servings={meal.servings} />
+                  </Stack>
+                  <Group gap="xs">
+                    {isNext
+                      ? <Badge color="green" variant="light">Als Nächstes</Badge>
+                      : <Badge variant="outline" color="gray">#{i + 1}</Badge>}
+                    <MoveButtons intent="move" fields={{ position: meal.position }} first={isNext} last={i === scheduled.length - 1} />
+                    {isNext ? (
+                      <Button component={Link} to={`/cook/${meal.id}?position=${meal.position}`} color="green"
+                        leftSection={<IconPlayerPlay size={16} />}>
+                        Kochen
+                      </Button>
+                    ) : (
+                      <Button component={Link} to={`/cook/${meal.id}?position=${meal.position}`}
+                        variant="subtle" color="green" size="xs" px={6} aria-label={`${meal.name} kochen`}>
                         <IconPlayerPlay size={14} />
                       </Button>
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="remove" />
-                        <input type="hidden" name="position" value={meal.position} />
-                        <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`${meal.name} aus dem Speiseplan entfernen`}>
-                          <IconX size={14} />
-                        </Button>
-                      </Form>
-                    </Group>
+                    )}
+                    <Form method="post">
+                      <input type="hidden" name="intent" value="remove" />
+                      <input type="hidden" name="position" value={meal.position} />
+                      <Button type="submit" variant="subtle" color="gray" size="xs" px={6} aria-label={`${meal.name} aus dem Speiseplan entfernen`}>
+                        <IconX size={14} />
+                      </Button>
+                    </Form>
                   </Group>
-                </Card>
-              ))}
-            </Stack>
-          )}
+                </Group>
+                {isNext && <ThawWarning ingredients={meal.ingredients} mt="xs" />}
+              </Card>
+            );
+          })}
         </Stack>
       )}
 
