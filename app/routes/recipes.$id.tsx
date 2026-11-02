@@ -10,7 +10,6 @@ import {
   NumberInput,
   Select,
   Stack,
-  Table,
   Text,
   Textarea,
   TextInput,
@@ -292,40 +291,36 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
 
       <Title order={3} mb="sm">Zutaten</Title>
 
-      <Table mb="md">
-        <Table.Tbody>
-          {ingredients.map((ing, index) => (
-            // Top-aligned, so the amount stays level with the name when a note makes the row taller
-            <Table.Tr key={ing.itemId} style={{ verticalAlign: "top" }}>
-              <Table.Td px={0} style={{ width: 56 }}>
-                <MoveButtons intent="move-ingredient" fields={{ itemId: ing.itemId }}
-                  first={index === 0} last={index === ingredients.length - 1} />
-              </Table.Td>
-              <Table.Td c="dimmed" ta="right" style={{ width: 90, verticalAlign: "top" }}>{formatAmount(ing)}</Table.Td>
-              <Table.Td><IngredientName {...ing} /></Table.Td>
-              <Table.Td style={{ width: 40 }}>
-                <ActionIcon variant="subtle" onClick={() => editIngredient(ing)} aria-label={`${ing.name} bearbeiten`}>
-                  <IconPencil size={16} />
+      {/* Rows rather than a table, so they can be dragged; spaced and bordered like Mantine's table */}
+      <Box fz="sm" mb="md">
+        {ingredients.map((ing, index) => (
+          // Top-aligned, so the amount stays level with the name when a note makes the row taller
+          <Group key={ing.itemId} gap={0} wrap="nowrap" align="flex-start" py={7}
+            style={index < ingredients.length - 1 ? { borderBottom: "1px solid var(--mantine-color-default-border)" } : undefined}>
+            <Box w={56} style={{ flexShrink: 0 }}>
+              <MoveButtons intent="move-ingredient" fields={{ itemId: ing.itemId }}
+                first={index === 0} last={index === ingredients.length - 1} />
+            </Box>
+            <Box w={90} px="xs" c="dimmed" ta="right" style={{ flexShrink: 0 }}>{formatAmount(ing)}</Box>
+            <Box px="xs" style={{ flex: 1, minWidth: 0 }}><IngredientName {...ing} /></Box>
+            <Box w={48} px="xs" style={{ flexShrink: 0 }}>
+              <ActionIcon variant="subtle" onClick={() => editIngredient(ing)} aria-label={`${ing.name} bearbeiten`}>
+                <IconPencil size={16} />
+              </ActionIcon>
+            </Box>
+            <Box w={48} px="xs" style={{ flexShrink: 0 }}>
+              <Form method="post">
+                <input type="hidden" name="intent" value="remove-ingredient" />
+                <input type="hidden" name="itemId" value={ing.itemId} />
+                <ActionIcon variant="subtle" color="red" type="submit" aria-label={`${ing.name} entfernen`}>
+                  <IconTrash size={16} />
                 </ActionIcon>
-              </Table.Td>
-              <Table.Td style={{ width: 40 }}>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="remove-ingredient" />
-                  <input type="hidden" name="itemId" value={ing.itemId} />
-                  <ActionIcon variant="subtle" color="red" type="submit" aria-label={`${ing.name} entfernen`}>
-                    <IconTrash size={16} />
-                  </ActionIcon>
-                </Form>
-              </Table.Td>
-            </Table.Tr>
-          ))}
-          {ingredients.length === 0 && (
-            <Table.Tr>
-              <Table.Td c="dimmed">Noch keine Zutaten.</Table.Td>
-            </Table.Tr>
-          )}
-        </Table.Tbody>
-      </Table>
+              </Form>
+            </Box>
+          </Group>
+        ))}
+        {ingredients.length === 0 && <Text size="sm" c="dimmed" py={7} px="xs">Noch keine Zutaten.</Text>}
+      </Box>
 
       <Form method="post">
         <input type="hidden" name="intent" value="add-ingredient" />
