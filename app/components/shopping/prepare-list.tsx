@@ -42,8 +42,8 @@ export function PrepareList({ scheduled }: { scheduled: { position: number; name
           )}
           <Checkbox
             name="includeInStock"
-            label="Vorrätige Artikel einbeziehen"
-            description="Auch Artikel hinzufügen, die als immer vorrätig markiert sind"
+            label="Vorrätige Zutaten einbeziehen"
+            description="Auch Zutaten hinzufügen, die als immer vorrätig markiert sind"
             mt="xs"
           />
           <SubmitButton leftSection={<IconShoppingCart size={16} />}>

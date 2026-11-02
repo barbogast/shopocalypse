@@ -96,7 +96,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     case "add-ingredient": {
       const itemId = int(form, "itemId");
-      if (!itemId) return { ingredientError: "Bitte einen Artikel wählen." };
+      if (!itemId) return { ingredientError: "Bitte eine Zutat wählen." };
       const parsed = parseAmount(form);
       if ("error" in parsed) return { ingredientError: parsed.error };
       const { quantity, unit } = parsed.amount;

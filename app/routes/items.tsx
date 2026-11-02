@@ -369,7 +369,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
           </Table.Tbody>
         </Table>
       )}
-      {allItems.length === 0 && <Text c="dimmed" mb="xl">Noch keine Artikel.</Text>}
+      {allItems.length === 0 && <Text c="dimmed" mb="xl">Noch keine Zutaten.</Text>}
 
       <Divider mb="lg" />
 
@@ -384,7 +384,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
             <Card key={store.id} withBorder radius="md" p="md">
               <Group justify="space-between" mb="xs">
                 <RenamableName intent="rename-store" id={store.id} name={store.name} fw={600} />
-                <Form method="post" onSubmit={confirmFirst(`${store.name} mit allen Regalen löschen? Die Artikel bleiben ohne Laden erhalten.`)}>
+                <Form method="post" onSubmit={confirmFirst(`${store.name} mit allen Regalen löschen? Die Zutaten bleiben ohne Laden erhalten.`)}>
                   <input type="hidden" name="intent" value="delete-store" />
                   <input type="hidden" name="id" value={store.id} />
                   <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`${store.name} löschen`}>
@@ -398,7 +398,7 @@ export default function Items({ loaderData }: Route.ComponentProps) {
                     <RenamableName intent="rename-shelf" id={shelf.id} name={shelf.name} size="sm" />
                     <Group gap={0} wrap="nowrap">
                       <MoveButtons intent="move-shelf" fields={{ id: shelf.id }} first={i === 0} last={i === shelves.length - 1} />
-                      <Form method="post" onSubmit={confirmFirst(`Regal ${shelf.name} löschen? Die Artikel bleiben ohne Regal erhalten.`)}>
+                      <Form method="post" onSubmit={confirmFirst(`Regal ${shelf.name} löschen? Die Zutaten bleiben ohne Regal erhalten.`)}>
                         <input type="hidden" name="intent" value="delete-shelf" />
                         <input type="hidden" name="id" value={shelf.id} />
                         <ActionIcon type="submit" variant="subtle" color="red" size="sm" aria-label={`${shelf.name} löschen`}>

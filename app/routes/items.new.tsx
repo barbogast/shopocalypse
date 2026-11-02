@@ -10,7 +10,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items.new";
 
 export function meta() {
-  return [{ title: pageTitle("Neuer Artikel") }];
+  return [{ title: pageTitle("Neue Zutat") }];
 }
 
 export async function loader() {
@@ -31,7 +31,7 @@ export default function NewItem({ loaderData, actionData }: Route.ComponentProps
 
   return (
     <Container size="sm" py="xl">
-      <Title mb="lg">Neuer Artikel</Title>
+      <Title mb="lg">Neue Zutat</Title>
       <Form method="post">
         <Stack>
           <ItemFields stores={allStores} shelves={allShelves} parents={parents} autoFocus />

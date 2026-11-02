@@ -12,7 +12,7 @@ import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/items.$id";
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: pageTitle(data?.item.name ?? "Artikel") }];
+  return [{ title: pageTitle(data?.item.name ?? "Zutat") }];
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -43,7 +43,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (form.get("intent") === "merge") {
     const keepId = int(form, "keepId");
-    if (!keepId) return { mergeError: "Bitte einen Artikel zum Zusammenführen wählen." };
+    if (!keepId) return { mergeError: "Bitte eine Zutat zum Zusammenführen wählen." };
     const merged = await mergeItem(id, keepId);
     if (merged.error) return { mergeError: merged.error };
     return redirect(returnTo);
@@ -61,7 +61,7 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
 
   return (
     <Container size="sm" py="xl">
-      <Title mb="lg">Artikel bearbeiten</Title>
+      <Title mb="lg">Zutat bearbeiten</Title>
       <Form method="post">
         <input type="hidden" name="returnTo" value={returnTo} />
         <Stack>
@@ -76,11 +76,11 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
 
       <Divider my="xl" />
 
-      <Title order={4} mb="xs">Mit anderem Artikel zusammenführen</Title>
+      <Title order={4} mb="xs">Mit anderer Zutat zusammenführen</Title>
       <Text size="sm" c="dimmed" mb="md">
-        Für Duplikate: Rezepte und Einkaufslisten verwenden danach den gewählten Artikel, und {item.name} wird gelöscht.
+        Für Duplikate: Rezepte und Einkaufslisten verwenden danach die gewählte Zutat, und {item.name} wird gelöscht.
       </Text>
-      <Form method="post" onSubmit={confirmFirst(`${item.name} mit dem gewählten Artikel zusammenführen? Das lässt sich nicht rückgängig machen.`)}>
+      <Form method="post" onSubmit={confirmFirst(`${item.name} mit der gewählten Zutat zusammenführen? Das lässt sich nicht rückgängig machen.`)}>
         <input type="hidden" name="intent" value="merge" />
         <input type="hidden" name="returnTo" value={returnTo} />
         <Stack>
@@ -90,7 +90,7 @@ export default function EditItem({ loaderData, actionData }: Route.ComponentProp
             data={otherItems.map((i) => ({ value: String(i.id), label: i.name }))}
             searchable
             required
-            placeholder="Artikel wählen…"
+            placeholder="Zutat wählen…"
           />
           <FormError error={actionData && "mergeError" in actionData ? actionData.mergeError : null} />
           <Group>

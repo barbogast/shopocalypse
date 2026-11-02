@@ -69,7 +69,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (form.get("intent") === "set-plural") {
     const itemId = int(form, "itemId");
     const plural = text(form, "plural");
-    if (!itemId || !plural) return { error: "Bitte einen Artikel und einen Plural angeben.", imported: null };
+    if (!itemId || !plural) return { error: "Bitte eine Zutat und einen Plural angeben.", imported: null };
     return { ...(await setPlural(itemId, plural)), imported: null };
   }
 
@@ -172,7 +172,7 @@ function FormatHelp() {
         <List.Item>Einheiten: {UNITS.map((u) => u.label).join(", ")}, auch ausgeschrieben (<Code>Esslöffel</Code>) oder auf Englisch (<Code>tbsp</Code>)</List.Item>
         <List.Item>Eine Anmerkung nach <Code> - </Code>, einem Komma oder in Klammern bleibt bei der Zutat: <Code>1 Zwiebel - gewürfelt</Code>. In der Vorschau ankreuzen, wenn sie beim Einkaufen wichtig ist, wie <Code>mind. 30% Fett</Code></List.Item>
         <List.Item>Anführungszeichen behalten Komma, Bindestrich oder Klammern im Namen: <Code>"Salz, Pfeffer"</Code></List.Item>
-        <List.Item>Zutaten werden über Name oder Plural (ohne Anmerkung) den Artikeln zugeordnet; unbekannte Namen werden neue Artikel</List.Item>
+        <List.Item>Rezeptzeilen werden über Name oder Plural (ohne Anmerkung) vorhandenen Zutaten zugeordnet; unbekannte Namen werden neue Zutaten</List.Item>
       </List>
     </Card>
   );
@@ -468,7 +468,7 @@ function SuggestForNewItems({ newItems, names, onShelved }: {
   return (
     <Card withBorder radius="md" p="md" mb="lg">
       <Group justify="space-between" mb={suggestions ? "sm" : 0}>
-        <Text size="sm">Claude Regal, Einheit, Plural und Oberbegriff für die neuen Artikel vorschlagen und Pluralnamen korrigieren lassen.</Text>
+        <Text size="sm">Claude Regal, Einheit, Plural und Oberbegriff für die neuen Zutaten vorschlagen und Pluralnamen korrigieren lassen.</Text>
         <suggest.Form method="post" action="/items/suggest">
           {newItems.map((item) => (
             <span key={item.id}>
@@ -482,7 +482,7 @@ function SuggestForNewItems({ newItems, names, onShelved }: {
         </suggest.Form>
       </Group>
       {suggest.data && "error" in suggest.data && <Text size="sm" c="red">{suggest.data.error}</Text>}
-      {suggestions && rows.length === 0 && <Text size="sm" c="dimmed">Keine Vorschläge für diese Artikel.</Text>}
+      {suggestions && rows.length === 0 && <Text size="sm" c="dimmed">Keine Vorschläge für diese Zutaten.</Text>}
       {rows.length > 0 && (
         <apply.Form method="post">
           <input type="hidden" name="intent" value="apply-suggestions" />
@@ -543,9 +543,9 @@ function Imported({ id, name, newItems, storeName, names, onImportAnother }: {
         {unsorted.length > 0 && (
           <>
             <Text size="sm" mb="xs">
-              {unsorted.length === 1 ? "Dieser neue Artikel hat" : `Diese ${unsorted.length} neuen Artikel haben`}{" "}
+              {unsorted.length === 1 ? "Diese neue Zutat hat" : `Diese ${unsorted.length} neuen Zutaten haben`}{" "}
               {storeName ? `noch kein Regal in ${storeName}` : "noch keinen Laden und kein Regal"},
-              daher kann die Einkaufsliste {unsorted.length === 1 ? "ihn" : "sie"} nicht einsortieren:
+              daher kann die Einkaufsliste sie nicht einsortieren:
             </Text>
             <List size="sm">
               {unsorted.map((item) => (
@@ -563,7 +563,7 @@ function Imported({ id, name, newItems, storeName, names, onImportAnother }: {
         <Button component={Link} to="/recipes/import" onClick={onImportAnother} variant="light" leftSection={<IconFileImport size={16} />}>
           Weiteres importieren
         </Button>
-        {newItems.length > 0 && <Button component={Link} to={NEWEST_ITEMS} variant="subtle">Neueste Artikel</Button>}
+        {newItems.length > 0 && <Button component={Link} to={NEWEST_ITEMS} variant="subtle">Neueste Zutaten</Button>}
       </Group>
     </Container>
   );
@@ -669,7 +669,7 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
               <SubmitButton disabled={!canImport}>Importieren</SubmitButton>
               {canImport && newItemCount > 0 && (
                 <Text size="sm" c="dimmed">
-                  Legt {newItemCount} {newItemCount === 1 ? "neuen Artikel" : "neue Artikel"} an
+                  Legt {newItemCount} {newItemCount === 1 ? "neue Zutat" : "neue Zutaten"} an
                 </Text>
               )}
             </Group>
@@ -713,7 +713,7 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
                       }>
                         {!knownItems.has(itemKey(ing.name)) && (
                           <>
-                            <Badge size="xs" variant="light" color="orange" ml={6}>neuer Artikel</Badge>
+                            <Badge size="xs" variant="light" color="orange" ml={6}>neue Zutat</Badge>
                             <PluralSuggestion name={ing.name} singular={likelySingular(ing.name, allItems)} />
                           </>
                         )}

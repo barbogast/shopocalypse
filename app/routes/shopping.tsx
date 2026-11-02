@@ -91,7 +91,7 @@ export async function action({ request }: Route.ActionArgs) {
 
       const itemId = int(form, "itemId");
       const parsed = parseAmount(form);
-      if (!itemId) return { addError: "Bitte zuerst einen Artikel wählen." };
+      if (!itemId) return { addError: "Bitte zuerst eine Zutat wählen." };
       if ("error" in parsed) return { addError: parsed.error };
       await addItemToList(activeList.id, itemId, parsed.amount);
       break;
@@ -106,7 +106,7 @@ export async function action({ request }: Route.ActionArgs) {
       const allItems = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
       const { items, errors } = parseItemsText(text(form, "text"), allItems);
       if (errors.length) return { importError: "Bitte zuerst die Fehler im Text beheben." };
-      if (items.length === 0) return { importError: "Mindestens einen Artikel angeben." };
+      if (items.length === 0) return { importError: "Mindestens eine Zutat angeben." };
       const { newItems } = await addItemsToList(activeList.id, items);
       return { itemsImported: { count: items.length, newItems: newItems.length } };
     }
@@ -317,7 +317,7 @@ function ListView({
       <ListMeals recipes={listRecipes} allRecipes={allRecipes} />
 
       {listItems.length === 0 && (
-        <Text c="dimmed" mb="lg">Keine Artikel auf der Liste.</Text>
+        <Text c="dimmed" mb="lg">Keine Zutaten auf der Liste.</Text>
       )}
 
       {[...groups.entries()].map(([storeName, shelves]) => (

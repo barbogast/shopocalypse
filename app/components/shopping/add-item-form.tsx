@@ -34,7 +34,7 @@ export function AddItemForm({ items, stores, shelves, parents }: {
       <Group align="flex-end" gap="xs">
         <ItemPicker
           name="itemId"
-          label="Artikel hinzufügen"
+          label="Zutat hinzufügen"
           items={items}
           optionLabel={(i) => (i.listed ? `${i.name} (auf der Liste)` : i.name)}
           value={itemId}

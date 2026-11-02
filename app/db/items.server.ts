@@ -50,10 +50,10 @@ export async function parseItemForm(form: FormData, itemId?: number) {
   if (clash) return { error: clash } as const;
   if (parentId != null) {
     const parent = await db.select().from(schema.items).where(eq(schema.items.id, parentId)).get();
-    if (!parent || parent.id === itemId) return { error: "Bitte einen anderen Artikel als Oberbegriff wählen." } as const;
+    if (!parent || parent.id === itemId) return { error: "Bitte eine andere Zutat als Oberbegriff wählen." } as const;
     if (parent.parentId != null) return { error: `„${parent.name}“ ist selbst eine Variante.` } as const;
     if (itemId != null && await db.select().from(schema.items).where(eq(schema.items.parentId, itemId)).limit(1).get()) {
-      return { error: "Dieser Artikel hat Varianten und kann deshalb selbst keine sein." } as const;
+      return { error: "Diese Zutat hat Varianten und kann deshalb selbst keine sein." } as const;
     }
   }
   if (categoryId != null) {
@@ -92,7 +92,7 @@ export async function nameClash(words: (string | null)[], itemId?: number) {
   for (const word of words) {
     const clash = word && others.find((i) => itemKeys(i).includes(itemKey(word)));
     if (!clash) continue;
-    if (itemKey(clash.name) === itemKey(word)) return `Es gibt schon einen Artikel namens „${clash.name}“.` as const;
+    if (itemKey(clash.name) === itemKey(word)) return `Es gibt schon eine Zutat namens „${clash.name}“.` as const;
     return `„${word}“ ist schon der Plural von „${clash.name}“.` as const;
   }
   return null;
@@ -173,7 +173,7 @@ export async function mergeItem(duplicateId: number, keepId: number) {
   return db.transaction(async (tx) => {
     const duplicate = await tx.select().from(schema.items).where(eq(schema.items.id, duplicateId)).get();
     const keep = await tx.select().from(schema.items).where(eq(schema.items.id, keepId)).get();
-    if (!duplicate || !keep || duplicateId === keepId) return { error: "Bitte einen anderen Artikel zum Zusammenführen wählen." } as const;
+    if (!duplicate || !keep || duplicateId === keepId) return { error: "Bitte eine andere Zutat zum Zusammenführen wählen." } as const;
 
     // Recipes listing both: fold the duplicate's ingredient into the kept one
     const dupIngredients = await tx.select().from(schema.recipeIngredients).where(eq(schema.recipeIngredients.itemId, duplicateId)).all();

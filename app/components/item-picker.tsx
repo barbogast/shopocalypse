@@ -94,7 +94,7 @@ export function ItemPicker<T extends PickerItem>({
 
       {/* No returnFocus: it would take focus back from the next field to the item picker.
           The modal sits in a portal, but React still bubbles its submit to a form around the picker */}
-      <Modal opened={opened} onClose={modal.close} title="Neuer Artikel" returnFocus={false}>
+      <Modal opened={opened} onClose={modal.close} title="Neue Zutat" returnFocus={false}>
         <fetcher.Form method="post" action="/items/create" onSubmit={(e) => e.stopPropagation()}>
           <Stack>
             <ItemFields

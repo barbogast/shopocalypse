@@ -160,7 +160,7 @@ function addIngredientLine(
   if (duplicate) {
     const message = itemKey(duplicate.name) === itemKey(parsed.name)
       ? `„${parsed.name}“ steht schon in Zeile ${duplicate.line}; bitte zu einer Zeile zusammenfassen.`
-      : `„${parsed.name}“ ist derselbe Artikel wie „${duplicate.name}“ in Zeile ${duplicate.line}; bitte zu einer Zeile zusammenfassen.`;
+      : `„${parsed.name}“ ist dieselbe Zutat wie „${duplicate.name}“ in Zeile ${duplicate.line}; bitte zu einer Zeile zusammenfassen.`;
     errors.push({ line, message });
     return;
   }

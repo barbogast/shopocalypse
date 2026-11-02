@@ -41,16 +41,16 @@ export function ImportItemsButton({ items }: { items: { id: number; name: string
   return (
     <>
       <Button variant="subtle" size="compact-sm" mt="xs" leftSection={<IconFileImport size={14} />} onClick={modal.open}>
-        Artikel einfügen
+        Zutaten einfügen
       </Button>
-      <Modal opened={opened} onClose={modal.close} title="Artikel einfügen" size="lg">
+      <Modal opened={opened} onClose={modal.close} title="Zutaten einfügen" size="lg">
         {/* The preview stays outside the form, since its plural suggestions are forms of their own */}
         <Stack>
           <Form method="post" id="import-items">
             <input type="hidden" name="intent" value="import-items" />
             <Textarea
               name="text"
-              description="Ein Artikel pro Zeile, wie die Zutaten eines Rezepts: Menge, Einheit, Name und eine Anmerkung nach „ - “"
+              description="Eine Zutat pro Zeile, wie die Zutaten eines Rezepts: Menge, Einheit, Name und eine Anmerkung nach „ - “"
               placeholder={IMPORT_PLACEHOLDER}
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
@@ -85,7 +85,7 @@ export function ImportItemsButton({ items }: { items: { id: number; name: string
                       <IngredientName {...ing}>
                         {!knownItems.has(itemKey(ing.name)) && (
                           <>
-                            <Badge size="xs" variant="light" color="orange" ml={6}>neuer Artikel</Badge>
+                            <Badge size="xs" variant="light" color="orange" ml={6}>neue Zutat</Badge>
                             <PluralSuggestion name={ing.name} singular={likelySingular(ing.name, items)} />
                           </>
                         )}
@@ -99,10 +99,10 @@ export function ImportItemsButton({ items }: { items: { id: number; name: string
           <FormError error={actionData && "importError" in actionData ? actionData.importError : null} />
           <Group>
             <SubmitButton form="import-items" disabled={!canImport} leftSection={<IconPlus size={16} />}>
-              {parsed.length || ""} Artikel hinzufügen
+              {parsed.length || ""} {parsed.length === 1 ? "Zutat" : "Zutaten"} hinzufügen
             </SubmitButton>
             {canImport && newItemCount > 0 && (
-              <Text size="sm" c="dimmed">Legt {newItemCount} {newItemCount === 1 ? "neuen Artikel" : "neue Artikel"} an</Text>
+              <Text size="sm" c="dimmed">Legt {newItemCount} {newItemCount === 1 ? "neue Zutat" : "neue Zutaten"} an</Text>
             )}
           </Group>
         </Stack>
