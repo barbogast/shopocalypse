@@ -6,6 +6,7 @@ heading per day.
 
 ## 2026-11-02
 
+- Im Chat mit Claude zeigt jede Antwort, was sie am Rezept geändert hat. Im Änderungsverlauf sind geänderte Wörter jetzt hervorgehoben.
 - Neu: diese Seite. Ganz unten auf jeder Seite führt „Neuigkeiten“ hierher.
 - Speiseplan und Zutaten eines Rezepts lassen sich per Ziehen umsortieren.
 - Die Einkaufsliste bleibt auf allen Handys aktuell, ohne neu zu laden.

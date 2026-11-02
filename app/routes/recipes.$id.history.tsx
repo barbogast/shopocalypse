@@ -1,13 +1,14 @@
-import { Accordion, Box, Button, Collapse, Container, Group, Text, Title } from "@mantine/core";
+import { Accordion, Button, Collapse, Container, Group, Text, Title } from "@mantine/core";
 import { IconArrowLeft } from "@tabler/icons-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { asc, eq } from "drizzle-orm";
 import { Link } from "react-router";
 import { LocalDateTime } from "~/components/local-date-time";
+import { RecipeDiff, TextLines } from "~/components/recipe-diff";
 import { db } from "~/db/client";
 import * as schema from "~/db/schema";
 import { pageTitle } from "~/page-title";
-import { type DiffLine, diffVersions } from "~/recipe-history";
+import { diffVersions } from "~/recipe-history";
 import type { Route } from "./+types/recipes.$id.history";
 
 export function meta({ data }: Route.MetaArgs) {
@@ -30,36 +31,6 @@ export async function loader({ params }: Route.LoaderArgs) {
     .reverse();
 
   return { recipe, versions };
-}
-
-const LINE_STYLES = {
-  added: { bg: "var(--mantine-color-green-light)", c: "var(--mantine-color-green-light-color)", marker: "+" },
-  removed: { bg: "var(--mantine-color-red-light)", c: "var(--mantine-color-red-light-color)", marker: "−" },
-  same: { bg: undefined, c: "dimmed", marker: " " },
-};
-
-// Wraps long lines (instructions are a paragraph per line) and keeps blank ones their height
-function TextLines({ children }: { children: ReactNode }) {
-  return <Box fz="sm" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{children}</Box>;
-}
-
-function Diff({ lines }: { lines: DiffLine[] }) {
-  return (
-    <TextLines>
-      {lines.map((line, i) => {
-        if (line.kind === "skipped") {
-          return <Text key={i} size="xs" c="dimmed" fs="italic" py={2}>⋯ {line.count} unveränderte Zeilen</Text>;
-        }
-        const style = LINE_STYLES[line.kind];
-        return (
-          <Group key={i} gap={6} wrap="nowrap" align="flex-start" bg={style.bg} c={style.c} px={4}>
-            <Box component="span" ff="monospace" aria-hidden>{style.marker}</Box>
-            <Box component="span" td={line.kind === "removed" ? "line-through" : undefined}>{line.text || " "}</Box>
-          </Group>
-        );
-      })}
-    </TextLines>
-  );
 }
 
 function FullVersion({ text }: { text: string }) {
@@ -106,7 +77,7 @@ export default function RecipeHistory({ loaderData }: Route.ComponentProps) {
               <Accordion.Panel>
                 {v.diff ? (
                   <>
-                    <Diff lines={v.diff.lines} />
+                    <RecipeDiff lines={v.diff.lines} />
                     <FullVersion text={v.text} />
                   </>
                 ) : (

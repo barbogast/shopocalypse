@@ -7,6 +7,11 @@ describe("parseChat", () => {
     expect(parseChat(JSON.stringify(chat))).toEqual(chat);
   });
 
+  it("keeps the texts before and after a reply that changed the recipe", () => {
+    const chat = [{ role: "user", content: "Mehr Lauch" }, { role: "assistant", content: "Gerne.", before: "Suppe\n1 Lauch", after: "Suppe\n2 Lauch" }] as const;
+    expect(parseChat(JSON.stringify(chat))).toEqual(chat);
+  });
+
   it("treats a missing or broken chat as empty", () => {
     expect(parseChat(null)).toEqual([]);
     expect(parseChat("not json")).toEqual([]);

@@ -3,7 +3,13 @@
 
 import { z } from "zod";
 
-const ChatSchema = z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string() }));
+// A reply that changed the recipe keeps the text sent with the turn (before) and Claude's (after), to show what it changed
+const ChatSchema = z.array(z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string(),
+  before: z.string().optional(),
+  after: z.string().optional(),
+}));
 
 export type ChatMessage = z.infer<typeof ChatSchema>[number];
 

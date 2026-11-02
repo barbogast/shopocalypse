@@ -47,4 +47,23 @@ describe("diffVersions", () => {
     const longer = diffVersions(["a", ...lines(6), "b"].join("\n"), ["A", ...lines(6), "B"].join("\n"));
     expect(longer.lines).toContainEqual({ kind: "skipped", count: 2 });
   });
+
+  it("marks the changed words of an edited line", () => {
+    const diff = diffVersions("Zwiebel in Butter anbraten.", "Zwiebel in Olivenöl anbraten.").lines;
+    expect(diff).toEqual([
+      { kind: "removed", text: "Zwiebel in Butter anbraten.", words: [
+        { changed: false, text: "Zwiebel in " }, { changed: true, text: "Butter" }, { changed: false, text: " anbraten." },
+      ] },
+      { kind: "added", text: "Zwiebel in Olivenöl anbraten.", words: [
+        { changed: false, text: "Zwiebel in " }, { changed: true, text: "Olivenöl" }, { changed: false, text: " anbraten." },
+      ] },
+    ]);
+  });
+
+  it("marks no words when an edited line has nothing in common with the old one", () => {
+    expect(diffVersions("Salz", "Pfeffer").lines).toEqual([
+      { kind: "removed", text: "Salz" },
+      { kind: "added", text: "Pfeffer" },
+    ]);
+  });
 });

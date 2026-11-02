@@ -7,6 +7,7 @@ import { FormError } from "~/components/form-error";
 import { IngredientName } from "~/components/ingredient-name";
 import { LineGutter, TEXT_METRICS } from "~/components/line-gutter";
 import { PluralSuggestion } from "~/components/plural-suggestion";
+import { RecipeDiff } from "~/components/recipe-diff";
 import { LocalDateTime } from "~/components/local-date-time";
 import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
@@ -24,6 +25,7 @@ import type { ChatMessage } from "~/recipe-chat";
 import { chatRecipe, type KnownRecipe } from "~/recipe-chat.server";
 import { type Photo, transcribeRecipe } from "~/recipe-photo.server";
 import { itemKey, itemKeys, likelySingular } from "~/item-names";
+import { diffVersions } from "~/recipe-history";
 import { type ParsedIngredient, parseRecipeText } from "~/recipe-import";
 import { formatAmount, UNITS, unitName, type UnitKey } from "~/units";
 import { pageTitle } from "~/page-title";
@@ -127,8 +129,9 @@ export async function action({ request }: Route.ActionArgs) {
     const preferences = await getSetting("recipePreferences");
     const result = await chatRecipe({ chat: draft?.chat ?? [], draftText, message, items, recipes: await knownRecipes(), preferences });
     if ("error" in result) return { error: result.error, imported: null };
-    const chat: ChatMessage[] = [...(draft?.chat ?? []), { role: "user", content: message }, { role: "assistant", content: result.reply }];
     const newText = result.text ?? draftText;
+    const changed = newText !== draftText ? { before: draftText, after: newText } : {};
+    const chat: ChatMessage[] = [...(draft?.chat ?? []), { role: "user", content: message }, { role: "assistant", content: result.reply, ...changed }];
     if (draft) {
       await saveChat(draft.id, chat, newText);
       return { error: null, imported: null };
@@ -230,7 +233,7 @@ function RecipeChat({ fetcher, draftId, chat, text, preferences }: {
         {[...chat, ...(sent ? [{ role: "user" as const, content: sent }] : [])].map((m, i) =>
           m.role === "user"
             ? <Paper key={i} bg="var(--mantine-primary-color-light)" p="xs" radius="md" ml="xl" style={{ whiteSpace: "pre-wrap" }} fz="sm">{m.content}</Paper>
-            : <div key={i}><Markdown>{m.content}</Markdown></div>,
+            : <div key={i}><Markdown>{m.content}</Markdown>{m.after != null && <ChatChanges before={m.before ?? ""} after={m.after} />}</div>,
         )}
         {sent && <Text size="sm" c="dimmed">Claude schreibt…</Text>}
         {error && <Text size="sm" c="red">{error}</Text>}
@@ -259,6 +262,22 @@ function RecipeChat({ fetcher, draftId, chat, text, preferences }: {
         <Preferences saved={preferences} />
       </Stack>
     </Card>
+  );
+}
+
+// What a reply changed in the recipe, from the text sent with the turn, so edits by hand in between don't count
+function ChatChanges({ before, after }: { before: string; after: string }) {
+  const [open, setOpen] = useState(false);
+  const diff = useMemo(() => diffVersions(before, after), [before, after]);
+  return (
+    <>
+      <Button size="compact-xs" variant="subtle" onClick={() => setOpen((o) => !o)}>
+        {open ? "Änderungen ausblenden" : `Änderungen zeigen (+${diff.added} −${diff.removed})`}
+      </Button>
+      <Collapse expanded={open}>
+        <Paper withBorder p="xs" mt={4}><RecipeDiff lines={diff.lines} /></Paper>
+      </Collapse>
+    </>
   );
 }
 
