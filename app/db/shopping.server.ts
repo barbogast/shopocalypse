@@ -311,7 +311,9 @@ export async function listItemsInOrder(listId: number) {
       notes: schema.shoppingListItems.notes,
       bought: schema.shoppingListItems.bought,
       source: schema.shoppingListItems.source,
+      storeId: schema.stores.id,
       storeName: schema.stores.name,
+      shelfId: schema.itemCategories.id,
       shelfName: schema.itemCategories.name,
     })
     .from(schema.shoppingListItems)

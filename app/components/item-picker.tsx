@@ -35,6 +35,7 @@ export function ItemPicker<T extends PickerItem>({
   stores,
   shelves,
   parents,
+  autoFocus,
 }: {
   name: string;
   label: ReactNode;
@@ -55,6 +56,7 @@ export function ItemPicker<T extends PickerItem>({
   stores: Stores;
   shelves: Shelves;
   parents: Parents;
+  autoFocus?: boolean;
 }) {
   const [opened, modal] = useDisclosure(false);
   const [createName, setCreateName] = useState("");
@@ -75,6 +77,7 @@ export function ItemPicker<T extends PickerItem>({
         data={options}
         value={value}
         searchable
+        autoFocus={autoFocus}
         filter={itemSearchFilter(items)}
         searchValue={search}
         onSearchChange={onSearchChange}

@@ -6,6 +6,7 @@ heading per day.
 
 ## 2026-11-03
 
+- Auf der Einkaufsliste hat jedes Regal ein „+“: es bietet nur die Zutaten dieses Regals an, und neue Namen landen gleich dort.
 - Neue Namen kommen auf der Einkaufsliste jetzt nur auf diese Liste, ohne dass eine Zutat angelegt wird – praktisch für Batterien oder Geschenkpapier. Laden und Regal sind optional. Mit „Zutat permanent speichern“ wird daraus doch eine Zutat.
 
 ## 2026-11-02

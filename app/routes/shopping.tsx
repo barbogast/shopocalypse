@@ -1,6 +1,6 @@
-import { Button, Container, CopyButton, Divider, Group, Stack, Table, Text, Title } from "@mantine/core";
-import { IconCheck, IconCopy } from "@tabler/icons-react";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { ActionIcon, Button, Container, CopyButton, Divider, Group, Stack, Table, Text, Title } from "@mantine/core";
+import { IconCheck, IconCopy, IconPlus, IconX } from "@tabler/icons-react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { eq, sql } from "drizzle-orm";
 import { Form, type ShouldRevalidateFunctionArgs, useActionData, useFetchers, useRevalidator, useSubmit } from "react-router";
 import { FormError } from "~/components/form-error";
@@ -54,7 +54,8 @@ export async function loader() {
   // Items already on the list can be added again to raise their amount
   const listedItemIds = new Set(listItems.map((i) => i.itemId));
   const allItems = await db
-    .select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit })
+    .select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit,
+      storeId: schema.items.storeId, categoryId: schema.items.categoryId })
     .from(schema.items)
     .orderBy(sql`${schema.items.name} collate nocase`)
     .then((all) => all.map((i) => ({ ...i, listed: listedItemIds.has(i.id) })));
@@ -342,6 +343,8 @@ function ListView({
   const unsentCount = outbox.unsynced(entries).filter((e) => !sending.has(e.id)).length;
   useFlushOutbox();
   const actionData = useActionData<typeof action>();
+  // The shelf whose add form is open, as `store/shelf`
+  const [addingTo, setAddingTo] = useState<string | null>(null);
 
   // Each fresh load of the list has what the server already got
   useEffect(() => outbox.settle(loadedItems), [loadedItems]);
@@ -395,22 +398,53 @@ function ListView({
           <Title order={4}>{storeName}</Title>
           <Table>
             <Table.Tbody>
-              {[...shelves.entries()].flatMap(([shelfName, shelfItems]) => [
-                // No heading when nothing in this store has a shelf
-                ...(shelfName != null || shelves.size > 1
-                  ? [
-                      // A tinted band, so the shelves stand apart from the items between them
-                      <Table.Tr key={`shelf-${shelfName ?? ""}`} bg="var(--mantine-color-gray-light)">
-                        <Table.Td colSpan={4} py={6}>
-                          <Text size="sm" fw={700}>{shelfName ?? "Sonstiges"}</Text>
-                        </Table.Td>
-                      </Table.Tr>,
-                    ]
-                  : []),
-                ...shelfItems.map((item) => (
-                  <ListItemRow key={item.id} item={item} usedIn={item.itemId != null ? recipesByItem.get(item.itemId) : undefined} />
-                )),
-              ])}
+              {[...shelves.entries()].flatMap(([shelfName, shelfItems]) => {
+                const key = `${storeName}/${shelfName ?? ""}`;
+                const adding = addingTo === key;
+                return [
+                  // No heading when nothing in this store has a shelf
+                  ...(shelfName != null || shelves.size > 1
+                    ? [
+                        // A tinted band, so the shelves stand apart from the items between them
+                        <Table.Tr key={`shelf-${shelfName ?? ""}`} bg="var(--mantine-color-gray-light)">
+                          <Table.Td colSpan={4} py={6}>
+                            <Group justify="space-between" wrap="nowrap">
+                              <Text size="sm" fw={700}>{shelfName ?? "Sonstiges"}</Text>
+                              <ActionIcon
+                                variant="subtle"
+                                color="gray"
+                                size="sm"
+                                onClick={() => setAddingTo(adding ? null : key)}
+                                aria-label={adding ? "Schließen" : `Zutat zu ${shelfName ?? "Sonstiges"} hinzufügen`}
+                              >
+                                {adding ? <IconX size={14} /> : <IconPlus size={14} />}
+                              </ActionIcon>
+                            </Group>
+                          </Table.Td>
+                        </Table.Tr>,
+                      ]
+                    : []),
+                  ...(adding
+                    ? [
+                        <Table.Tr key={`add-${shelfName ?? ""}`}>
+                          <Table.Td colSpan={4}>
+                            <AddItemForm
+                              items={allItems}
+                              stores={allStores}
+                              shelves={allShelves}
+                              parents={parents}
+                              shelf={{ storeId: shelfItems[0].storeId, categoryId: shelfItems[0].shelfId }}
+                              onAdded={() => setAddingTo(null)}
+                            />
+                          </Table.Td>
+                        </Table.Tr>,
+                      ]
+                    : []),
+                  ...shelfItems.map((item) => (
+                    <ListItemRow key={item.id} item={item} usedIn={item.itemId != null ? recipesByItem.get(item.itemId) : undefined} />
+                  )),
+                ];
+              })}
             </Table.Tbody>
           </Table>
         </Stack>

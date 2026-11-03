@@ -1,23 +1,28 @@
 import { ActionIcon, Button, Group, NumberInput, Select, TextInput } from "@mantine/core";
 import { IconDeviceFloppy, IconPlus, IconX } from "@tabler/icons-react";
 import { type ComponentProps, useEffect, useRef, useState } from "react";
-import { Form, useActionData } from "react-router";
+import { useFetcher } from "react-router";
 import { FormError } from "~/components/form-error";
 import { CreateItemModal, ItemPicker, type PickerItem } from "~/components/item-picker";
 import { int } from "~/forms";
 import { StoreShelfFields } from "~/components/store-shelf-fields";
 import { SubmitButton } from "~/components/submit-button";
-import type { action, ActiveListData } from "~/routes/shopping";
+import type { ActiveListData, clientAction } from "~/routes/shopping";
 import { DEFAULT_UNIT, UNIT_OPTIONS } from "~/units";
 
 // Manually add an item; the unit starts on the item's default unit.
 // A name no item has goes on this list only (a one-off), optionally with a store
-// and shelf, unless it's saved as an item first with "Zutat permanent speichern"
-export function AddItemForm({ items, stores, shelves, parents }: {
+// and shelf, unless it's saved as an item first with "Zutat permanent speichern".
+// With a shelf, it only offers that shelf's items, and one-offs and new items go there too.
+// Sent through a fetcher, so an error shows only on the form it came from.
+export function AddItemForm({ items, stores, shelves, parents, shelf, onAdded }: {
   items: ActiveListData["allItems"];
   stores: ActiveListData["allStores"];
   shelves: ActiveListData["allShelves"];
   parents: ActiveListData["parents"];
+  // Null ids for items without a store or shelf
+  shelf?: { storeId: number | null; categoryId: number | null };
+  onAdded?: () => void;
 }) {
   const [itemId, setItemId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -29,7 +34,9 @@ export function AddItemForm({ items, stores, shelves, parents }: {
   const [createOpened, setCreateOpened] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
-  const actionData = useActionData<typeof action>();
+  const fetcher = useFetcher<typeof clientAction>();
+  const actionData = fetcher.data;
+  const sent = useRef(false);
 
   const selectItem = (item: PickerItem | undefined) => {
     setItemId(item ? String(item.id) : null);
@@ -54,8 +61,17 @@ export function AddItemForm({ items, stores, shelves, parents }: {
     if (actionData && "oneOffAdded" in actionData) backToPicker();
   }, [actionData]);
 
+  // Idle again once the list has reloaded, so it already shows what was added
+  useEffect(() => {
+    if (fetcher.state === "submitting") sent.current = true;
+    if (fetcher.state === "idle" && sent.current) {
+      sent.current = false;
+      if (!(actionData && "addError" in actionData)) onAdded?.();
+    }
+  }, [fetcher.state]);
+
   return (
-    <Form method="post" ref={formRef}>
+    <fetcher.Form method="post" ref={formRef}>
       <input type="hidden" name="intent" value={oneOff == null ? "add-manual" : "add-one-off"} />
       <Group align="flex-end" gap="xs">
         {oneOff == null ? (
@@ -63,6 +79,8 @@ export function AddItemForm({ items, stores, shelves, parents }: {
             name="itemId"
             label="Zutat hinzufügen"
             items={items}
+            hidden={shelf && ((i) => i.storeId !== shelf.storeId || i.categoryId !== shelf.categoryId)}
+            autoFocus={shelf != null}
             optionLabel={(i) => (i.listed ? `${i.name} (auf der Liste)` : i.name)}
             value={itemId}
             search={search}
@@ -103,10 +121,17 @@ export function AddItemForm({ items, stores, shelves, parents }: {
       </Group>
       {oneOff != null && (
         <>
-          {/* Both optional: without a store it's listed under "Sonstige" */}
-          <Group grow gap="xs" mt="xs">
-            <StoreShelfFields stores={stores} shelves={shelves} />
-          </Group>
+          {shelf ? (
+            <>
+              <input type="hidden" name="storeId" value={shelf.storeId ?? ""} />
+              <input type="hidden" name="categoryId" value={shelf.categoryId ?? ""} />
+            </>
+          ) : (
+            // Both optional: without a store it's listed under "Sonstige"
+            <Group grow gap="xs" mt="xs">
+              <StoreShelfFields stores={stores} shelves={shelves} />
+            </Group>
+          )}
           <Group gap="xs" mt="sm">
             <SubmitButton leftSection={<IconPlus size={16} />}>Hinzufügen</SubmitButton>
             <Button variant="light" leftSection={<IconDeviceFloppy size={16} />} onClick={saveAsItem}>
@@ -130,6 +155,6 @@ export function AddItemForm({ items, stores, shelves, parents }: {
         parents={parents}
       />
       <FormError error={actionData && "addError" in actionData ? actionData.addError : null} mt="xs" />
-    </Form>
+    </fetcher.Form>
   );
 }
