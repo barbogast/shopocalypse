@@ -82,10 +82,11 @@ export function AddItemForm({ items, stores, shelves, parents }: {
         ) : (
           <TextInput
             name="name"
-            label="Nur auf diese Liste"
+            label="Name"
             value={oneOff}
             onChange={(e) => setOneOff(e.currentTarget.value)}
             required
+            withAsterisk={false}
             rightSection={
               <ActionIcon variant="subtle" color="gray" onClick={backToPicker} aria-label="Doch eine Zutat wählen">
                 <IconX size={14} />
@@ -97,18 +98,22 @@ export function AddItemForm({ items, stores, shelves, parents }: {
         <NumberInput ref={quantityRef} name="quantity" label="Menge" min={0} decimalScale={2} decimalSeparator=","
           placeholder="—" style={{ width: 70 }} />
         <Select name="unit" label="Einheit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
-        <SubmitButton leftSection={<IconPlus size={16} />}>Hinzufügen</SubmitButton>
+        {/* A one-off's fields take more rows, so its buttons go below them */}
+        {oneOff == null && <SubmitButton leftSection={<IconPlus size={16} />}>Hinzufügen</SubmitButton>}
       </Group>
-      {/* Both optional: without a store it's listed under "Sonstige" */}
       {oneOff != null && (
-        <Group align="flex-end" gap="xs" mt="xs">
-          <Group grow gap="xs" style={{ flex: 1, minWidth: 240 }}>
+        <>
+          {/* Both optional: without a store it's listed under "Sonstige" */}
+          <Group grow gap="xs" mt="xs">
             <StoreShelfFields stores={stores} shelves={shelves} />
           </Group>
-          <Button variant="light" leftSection={<IconDeviceFloppy size={16} />} onClick={saveAsItem}>
-            Zutat permanent speichern
-          </Button>
-        </Group>
+          <Group gap="xs" mt="sm">
+            <SubmitButton leftSection={<IconPlus size={16} />}>Hinzufügen</SubmitButton>
+            <Button variant="light" leftSection={<IconDeviceFloppy size={16} />} onClick={saveAsItem}>
+              Zutat permanent speichern
+            </Button>
+          </Group>
+        </>
       )}
       <CreateItemModal
         opened={createOpened}
