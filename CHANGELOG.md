@@ -4,6 +4,10 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-03
+
+- Einmalige Sachen wie Batterien oder Geschenkpapier können auf die Einkaufsliste, ohne dass dafür eine Zutat angelegt wird: einfach den Namen suchen und „nur auf diese Liste“ wählen. Laden und Regal sind optional.
+
 ## 2026-11-02
 
 - Rezepte können ein Foto vom Gericht haben: „Foto hinzufügen“ oben auf der Rezeptseite, oder ein Bild auf der Seite einfügen. Es erscheint auch beim Kochen und klein im Speiseplan.

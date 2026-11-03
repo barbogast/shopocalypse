@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { itemKey } from "~/item-names";
 import { type ParsedIngredient } from "~/recipe-import";
@@ -59,11 +59,12 @@ export async function changeItemsForMeals(
   after: Meal[],
 ) {
   const ingredients = await listIngredients(tx, [...new Set([...before, ...after].map((m) => m.recipeId))]);
-  const listed = await tx
+  // One-off entries aren't in any recipe, so meals never change them
+  const listed = (await tx
     .select({ id: schema.shoppingListItems.id, itemId: schema.shoppingListItems.itemId, amounts: schema.shoppingListItems.amounts, source: schema.shoppingListItems.source })
     .from(schema.shoppingListItems)
-    .where(eq(schema.shoppingListItems.shoppingListId, list.id))
-    .all();
+    .where(and(eq(schema.shoppingListItems.shoppingListId, list.id), isNotNull(schema.shoppingListItems.itemId)))
+    .all()).map((row) => ({ ...row, itemId: row.itemId! }));
 
   for (const change of changeListMeals(listed, before, after, ingredients, list.includeInStock)) {
     if (change.kind === "insert") {
@@ -103,6 +104,54 @@ async function addToList(tx: Tx, listId: number, itemId: number, amounts: Amount
 
 export async function addItemToList(listId: number, itemId: number, amount: Amount) {
   await db.transaction((tx) => addToList(tx, listId, itemId, [amount]));
+}
+
+// Adds a one-off entry: just a name, not an item from the catalog, optionally filed under a
+// store and shelf. A one-off with the same name (ignoring case) already on the list gets the
+// amounts added up and needs buying again; a store given now moves it there.
+export async function addOneOffToList(
+  listId: number,
+  entry: { name: string; storeId: number | null; categoryId: number | null; amount: Amount },
+) {
+  const { name, storeId, amount } = entry;
+  return db.transaction(async (tx) => {
+    if (storeId != null && !(await tx.select().from(schema.stores).where(eq(schema.stores.id, storeId)).get())) {
+      return { error: "Diesen Laden gibt es nicht mehr." };
+    }
+    // A shelf only goes with its own store
+    const shelf = entry.categoryId == null
+      ? null
+      : await tx.select().from(schema.itemCategories).where(eq(schema.itemCategories.id, entry.categoryId)).get();
+    if (entry.categoryId != null && (!shelf || shelf.storeId !== storeId)) {
+      return { error: "Dieses Regal gehört nicht zum gewählten Laden." };
+    }
+    const categoryId = shelf?.id ?? null;
+
+    const listed = await tx
+      .select()
+      .from(schema.shoppingListItems)
+      .where(and(
+        eq(schema.shoppingListItems.shoppingListId, listId),
+        isNull(schema.shoppingListItems.itemId),
+        sql`${schema.shoppingListItems.name} = ${name} collate nocase`,
+      ))
+      .get();
+    if (listed) {
+      await tx.update(schema.shoppingListItems)
+        .set({
+          amounts: combineAmounts([...listed.amounts, amount]),
+          bought: false,
+          ...(storeId != null && { storeId, categoryId }),
+        })
+        .where(eq(schema.shoppingListItems.id, listed.id))
+        .run();
+    } else {
+      await tx.insert(schema.shoppingListItems)
+        .values({ shoppingListId: listId, name, storeId, categoryId, amounts: combineAmounts([amount]), source: "manual" })
+        .run();
+    }
+    return { error: null };
+  });
 }
 
 // Adds parsed items to a list by hand, with their notes, creating the items that don't exist yet
@@ -243,9 +292,11 @@ export async function listScheduledMeals() {
     .orderBy(asc(schema.mealSchedule.position));
 }
 
-// A list's items in shopping order, with their store and shelf
+// A list's items in shopping order, with their store and shelf. One-off entries (no item)
+// have their own name, store and shelf
 export async function listItemsInOrder(listId: number) {
   const parentItems = alias(schema.items, "parents");
+  const name = sql<string>`coalesce(${schema.items.name}, ${schema.shoppingListItems.name})`;
   const listedParents = alias(schema.shoppingListItems, "listed_parents");
   // Indented under its parent only when the parent is on the list too and they share a shelf
   const isVariant = sql<boolean>`${listedParents.id} is not null and ${parentItems.storeId} is ${schema.items.storeId} and ${parentItems.categoryId} is ${schema.items.categoryId}`;
@@ -254,7 +305,7 @@ export async function listItemsInOrder(listId: number) {
       id: schema.shoppingListItems.id,
       itemId: schema.shoppingListItems.itemId,
       isVariant: isVariant.mapWith(Boolean),
-      itemName: schema.items.name,
+      itemName: name,
       itemPlural: schema.items.plural,
       amounts: schema.shoppingListItems.amounts,
       notes: schema.shoppingListItems.notes,
@@ -264,9 +315,9 @@ export async function listItemsInOrder(listId: number) {
       shelfName: schema.itemCategories.name,
     })
     .from(schema.shoppingListItems)
-    .innerJoin(schema.items, eq(schema.shoppingListItems.itemId, schema.items.id))
-    .leftJoin(schema.stores, eq(schema.items.storeId, schema.stores.id))
-    .leftJoin(schema.itemCategories, eq(schema.items.categoryId, schema.itemCategories.id))
+    .leftJoin(schema.items, eq(schema.shoppingListItems.itemId, schema.items.id))
+    .leftJoin(schema.stores, eq(schema.stores.id, sql`coalesce(${schema.items.storeId}, ${schema.shoppingListItems.storeId})`))
+    .leftJoin(schema.itemCategories, eq(schema.itemCategories.id, sql`coalesce(${schema.items.categoryId}, ${schema.shoppingListItems.categoryId})`))
     .leftJoin(parentItems, eq(schema.items.parentId, parentItems.id))
     .leftJoin(listedParents, and(
       eq(listedParents.shoppingListId, schema.shoppingListItems.shoppingListId),
@@ -280,9 +331,9 @@ export async function listItemsInOrder(listId: number) {
       schema.stores.name,
       sql`${schema.itemCategories.position} is null`,
       schema.itemCategories.position,
-      sql`case when ${isVariant} then ${parentItems.name} else ${schema.items.name} end collate nocase`,
+      sql`case when ${isVariant} then ${parentItems.name} else ${name} end collate nocase`,
       isVariant,
-      sql`${schema.items.name} collate nocase`,
+      sql`${name} collate nocase`,
     );
 }
 

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { type AnySQLiteColumn, blob, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { type AnySQLiteColumn, blob, check, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { ListNote } from "../shopping-list";
 import type { Amount, UnitKey } from "../units";
 
@@ -163,16 +163,23 @@ export const shoppingListItems = sqliteTable("shopping_list_items", {
   shoppingListId: integer("shopping_list_id")
     .notNull()
     .references(() => shoppingLists.id),
-  itemId: integer("item_id")
-    .notNull()
-    .references(() => items.id),
+  // Null for a one-off entry, which has a name instead and isn't in the item catalog
+  itemId: integer("item_id").references(() => items.id),
+  // Only one-off entries (no item) have these: what to buy, and optionally where
+  name: text("name"),
+  storeId: integer("store_id").references(() => stores.id),
+  categoryId: integer("category_id").references(() => itemCategories.id),
   // Combined amounts needed, one per unit kind; empty when no quantity is given
   amounts: text("amounts", { mode: "json" }).$type<Amount[]>().notNull(),
   // Parts of the amounts that come with a note from the recipe ("200 ml mind. 30% Fett")
   notes: text("notes", { mode: "json" }).$type<ListNote[]>().notNull().default(sql`'[]'`),
   bought: integer("bought", { mode: "boolean" }).notNull().default(false),
   source: text("source", { enum: ["meal_plan", "stock_deficit", "manual"] }).notNull(),
-}, (t) => [uniqueIndex("shopping_list_items_list_item").on(t.shoppingListId, t.itemId)]);
+}, (t) => [
+  uniqueIndex("shopping_list_items_list_item").on(t.shoppingListId, t.itemId),
+  // Either an item from the catalog or a one-off name, never both
+  check("shopping_list_items_item_or_name", sql`(item_id is null) <> (name is null)`),
+]);
 
 // Household-wide settings by key, such as the recipe preferences the chat with Claude follows
 export const settings = sqliteTable("settings", {

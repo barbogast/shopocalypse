@@ -139,6 +139,7 @@ export async function moveShelf(id: number, up: boolean) {
 export async function deleteShelf(id: number) {
   await db.transaction(async (tx) => {
     await tx.update(schema.items).set({ categoryId: null }).where(eq(schema.items.categoryId, id)).run();
+    await tx.update(schema.shoppingListItems).set({ categoryId: null }).where(eq(schema.shoppingListItems.categoryId, id)).run();
     await tx.delete(schema.itemCategories).where(eq(schema.itemCategories.id, id)).run();
   });
 }
@@ -147,6 +148,7 @@ export async function deleteShelf(id: number) {
 export async function deleteStore(id: number) {
   await db.transaction(async (tx) => {
     await tx.update(schema.items).set({ storeId: null, categoryId: null }).where(eq(schema.items.storeId, id)).run();
+    await tx.update(schema.shoppingListItems).set({ storeId: null, categoryId: null }).where(eq(schema.shoppingListItems.storeId, id)).run();
     await tx.delete(schema.itemCategories).where(eq(schema.itemCategories.storeId, id)).run();
     await tx.delete(schema.stores).where(eq(schema.stores.id, id)).run();
   });

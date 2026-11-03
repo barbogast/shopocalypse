@@ -17,6 +17,7 @@ import {
   addItemsToList,
   addItemToList,
   addMeal,
+  addOneOffToList,
   discardList,
   finishList,
   getActiveList,
@@ -96,6 +97,26 @@ export async function action({ request }: Route.ActionArgs) {
       if ("error" in parsed) return { addError: parsed.error };
       await addItemToList(activeList.id, itemId, parsed.amount);
       break;
+    }
+
+    // Something not in the item catalog, on this list only
+    case "add-one-off": {
+      const activeList = await getActiveList();
+      if (!activeList) return null;
+
+      const name = text(form, "name");
+      const parsed = parseAmount(form);
+      if (!name) return { addError: "Bitte einen Namen angeben." };
+      if ("error" in parsed) return { addError: parsed.error };
+      const { error } = await addOneOffToList(activeList.id, {
+        name,
+        storeId: int(form, "storeId"),
+        categoryId: int(form, "categoryId"),
+        amount: parsed.amount,
+      });
+      if (error) return { addError: error };
+      // Tells the form to go back to picking an item
+      return { oneOffAdded: true };
     }
 
     // Items pasted as text, one per line like a recipe's ingredients
@@ -386,7 +407,7 @@ function ListView({
                     ]
                   : []),
                 ...shelfItems.map((item) => (
-                  <ListItemRow key={item.id} item={item} usedIn={recipesByItem.get(item.itemId)} />
+                  <ListItemRow key={item.id} item={item} usedIn={item.itemId != null ? recipesByItem.get(item.itemId) : undefined} />
                 )),
               ])}
             </Table.Tbody>

@@ -2,11 +2,13 @@ import "./test-db";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "./client";
+import { deleteStore } from "./items.server";
 import { importRecipe } from "./recipes.server";
 import * as schema from "./schema";
 import {
   addItemToList,
   addMeal,
+  addOneOffToList,
   discardList,
   finishList,
   getActiveList,
@@ -71,6 +73,59 @@ describe("addItemToList", () => {
     await setBought(row.id, true);
     await addItemToList(list.id, mehl, { quantity: 1, unit: "kg" });
     expect(await listItemsInOrder(list.id)).toMatchObject([{ amounts: [{ quantity: 1.5, unit: "kg" }], bought: false, source: "manual" }]);
+  });
+});
+
+describe("addOneOffToList", () => {
+  const none = { quantity: null, unit: null };
+
+  it("lists a name that isn't an item, under its store and shelf", async () => {
+    await prepareList([], false);
+    const list = await activeList();
+    const store = await db.insert(schema.stores).values({ name: "Drogerie" }).returning().get();
+    const shelf = await db.insert(schema.itemCategories).values({ name: "Haushalt", storeId: store.id }).returning().get();
+    const before = await db.$count(schema.items);
+    expect(await addOneOffToList(list.id, { name: "Batterien", storeId: store.id, categoryId: shelf.id, amount: { quantity: 4, unit: "pcs" } }))
+      .toEqual({ error: null });
+    expect(await listItemsInOrder(list.id)).toMatchObject([
+      { itemId: null, itemName: "Batterien", storeName: "Drogerie", shelfName: "Haushalt", amounts: [{ quantity: 4, unit: "pcs" }], source: "manual" },
+    ]);
+    expect(await db.$count(schema.items)).toBe(before);
+
+    // Deleting the store keeps the entry, without a store
+    await deleteStore(store.id);
+    expect(await listItemsInOrder(list.id)).toMatchObject([{ itemName: "Batterien", storeName: null, shelfName: null }]);
+  });
+
+  it("adds up a one-off with the same name, which needs buying again", async () => {
+    await prepareList([], false);
+    const list = await activeList();
+    await addOneOffToList(list.id, { name: "Servietten", storeId: null, categoryId: null, amount: { quantity: 1, unit: "pack" } });
+    const [row] = await listItemsInOrder(list.id);
+    await setBought(row.id, true);
+    await addOneOffToList(list.id, { name: "servietten", storeId: null, categoryId: null, amount: { quantity: 2, unit: "pack" } });
+    expect(await listItemsInOrder(list.id)).toMatchObject([{ id: row.id, amounts: [{ quantity: 3, unit: "pack" }], bought: false }]);
+  });
+
+  it("refuses a shelf from another store", async () => {
+    await prepareList([], false);
+    const list = await activeList();
+    const [a, b] = await db.insert(schema.stores).values([{ name: "A" }, { name: "B" }]).returning();
+    const shelf = await db.insert(schema.itemCategories).values({ name: "Regal", storeId: b.id }).returning().get();
+    expect(await addOneOffToList(list.id, { name: "Kerzen", storeId: a.id, categoryId: shelf.id, amount: none }))
+      .toEqual({ error: "Dieses Regal gehört nicht zum gewählten Laden." });
+    expect(await listItemsInOrder(list.id)).toEqual([]);
+  });
+
+  it("is left alone when meals are added or removed", async () => {
+    const { recipeId } = await scheduleRecipe("Polenta");
+    await prepareList([], false);
+    const list = await activeList();
+    await addOneOffToList(list.id, { name: "Geschenkpapier", storeId: null, categoryId: null, amount: none });
+    await addMeal(list, recipeId, null);
+    const [meal] = await listMealsWithRecipes(list.id);
+    await removeMeal(list, meal.listRecipeId);
+    expect(await listItemsInOrder(list.id)).toMatchObject([{ itemName: "Geschenkpapier" }]);
   });
 });
 

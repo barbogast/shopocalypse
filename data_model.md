@@ -95,7 +95,8 @@ A recipe appears once per scheduled meal, so it can be listed more than once. Me
 
 - id
 - shopping_list_id
-- item_id
+- item_id — empty for a one-off entry
+- name, store_id, category_id — only for one-off entries: something bought this once (Batterien, Geschenkpapier) that isn't an item in the catalog. Store and shelf are optional; without a store it's listed under "Sonstige". Meals added or removed never touch it, and one added again under the same name (ignoring case) gets the amounts added up. Deleting its store or shelf keeps it, without them
 - amounts (JSON list of `{ quantity, unit }`) — what's needed, one entry per unit kind (e.g. `10 g + 2 tbsp`); empty when no quantity is given
 - bought (boolean) — set when ticking off
 - source: meal_plan | stock_deficit | manual
@@ -108,7 +109,8 @@ A recipe appears once per scheduled meal, so it can be listed more than once. Me
 - MealSchedule → Recipe: many-to-one
 - MealHistory → Recipe: many-to-one
 - ShoppingListRecipe → ShoppingList, Recipe: many-to-one
-- ShoppingListItem → Item: many-to-one (nullable)
+- ShoppingListItem → Item: many-to-one (nullable: a one-off entry has a name instead)
+- ShoppingListItem → Store, ItemCategory: many-to-one, only for one-off entries
 - ItemCategory → Store: many-to-one
 
 ## Notes and assumptions

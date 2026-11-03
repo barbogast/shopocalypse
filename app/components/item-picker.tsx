@@ -25,6 +25,7 @@ export function ItemPicker<T extends PickerItem>({
   onSearchChange,
   onSelect,
   onCreated,
+  onOneOff,
   defaultUnit,
   stores,
   shelves,
@@ -42,6 +43,8 @@ export function ItemPicker<T extends PickerItem>({
   onSearchChange: (search: string) => void;
   onSelect: (item: T | undefined) => void;
   onCreated: (item: PickerItem) => void;
+  // When given, a name that doesn't exist yet can also be used just once, without creating an item
+  onOneOff?: (name: string) => void;
   // Prefilled in the new item's form
   defaultUnit: string | null;
   stores: (typeof schema.stores.$inferSelect)[];
@@ -58,6 +61,7 @@ export function ItemPicker<T extends PickerItem>({
   const canCreate = searchName !== "" && !items.some((i) => itemKeys(i).includes(itemKey(searchName)));
   const options = items.filter((i) => !hidden?.(i)).map((i) => ({ value: String(i.id), label: optionLabel(i) }));
   if (canCreate) options.push({ value: "__create__", label: `+ „${searchName}“ anlegen` });
+  if (canCreate && onOneOff) options.push({ value: "__one_off__", label: `+ „${searchName}“ nur auf diese Liste` });
 
   // Arrives before the page's loader reruns, so the new item isn't in items yet
   useEffect(() => {
@@ -81,7 +85,9 @@ export function ItemPicker<T extends PickerItem>({
         searchValue={search}
         onSearchChange={onSearchChange}
         onChange={(picked) => {
-          if (picked === "__create__") {
+          if (picked === "__one_off__") {
+            onOneOff?.(searchName);
+          } else if (picked === "__create__") {
             setCreateName(searchName);
             setError(null);
             modal.open();
