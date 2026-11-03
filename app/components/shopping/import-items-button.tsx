@@ -40,10 +40,10 @@ export function ImportItemsButton({ items }: { items: { id: number; name: string
 
   return (
     <>
-      <Button variant="subtle" size="compact-sm" mt="xs" leftSection={<IconFileImport size={14} />} onClick={modal.open}>
-        Zutaten einfügen
+      <Button size="xs" variant="light" leftSection={<IconFileImport size={14} />} onClick={modal.open}>
+        Aus Text importieren
       </Button>
-      <Modal opened={opened} onClose={modal.close} title="Zutaten einfügen" size="lg">
+      <Modal opened={opened} onClose={modal.close} title="Aus Text importieren" size="lg">
         {/* The preview stays outside the form, since its plural suggestions are forms of their own */}
         <Stack>
           <Form method="post" id="import-items">

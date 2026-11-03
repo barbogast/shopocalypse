@@ -365,6 +365,7 @@ function ListView({
         <Group gap="sm">
           {unsentCount > 0 && <Text c="orange" size="sm">{unsentCount} noch nicht gespeichert</Text>}
           <Text c="dimmed" size="sm">{tickedCount}/{listItems.length}</Text>
+          <ImportItemsButton items={allItems} />
           {/* Copies what's still to buy, to paste into another app */}
           <CopyButton value={listAsText(listItems)}>
             {({ copied, copy }) => (
@@ -417,7 +418,6 @@ function ListView({
 
       <Divider my="md" />
       <AddItemForm items={allItems} stores={allStores} shelves={allShelves} parents={parents} />
-      <ImportItemsButton items={allItems} />
 
       <Divider my="lg" />
       <FormError error={actionData && "listError" in actionData ? actionData.listError : null} mt="xs" />
