@@ -1,8 +1,8 @@
 // Shrinks a photo in the browser before it's uploaded: phone photos are often 3–12 MB, and Vercel
 // refuses request bodies over 4.5 MB. Claude scales images down to about this size anyway.
 const LONG_EDGE = 1568;
-// Thumbnails show at about 48px; this keeps them sharp on 3x screens
-const THUMBNAIL_SIZE = 160;
+// Thumbnails show at 72px; this keeps them sharp on 3x screens
+const THUMBNAIL_SIZE = 216;
 
 export async function resizePhoto(file: File): Promise<Blob> {
   const bitmap = await openPhoto(file);

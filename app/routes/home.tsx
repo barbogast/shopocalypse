@@ -139,7 +139,9 @@ export async function action({ request }: Route.ActionArgs) {
   return null;
 }
 
-const THUMBNAIL_SIZE = 44;
+const THUMBNAIL_SIZE = 72;
+// How far a thumbnail reaches into the card's padding above and below, so it doesn't make the row taller
+const THUMBNAIL_OVERHANG = 9;
 
 function MealThumbnail({ url }: { url: string | null }) {
   return url ? (
@@ -188,7 +190,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                     <Group gap="xs" wrap="nowrap" style={isNext ? { flex: "1 1 220px" } : { flex: 1, minWidth: 0 }}>
                       {grip}
                       {showThumbnails && (
-                        <UnstyledButton onClick={() => setOpenPosition(meal.position)} aria-hidden tabIndex={-1} style={{ flexShrink: 0 }}>
+                        <UnstyledButton onClick={() => setOpenPosition(meal.position)} aria-hidden tabIndex={-1} my={-THUMBNAIL_OVERHANG} style={{ flexShrink: 0 }}>
                           <MealThumbnail url={meal.thumbnailUrl} />
                         </UnstyledButton>
                       )}
@@ -200,9 +202,10 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                       </Stack>
                     </Group>
                     <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                      {/* Phones skip the number: the order shows it, and the name needs the width beside the photo */}
                       {isNext
                         ? <Badge color="green" variant="light">Als Nächstes</Badge>
-                        : <Badge variant="outline" color="gray">#{i + 1}</Badge>}
+                        : <Badge variant="outline" color="gray" visibleFrom="xs">#{i + 1}</Badge>}
                       {isNext ? (
                         <Button component={Link} to={`/cook/${meal.id}?position=${meal.position}`} color="green"
                           leftSection={<IconPlayerPlay size={16} />}>
