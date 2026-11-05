@@ -7,6 +7,7 @@ heading per day.
 ## 2026-11-05
 
 - Beim Kochen lässt sich unter „Gekocht am“ der Tag wählen: heute, gestern, die zwei Wochentage davor oder ein anderes Datum. So kann ein Gericht auch später noch eingetragen werden.
+- Beim Stellen eines Timers öffnen die Pfeiltasten am Handy nicht mehr die Tastatur.
 
 ## 2026-11-03
 

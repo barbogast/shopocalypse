@@ -1,7 +1,7 @@
 import { ActionIcon, Affix, Badge, Button, Group, Modal, NumberInput, Paper, Stack, Text, UnstyledButton } from "@mantine/core";
-import { IconAlarm, IconClock, IconPlayerPause, IconPlayerPlay, IconX } from "@tabler/icons-react";
+import { IconAlarm, IconChevronDown, IconChevronUp, IconClock, IconPlayerPause, IconPlayerPlay, IconX } from "@tabler/icons-react";
 import type { Parent, PhrasingContent, Root, RootContent, Text as TextNode } from "mdast";
-import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, type CSSProperties, type ReactNode, useContext, useEffect, useState } from "react";
 import type { Components } from "react-markdown";
 import { findDurations, formatClock } from "~/cook-timers";
 
@@ -113,6 +113,27 @@ function TimerChip(props: { "data-seconds"?: string; "data-key"?: string; "data-
 
 export const timerComponents = { "timer-chip": TimerChip } as Components;
 
+// NumberInput's own step buttons focus the input, which opens the keyboard on a
+// phone. These look the same but leave the focus alone.
+function TimeInput({ label, max, value, onChange }: { label: string; max: number; value: number; onChange: (value: number) => void }) {
+  const stepButton = (by: number, disabled: boolean, icon: ReactNode) => (
+    <UnstyledButton className={NumberInput.classes.control} tabIndex={-1} aria-hidden disabled={disabled}
+      style={{ touchAction: "manipulation" }} onClick={() => onChange(value + by)}>
+      {icon}
+    </UnstyledButton>
+  );
+  return (
+    <NumberInput label={label} size="lg" min={0} max={max} allowDecimal={false} allowNegative={false}
+      clampBehavior="strict" value={value} onChange={(v) => onChange(Number(v) || 0)}
+      rightSection={
+        <div className={NumberInput.classes.controls} style={{ "--ni-chevron-size": "var(--ni-chevron-size-lg)" } as CSSProperties}>
+          {stepButton(1, value >= max, <IconChevronUp size={18} />)}
+          {stepButton(-1, value <= 0, <IconChevronDown size={18} />)}
+        </div>
+      } />
+  );
+}
+
 // Timers for the cook page: times in the instructions start one when tapped
 // (render them with remarkTimers and timerComponents), and a button starts a
 // free one. They're kept in the browser per recipe, so they survive a reload.
@@ -200,11 +221,8 @@ export function CookTimers({ recipeId, children }: { recipeId: number; children:
           <Stack>
             {draft.key != null && <Text size="sm" c="dimmed" lineClamp={2}>{draft.label}</Text>}
             <Group grow>
-              <NumberInput label="Minuten" size="lg" min={0} max={999} allowDecimal={false} allowNegative={false}
-                value={draft.minutes} onChange={(v) => setDraft({ ...draft, minutes: Number(v) || 0 })} />
-              <NumberInput label="Sekunden" size="lg" min={0} max={59} allowDecimal={false} allowNegative={false}
-                clampBehavior="strict" value={draft.seconds}
-                onChange={(v) => setDraft({ ...draft, seconds: Number(v) || 0 })} />
+              <TimeInput label="Minuten" max={999} value={draft.minutes} onChange={(minutes) => setDraft({ ...draft, minutes })} />
+              <TimeInput label="Sekunden" max={59} value={draft.seconds} onChange={(seconds) => setDraft({ ...draft, seconds })} />
             </Group>
             <Group>
               {/* Focused instead of the inputs, so the keyboard only opens when the time is changed */}
