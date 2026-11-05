@@ -1,7 +1,7 @@
-import { Badge, Box, Button, Container, Group, Image, Stack, Table, Text, Textarea, Title } from "@mantine/core";
+import { Badge, Box, Button, Container, Group, Image, Stack, Table, Text, Textarea, TextInput, Title } from "@mantine/core";
 import { IconCheck, IconPencil } from "@tabler/icons-react";
 import { and, eq } from "drizzle-orm";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Form, Link, redirect, useLocation, useNavigate } from "react-router";
 import { CookTimers, remarkTimers, timerComponents } from "~/components/cook-timers";
 import { IngredientName } from "~/components/ingredient-name";
@@ -90,12 +90,27 @@ function useWakeLock() {
   }, []);
 }
 
+// The browser's local date, empty until hydrated since the server's time zone may differ.
+// Keeps up when the page stays open past midnight.
+function useToday() {
+  const [today, setToday] = useState("");
+  useEffect(() => {
+    const update = () => setToday(localDate());
+    update();
+    const timer = setInterval(update, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  return today;
+}
+
 export default function Cook({ loaderData }: Route.ComponentProps) {
   const { recipe, servings, ingredients, scheduled, photoUrl } = loaderData;
   const navigate = useNavigate();
   // "default" means this is the first page of the visit (opened from a link or bookmark)
   const cameFromApp = useLocation().key !== "default";
-  const cookedOnRef = useRef<HTMLInputElement>(null);
+  const today = useToday();
+  // Null follows today; set when the meal is recorded on a later day
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
   useWakeLock();
 
   return (
@@ -143,9 +158,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
         <Text size="lg" mb="xl" c="dimmed">Keine Zubereitung.</Text>
       )}
 
-      {/* Read at submit time: the page may stay open past midnight */}
-      <Form method="post" onSubmit={() => cookedOnRef.current && (cookedOnRef.current.value = localDate())}>
-        <input type="hidden" name="cookedOn" ref={cookedOnRef} />
+      <Form method="post">
         <Stack>
           <Textarea
             name="comments"
@@ -154,6 +167,15 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
             defaultValue={recipe.comments ?? ""}
             autosize
             minRows={2}
+          />
+          <TextInput
+            type="date"
+            name="cookedOn"
+            label="Gekocht am"
+            value={pickedDate ?? today}
+            max={today}
+            onChange={(e) => setPickedDate(e.currentTarget.value || null)}
+            maw={200}
           />
           <Group>
             <SubmitButton color="green" leftSection={<IconCheck size={16} />}>

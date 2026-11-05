@@ -4,6 +4,10 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-05
+
+- Beim Kochen lässt sich das Datum unter „Gekocht am“ ändern, so kann ein Gericht auch am nächsten Tag noch für gestern eingetragen werden.
+
 ## 2026-11-03
 
 - Wenn Claude ein Rezept überarbeitet, ändert es nur noch, worum du gebeten hast, statt das ganze Rezept umzuformatieren.
