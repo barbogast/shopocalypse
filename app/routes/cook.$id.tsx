@@ -9,7 +9,7 @@ import { Markdown } from "~/components/markdown";
 import { SubmitButton } from "~/components/submit-button";
 import { ThawWarning } from "~/components/thaw-warning";
 import { Weblink } from "~/components/weblink";
-import { isDateString, localDate } from "~/dates";
+import { daysBefore, isDateString, localDate, weekdayName } from "~/dates";
 import { db } from "~/db/client";
 import { recipePhotoUrl } from "~/db/recipe-photos.server";
 import { recordRecipeVersion } from "~/db/recipe-versions";
@@ -111,6 +111,13 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
   const today = useToday();
   // Null follows today; set when the meal is recorded on a later day
   const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const recentDays = today ? [
+    { date: daysBefore(today, 1), label: "Gestern" },
+    ...[2, 3].map((days) => {
+      const date = daysBefore(today, days);
+      return { date, label: weekdayName(date) };
+    }),
+  ] : [];
   useWakeLock();
 
   return (
@@ -168,15 +175,26 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
             autosize
             minRows={2}
           />
-          <TextInput
-            type="date"
-            name="cookedOn"
-            label="Gekocht am"
-            value={pickedDate ?? today}
-            max={today}
-            onChange={(e) => setPickedDate(e.currentTarget.value || null)}
-            maw={200}
-          />
+          <Stack gap="xs">
+            <TextInput
+              type="date"
+              name="cookedOn"
+              label="Gekocht am"
+              value={pickedDate ?? today}
+              max={today}
+              onChange={(e) => setPickedDate(e.currentTarget.value || null)}
+              maw={200}
+            />
+            <Group gap="xs">
+              {/* Tapping the chosen day again goes back to today */}
+              {recentDays.map(({ date, label }) => (
+                <Button key={date} size="xs" variant={pickedDate === date ? "filled" : "default"}
+                  onClick={() => setPickedDate(pickedDate === date ? null : date)}>
+                  {label}
+                </Button>
+              ))}
+            </Group>
+          </Stack>
           <Group>
             <SubmitButton color="green" leftSection={<IconCheck size={16} />}>
               Fertig gekocht
