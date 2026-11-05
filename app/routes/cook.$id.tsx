@@ -178,7 +178,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
             autosize
             minRows={2}
           />
-          {/* A disabled field isn't submitted, so the date goes in its own input */}
+          {/* The date field only exists for "Anderes Datum", so the date goes in its own input */}
           <input type="hidden" name="cookedOn" value={cookedOn} />
           <Stack gap="xs">
             <Radio.Group
@@ -194,16 +194,17 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
                 {dayOptions.map((option) => <Radio key={option.value} {...option} />)}
               </Group>
             </Radio.Group>
-            <TextInput
-              type="date"
-              aria-label="Datum"
-              value={cookedOn}
-              max={today}
-              disabled={cookedDay !== OTHER_DAY}
-              required
-              onChange={(e) => setOtherDate(e.currentTarget.value)}
-              maw={200}
-            />
+            {cookedDay === OTHER_DAY && (
+              <TextInput
+                type="date"
+                aria-label="Datum"
+                value={cookedOn}
+                max={today}
+                required
+                onChange={(e) => setOtherDate(e.currentTarget.value)}
+                maw={200}
+              />
+            )}
           </Stack>
           <Group>
             <SubmitButton color="green" leftSection={<IconCheck size={16} />}>
