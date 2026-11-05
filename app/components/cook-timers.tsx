@@ -240,16 +240,15 @@ export function CookTimers({ recipeId, children }: { recipeId: number; children:
       </Modal>
 
       {/* Above the bottom nav. Running timers fill a bar that scrolls sideways; the
-          page leaves room at its end so the bar never hides anything for good. */}
+          page leaves room below its footer so the bar never hides anything for good. */}
+      <style>{":root { --page-bottom-bar: 90px; }"}</style>
       <Affix position={{ bottom: "calc(70px + env(safe-area-inset-bottom))", left: 0, right: 0 }}
         style={{ pointerEvents: "none" }}>
-        <Group gap="xs" wrap="nowrap" p="xs" style={{
+        <Group gap="xs" wrap="nowrap" p="xs" style={timers.length > 0 ? {
           pointerEvents: "auto",
-          ...(timers.length > 0 && {
-            background: "var(--mantine-color-body)",
-            borderTop: "1px solid var(--mantine-color-default-border)",
-          }),
-        }}>
+          background: "var(--mantine-color-body)",
+          borderTop: "1px solid var(--mantine-color-default-border)",
+        } : undefined}>
           <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0, overflowX: "auto" }}>
             {timers.map((t) => {
               const done = isDone(t, now);
@@ -278,7 +277,7 @@ export function CookTimers({ recipeId, children }: { recipeId: number; children:
               );
             })}
           </Group>
-          <Button radius="xl" leftSection={<IconAlarm size={18} />} style={{ flexShrink: 0, boxShadow: "var(--mantine-shadow-md)" }}
+          <Button radius="xl" leftSection={<IconAlarm size={18} />} style={{ flexShrink: 0, pointerEvents: "auto", boxShadow: "var(--mantine-shadow-md)" }}
             onClick={() => setDraft({ key: null, label: "Timer", minutes: 5, seconds: 0 })}>
             Timer
           </Button>

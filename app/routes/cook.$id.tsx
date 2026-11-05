@@ -129,8 +129,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
 
   return (
     <CookTimers recipeId={recipe.id}>
-    {/* The bottom padding keeps the timer button clear of the form */}
-    <Container size="sm" pt="xl" pb={100}>
+    <Container size="sm" pt="xl">
       <Group justify="space-between" align="baseline" mb="lg">
         <Title>{recipe.name}</Title>
         <Button component={Link} to={`/recipes/${recipe.id}`} variant="subtle" size="xs"

@@ -55,7 +55,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
               <NewVersionBar />
               {/* The safe-area inset keeps the nav clear of the phone's home bar when installed */}
-              <main style={{ flex: 1, paddingBottom: "calc(70px + env(safe-area-inset-bottom))" }}>
+              {/* --page-bottom-bar is set by pages with a bar of their own above the nav */}
+              <main style={{ flex: 1, paddingBottom: "calc(70px + env(safe-area-inset-bottom) + var(--page-bottom-bar, 0px))" }}>
                 {children}
                 <VersionFooter />
               </main>

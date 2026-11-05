@@ -9,6 +9,7 @@ heading per day.
 - Beim Kochen lässt sich unter „Gekocht am“ der Tag wählen: heute, gestern, die zwei Wochentage davor oder ein anderes Datum. So kann ein Gericht auch später noch eingetragen werden.
 - Beim Kochen lassen sich die Portionen mit „+“ und „−“ ändern, die Zutatenmengen rechnen sich mit. Speiseplan und Einkaufsliste bleiben unverändert.
 - Beim Stellen eines Timers öffnen die Pfeiltasten am Handy nicht mehr die Tastatur.
+- Auf der Kochseite verdeckt die Timer-Leiste den Link „Neuigkeiten“ nicht mehr.
 
 ## 2026-11-03
 
