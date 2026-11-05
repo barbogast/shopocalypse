@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Container, Group, Image, Stack, Table, Text, Textarea, TextInput, Title } from "@mantine/core";
+import { Badge, Box, Button, Container, Group, Image, Radio, Stack, Table, Text, Textarea, TextInput, Title } from "@mantine/core";
 import { IconCheck, IconPencil } from "@tabler/icons-react";
 import { and, eq } from "drizzle-orm";
 import { useEffect, useState } from "react";
@@ -103,21 +103,24 @@ function useToday() {
   return today;
 }
 
+const OTHER_DAY = "other";
+
 export default function Cook({ loaderData }: Route.ComponentProps) {
   const { recipe, servings, ingredients, scheduled, photoUrl } = loaderData;
   const navigate = useNavigate();
   // "default" means this is the first page of the visit (opened from a link or bookmark)
   const cameFromApp = useLocation().key !== "default";
   const today = useToday();
-  // Null follows today; set when the meal is recorded on a later day
-  const [pickedDate, setPickedDate] = useState<string | null>(null);
-  const recentDays = today ? [
-    { date: daysBefore(today, 1), label: "Gestern" },
-    ...[2, 3].map((days) => {
-      const date = daysBefore(today, days);
-      return { date, label: weekdayName(date) };
-    }),
-  ] : [];
+  // How many days ago the meal was cooked, or OTHER_DAY for the date field
+  const [cookedDay, setCookedDay] = useState("0");
+  const [otherDate, setOtherDate] = useState("");
+  const cookedOn = cookedDay === OTHER_DAY ? otherDate : today && daysBefore(today, Number(cookedDay));
+  const dayOptions = [
+    { value: "0", label: "Heute" },
+    { value: "1", label: "Gestern" },
+    ...(today ? [2, 3].map((days) => ({ value: String(days), label: weekdayName(daysBefore(today, days)) })) : []),
+    { value: OTHER_DAY, label: "Anderes Datum" },
+  ];
   useWakeLock();
 
   return (
@@ -175,25 +178,32 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
             autosize
             minRows={2}
           />
+          {/* A disabled field isn't submitted, so the date goes in its own input */}
+          <input type="hidden" name="cookedOn" value={cookedOn} />
           <Stack gap="xs">
+            <Radio.Group
+              label="Gekocht am"
+              value={cookedDay}
+              onChange={(day) => {
+                // The field starts from the day chosen so far
+                if (day === OTHER_DAY) setOtherDate(cookedOn);
+                setCookedDay(day);
+              }}
+            >
+              <Group gap="md" mt="xs">
+                {dayOptions.map((option) => <Radio key={option.value} {...option} />)}
+              </Group>
+            </Radio.Group>
             <TextInput
               type="date"
-              name="cookedOn"
-              label="Gekocht am"
-              value={pickedDate ?? today}
+              aria-label="Datum"
+              value={cookedOn}
               max={today}
-              onChange={(e) => setPickedDate(e.currentTarget.value || null)}
+              disabled={cookedDay !== OTHER_DAY}
+              required
+              onChange={(e) => setOtherDate(e.currentTarget.value)}
               maw={200}
             />
-            <Group gap="xs">
-              {/* Tapping the chosen day again goes back to today */}
-              {recentDays.map(({ date, label }) => (
-                <Button key={date} size="xs" variant={pickedDate === date ? "filled" : "default"}
-                  onClick={() => setPickedDate(pickedDate === date ? null : date)}>
-                  {label}
-                </Button>
-              ))}
-            </Group>
           </Stack>
           <Group>
             <SubmitButton color="green" leftSection={<IconCheck size={16} />}>

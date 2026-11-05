@@ -6,7 +6,7 @@ heading per day.
 
 ## 2026-11-05
 
-- Beim Kochen lässt sich das Datum unter „Gekocht am“ ändern, so kann ein Gericht auch später noch eingetragen werden. „Gestern“ und die zwei Wochentage davor gehen mit einem Tipp.
+- Beim Kochen lässt sich unter „Gekocht am“ der Tag wählen: heute, gestern, die zwei Wochentage davor oder ein anderes Datum. So kann ein Gericht auch später noch eingetragen werden.
 
 ## 2026-11-03
 
