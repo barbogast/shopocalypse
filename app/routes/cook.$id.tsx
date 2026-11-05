@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Container, Group, Image, Radio, Stack, Table, Text, Textarea, TextInput, Title } from "@mantine/core";
+import { Box, Button, Container, Group, Image, Radio, Stack, Table, Text, Textarea, TextInput, Title } from "@mantine/core";
 import { IconCheck, IconPencil } from "@tabler/icons-react";
 import { and, eq } from "drizzle-orm";
 import { useEffect, useState } from "react";
@@ -6,6 +6,7 @@ import { Form, Link, redirect, useLocation, useNavigate } from "react-router";
 import { CookTimers, remarkTimers, timerComponents } from "~/components/cook-timers";
 import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
+import { ServingsStepper } from "~/components/servings";
 import { SubmitButton } from "~/components/submit-button";
 import { ThawWarning } from "~/components/thaw-warning";
 import { Weblink } from "~/components/weblink";
@@ -44,9 +45,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const meal = await scheduledMeal(request, id);
   // A stale link (meal already cooked or removed): cook it as a one-off instead
   if (!meal && new URL(request.url).searchParams.has("position")) return redirect(`/cook/${id}`);
-  const servings = meal?.servings ?? recipe.servingSize;
+  // ?servings= only rescales this page: the meal is about to be cooked, so the
+  // schedule and shopping list stay as they are. In the URL, it survives a reload.
+  const chosen = Number(new URL(request.url).searchParams.get("servings"));
+  const servings = Number.isInteger(chosen) && chosen >= 1 ? chosen : meal?.servings ?? recipe.servingSize;
   const [{ ingredients }] = await withIngredients([{ ...recipe, servings }]);
-  return { recipe, servings, ingredients, scheduled: meal != null, photoUrl: await recipePhotoUrl(id) };
+  return { recipe, servings, ingredients, position: meal?.position ?? null, photoUrl: await recipePhotoUrl(id) };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -106,7 +110,7 @@ function useToday() {
 const OTHER_DAY = "other";
 
 export default function Cook({ loaderData }: Route.ComponentProps) {
-  const { recipe, servings, ingredients, scheduled, photoUrl } = loaderData;
+  const { recipe, servings, ingredients, position, photoUrl } = loaderData;
   const navigate = useNavigate();
   // "default" means this is the first page of the visit (opened from a link or bookmark)
   const cameFromApp = useLocation().key !== "default";
@@ -129,20 +133,26 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
     <Container size="sm" pt="xl" pb={100}>
       <Group justify="space-between" align="baseline" mb="lg">
         <Title>{recipe.name}</Title>
-        <Group gap="xs">
-          <Badge variant="light" color={servings === recipe.servingSize ? "gray" : "blue"}>für {servings}</Badge>
-          <Button component={Link} to={`/recipes/${recipe.id}`} variant="subtle" size="xs"
-            leftSection={<IconPencil size={14} />}>
-            Bearbeiten
-          </Button>
-        </Group>
+        <Button component={Link} to={`/recipes/${recipe.id}`} variant="subtle" size="xs"
+          leftSection={<IconPencil size={14} />}>
+          Bearbeiten
+        </Button>
       </Group>
       {recipe.weblink && <Weblink href={recipe.weblink} display="block" mt="-sm" mb="lg" />}
       {photoUrl && <Image src={photoUrl} alt="" radius="md" mah={240} fit="cover" mb="lg" />}
 
       <ThawWarning ingredients={ingredients} mb="md" />
 
-      <Title order={3} mb="sm">Zutaten</Title>
+      <Group justify="space-between" align="center" mb="sm">
+        <Title order={3}>Zutaten</Title>
+        <Group gap="xs">
+          {servings !== recipe.servingSize && <Text size="sm" c="dimmed">Rezept für {recipe.servingSize}</Text>}
+          <Form replace preventScrollReset style={{ display: "flex", alignItems: "center" }}>
+            {position != null && <input type="hidden" name="position" value={position} />}
+            <ServingsStepper servings={servings} />
+          </Form>
+        </Group>
+      </Group>
       <Table mb="xl" fz="lg">
         <Table.Tbody>
           {ingredients.map((ing) => (
@@ -214,7 +224,7 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
               Abbrechen
             </Button>
           </Group>
-          {!scheduled && (
+          {position == null && (
             <Text size="xs" c="dimmed">Nicht aus dem Speiseplan: Wird als gekocht eingetragen, der Speiseplan bleibt unverändert.</Text>
           )}
         </Stack>

@@ -12,12 +12,10 @@ export function Servings({ servings }: { servings: number }) {
   );
 }
 
-// Minus/plus buttons for a scheduled meal's servings
-export function ServingsControl({ position, servings }: { position: number; servings: number }) {
+// Minus/plus buttons that submit the surrounding form with the new "servings"
+export function ServingsStepper({ servings }: { servings: number }) {
   return (
-    <Form method="post" style={{ display: "flex", alignItems: "center" }}>
-      <input type="hidden" name="intent" value="servings" />
-      <input type="hidden" name="position" value={position} />
+    <>
       <Button type="submit" name="servings" value={servings - 1} disabled={servings <= 1}
         variant="subtle" color="gray" size="xs" px={6} aria-label="Weniger Portionen">
         <IconMinus size={14} />
@@ -30,6 +28,17 @@ export function ServingsControl({ position, servings }: { position: number; serv
         variant="subtle" color="gray" size="xs" px={6} aria-label="Mehr Portionen">
         <IconPlus size={14} />
       </Button>
+    </>
+  );
+}
+
+// Changes a scheduled meal's servings
+export function ServingsControl({ position, servings }: { position: number; servings: number }) {
+  return (
+    <Form method="post" style={{ display: "flex", alignItems: "center" }}>
+      <input type="hidden" name="intent" value="servings" />
+      <input type="hidden" name="position" value={position} />
+      <ServingsStepper servings={servings} />
     </Form>
   );
 }
