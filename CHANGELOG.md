@@ -4,6 +4,10 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-06
+
+- Ein Tipp auf eine Mahlzeit im Speiseplan öffnet jetzt direkt die Kochseite.
+
 ## 2026-11-05
 
 - Beim Kochen lässt sich unter „Gekocht am“ der Tag wählen: heute, gestern, die zwei Wochentage davor oder ein anderes Datum. So kann ein Gericht auch später noch eingetragen werden.

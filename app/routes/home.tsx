@@ -23,7 +23,6 @@ import { useEffect, useState } from "react";
 import { Form, Link } from "react-router";
 import { FormError } from "~/components/form-error";
 import { ServingsControl } from "~/components/servings";
-import { RecipeDrawer } from "~/components/recipe-drawer";
 import { SortableList, useReorder } from "~/components/sortable-list";
 import { SubmitButton } from "~/components/submit-button";
 import { ThawWarning } from "~/components/thaw-warning";
@@ -49,9 +48,6 @@ export async function loader() {
       name: schema.recipes.name,
       servings: mealServings(schema.mealSchedule.servings),
       servingSize: schema.recipes.servingSize,
-      instructions: schema.recipes.instructions,
-      comments: schema.recipes.comments,
-      weblink: schema.recipes.weblink,
       photoUpdatedAt: schema.recipePhotos.updatedAt,
     })
     .from(schema.mealSchedule)
@@ -164,9 +160,6 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   useEffect(() => {
     if (actionData && "added" in actionData) setAddRecipeId(null);
   }, [actionData]);
-  // Tapping a meal's name opens its recipe details
-  const [openPosition, setOpenPosition] = useState<number | null>(null);
-  const open = scheduled.find((m) => m.position === openPosition);
   // Rows without a photo get an empty square, so the names stay aligned; none at all when no meal has one
   const showThumbnails = scheduled.some((m) => m.thumbnailUrl);
 
@@ -182,6 +175,7 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
             {(meal, i, grip) => {
               // The next meal gets the same row, marked and with the thaw warning and a prominent cook button
               const isNext = i === 0;
+              const cookUrl = `/cook/${meal.id}?position=${meal.position}`;
               return (
                 <Card withBorder radius="md" p="md"
                   style={isNext ? { borderColor: "var(--mantine-color-green-6)" } : undefined}>
@@ -190,12 +184,12 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                     <Group gap="xs" wrap="nowrap" style={isNext ? { flex: "1 1 220px" } : { flex: 1, minWidth: 0 }}>
                       {grip}
                       {showThumbnails && (
-                        <UnstyledButton onClick={() => setOpenPosition(meal.position)} aria-hidden tabIndex={-1} my={-THUMBNAIL_OVERHANG} style={{ flexShrink: 0 }}>
+                        <UnstyledButton component={Link} to={cookUrl} aria-hidden tabIndex={-1} my={-THUMBNAIL_OVERHANG} style={{ flexShrink: 0 }}>
                           <MealThumbnail url={meal.thumbnailUrl} />
                         </UnstyledButton>
                       )}
                       <Stack gap={0}>
-                        <Anchor component="button" type="button" c="inherit" ta="left" onClick={() => setOpenPosition(meal.position)}>
+                        <Anchor component={Link} to={cookUrl} c="inherit">
                           {meal.name}
                         </Anchor>
                         <ServingsControl position={meal.position} servings={meal.servings} />
@@ -206,15 +200,9 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                       {isNext
                         ? <Badge color="green" variant="light">Als Nächstes</Badge>
                         : <Badge variant="outline" color="gray" visibleFrom="xs">#{i + 1}</Badge>}
-                      {isNext ? (
-                        <Button component={Link} to={`/cook/${meal.id}?position=${meal.position}`} color="green"
-                          leftSection={<IconPlayerPlay size={16} />}>
+                      {isNext && (
+                        <Button component={Link} to={cookUrl} color="green" leftSection={<IconPlayerPlay size={16} />}>
                           Kochen
-                        </Button>
-                      ) : (
-                        <Button component={Link} to={`/cook/${meal.id}?position=${meal.position}`}
-                          variant="subtle" color="green" size="xs" px={6} aria-label={`${meal.name} kochen`}>
-                          <IconPlayerPlay size={14} />
                         </Button>
                       )}
                       <Form method="post">
@@ -233,8 +221,6 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
           </SortableList>
         </Stack>
       )}
-
-      <RecipeDrawer recipe={open} onClose={() => setOpenPosition(null)} />
 
       <Divider mb="lg" />
 
