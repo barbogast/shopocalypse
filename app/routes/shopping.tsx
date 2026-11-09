@@ -30,6 +30,7 @@ import {
   setBought,
 } from "~/db/shopping.server";
 import * as schema from "~/db/schema";
+import { tagsByRecipe } from "~/db/tags.server";
 import { confirmFirst, int, text } from "~/forms";
 import { pageTitle } from "~/page-title";
 import { parseItemsText } from "~/recipe-import";
@@ -64,7 +65,11 @@ export async function loader() {
     .select({ id: schema.recipes.id, name: schema.recipes.name, servingSize: schema.recipes.servingSize })
     .from(schema.recipes)
     .where(eq(schema.recipes.archived, false))
-    .orderBy(sql`${schema.recipes.name} collate nocase`);
+    .orderBy(sql`${schema.recipes.name} collate nocase`)
+    .then(async (rows) => {
+      const tags = await tagsByRecipe();
+      return rows.map((r) => ({ ...r, tags: tags.get(r.id)?.map((t) => t.name) ?? [] }));
+    });
 
   return {
     activeList,

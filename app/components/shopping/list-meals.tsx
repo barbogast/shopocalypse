@@ -1,9 +1,10 @@
-import { Anchor, Button, Collapse, Group, List, NumberInput, Select, Stack } from "@mantine/core";
+import { Anchor, Button, Collapse, Group, List, NumberInput, Stack } from "@mantine/core";
 import { IconChevronDown, IconChevronRight, IconPlus, IconTrash } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Form, useActionData } from "react-router";
 import { FormError } from "~/components/form-error";
 import { RecipeDrawer } from "~/components/recipe-drawer";
+import { RecipeSelect } from "~/components/recipe-select";
 import { Servings } from "~/components/servings";
 import { SubmitButton } from "~/components/submit-button";
 import type { action, ActiveListData, ListRecipe } from "~/routes/shopping";
@@ -87,13 +88,12 @@ function AddRecipeForm({ recipes }: { recipes: ActiveListData["allRecipes"] }) {
     <Form method="post">
       <input type="hidden" name="intent" value="add-recipe" />
       <Group align="flex-end" gap="xs">
-        <Select
+        <RecipeSelect
           name="recipeId"
           label="Mahlzeit hinzufügen"
-          data={recipes.map((r) => ({ value: String(r.id), label: r.name }))}
+          recipes={recipes}
           value={recipeId}
           onChange={setRecipeId}
-          searchable
           placeholder="Rezept wählen…"
           style={{ flex: 1, minWidth: 140 }}
         />

@@ -8,6 +8,7 @@ heading per day.
 
 - Rezepte können Tags haben, z. B. „Vegetarisch“ oder „Schnell“: auf der Rezeptseite unter „Tags“ eintragen. In der Rezeptliste lässt sich danach filtern.
 - Beim Auffüllen des Speiseplans lässt sich „Nur mit Tag“ wählen. Für einen Mix einfach mehrmals auffüllen, jeweils mit einem anderen Tag.
+- Beim Hinzufügen einer Mahlzeit zum Speiseplan oder zur Einkaufsliste zeigt die Rezeptauswahl die Tags. Die Suche findet Rezepte auch über ihren Tag.
 
 ## 2026-11-06
 

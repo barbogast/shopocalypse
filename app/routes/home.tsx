@@ -22,6 +22,7 @@ import { asc, desc, eq } from "drizzle-orm";
 import { useEffect, useState } from "react";
 import { Form, Link } from "react-router";
 import { FormError } from "~/components/form-error";
+import { RecipeSelect } from "~/components/recipe-select";
 import { ServingsControl } from "~/components/servings";
 import { SortableList, useReorder } from "~/components/sortable-list";
 import { SubmitButton } from "~/components/submit-button";
@@ -31,7 +32,7 @@ import { photoUrl } from "~/db/recipe-photos.server";
 import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
 import { autoFill, reorderSchedule, scheduleRecipe } from "~/db/schedule.server";
 import * as schema from "~/db/schema";
-import { allTags } from "~/db/tags.server";
+import { allTags, tagsByRecipe } from "~/db/tags.server";
 import { confirmFirst, int, text } from "~/forms";
 import { pageTitle } from "~/page-title";
 import { parseOrder } from "~/reorder";
@@ -62,7 +63,11 @@ export async function loader() {
     .select({ id: schema.recipes.id, name: schema.recipes.name })
     .from(schema.recipes)
     .where(eq(schema.recipes.archived, false))
-    .orderBy(schema.recipes.name);
+    .orderBy(schema.recipes.name)
+    .then(async (rows) => {
+      const tags = await tagsByRecipe();
+      return rows.map((r) => ({ ...r, tags: tags.get(r.id)?.map((t) => t.name) ?? [] }));
+    });
 
   const recentlyCooked = await db
     .select({ id: schema.mealHistory.id, recipeId: schema.recipes.id, name: schema.recipes.name, cookedAt: schema.mealHistory.cookedAt })
@@ -153,7 +158,6 @@ function MealThumbnail({ url }: { url: string | null }) {
 export default function Home({ loaderData, actionData }: Route.ComponentProps) {
   const { allRecipes, recentlyCooked, allTags } = loaderData;
   const [scheduled, reorder] = useReorder(loaderData.scheduled, (m) => m.position, "reorder");
-  const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
   // Shared by the add and auto-fill forms
   const [newServings, setNewServings] = useState<string | number>(4);
   // The add form's recipe, cleared once it's added but kept when adding fails
@@ -241,18 +245,17 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
           />
         )}
 
-        {availableRecipes.length > 0 && (
+        {allRecipes.length > 0 && (
           <Form method="post">
             <input type="hidden" name="intent" value="add" />
             <input type="hidden" name="servings" value={newServings} />
             <Group align="flex-end">
-              <Select
+              <RecipeSelect
                 name="recipeId"
                 label="Zum Speiseplan hinzufügen"
-                data={availableRecipes}
+                recipes={allRecipes}
                 value={addRecipeId}
                 onChange={setAddRecipeId}
-                searchable
                 placeholder="Rezept wählen…"
                 style={{ flex: 1 }}
               />
