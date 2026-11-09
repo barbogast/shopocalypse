@@ -26,6 +26,7 @@ import { RecipeSelect } from "~/components/recipe-select";
 import { ServingsControl } from "~/components/servings";
 import { SortableList, useReorder } from "~/components/sortable-list";
 import { SubmitButton } from "~/components/submit-button";
+import { TagBadge } from "~/components/tag-badge";
 import { ThawWarning } from "~/components/thaw-warning";
 import { db } from "~/db/client";
 import { photoUrl } from "~/db/recipe-photos.server";
@@ -66,7 +67,7 @@ export async function loader() {
     .orderBy(schema.recipes.name)
     .then(async (rows) => {
       const tags = await tagsByRecipe();
-      return rows.map((r) => ({ ...r, tags: tags.get(r.id)?.map((t) => t.name) ?? [] }));
+      return rows.map((r) => ({ ...r, tags: tags.get(r.id) ?? [] }));
     });
 
   const recentlyCooked = await db
@@ -288,6 +289,10 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                   data={allTags.map((t) => ({ value: String(t.id), label: t.name }))}
                   placeholder="Alle Rezepte"
                   clearable
+                  renderOption={({ option }) => {
+                    const tag = allTags.find((t) => String(t.id) === option.value);
+                    return tag ? <TagBadge {...tag} size="sm" /> : option.label;
+                  }}
                   style={{ flex: 1, minWidth: 140 }}
                 />
               )}

@@ -29,6 +29,15 @@ describe("setRecipeTags", () => {
   });
 });
 
+describe("tag colors", () => {
+  it("gives new tags different colors", async () => {
+    await db.delete(schema.recipeTags);
+    await db.delete(schema.tags);
+    await setRecipeTags(await newRecipe(), ["Eins", "Zwei", "Drei"]);
+    expect((await allTags()).map((t) => [t.name, t.color])).toEqual([["Drei", "orange"], ["Eins", "blue"], ["Zwei", "green"]]);
+  });
+});
+
 describe("copyRecipeTags", () => {
   it("gives a variant the original's tags", async () => {
     const original = await newRecipe();

@@ -3,6 +3,7 @@ import { IconArchive, IconArchiveOff, IconFileImport, IconMessageCircle, IconPla
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Form, Link, useSearchParams } from "react-router";
 import { RecipePhotoButton } from "~/components/recipe-photo-button";
+import { TagBadge } from "~/components/tag-badge";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
@@ -106,7 +107,7 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
         // Tapping the chosen tag again shows all recipes
         <Group gap="xs" mb="md">
           {allTags.map((tag) => (
-            <Chip key={tag.id} size="xs" checked={tagFilter === String(tag.id)}
+            <Chip key={tag.id} size="xs" color={tag.color} checked={tagFilter === String(tag.id)}
               onChange={(checked) => setParam("tag", checked ? String(tag.id) : null)}>
               {tag.name}
             </Chip>
@@ -130,7 +131,7 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
                   <Badge size="xs" variant="outline" color="gray" ml="xs">nicht auffüllen</Badge>
                 )}
                 {recipe.tags.map((tag) => (
-                  <Badge key={tag.id} size="xs" variant="light" ml="xs">{tag.name}</Badge>
+                  <TagBadge key={tag.id} {...tag} ml="xs" />
                 ))}
               </Table.Td>
               <Table.Td c="dimmed" style={{ width: 80 }}>

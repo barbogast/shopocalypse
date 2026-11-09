@@ -9,6 +9,7 @@ import {
   Group,
   NumberInput,
   Select,
+  Pill,
   Stack,
   TagsInput,
   Text,
@@ -85,7 +86,8 @@ export async function loader({ params }: Route.LoaderArgs) {
     .get() ?? { scheduledCount: 0 };
 
   const tags = (await tagsByRecipe([id])).get(id)?.map((t) => t.name) ?? [];
-  const tagOptions = (await allTags()).map((t) => t.name);
+  // Names and colors of all tags; a pill for a tag not saved yet has no color
+  const tagOptions = await allTags();
 
   return {
     recipe, ingredients, allItems, tags, tagOptions, ...await loadItemFormOptions(), cookedDates, versionCount, scheduledCount,
@@ -213,6 +215,7 @@ function SaveButton({ saved }: { saved: boolean }) {
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
   const { recipe, ingredients, allItems, tags, tagOptions, allStores, allShelves, parents, cookedDates, versionCount, scheduledCount, photoUrl } = loaderData;
   const cooked = cookedDates.length > 0;
+  const tagColors = new Map(tagOptions.map((t) => [t.name.toLocaleLowerCase("de"), t.color]));
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   const [orderedIngredients, saveIngredientOrder] = useReorder(ingredients, (i) => i.itemId, "reorder-ingredients");
   // The ingredient loaded into the form for editing, which stays selectable
@@ -305,8 +308,17 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           <NumberInput name="servingSize" label="Portionen" defaultValue={recipe.servingSize} min={1} allowDecimal={false} required />
           <TextInput name="weblink" label="Weblink" placeholder="https://…" inputMode="url" defaultValue={recipe.weblink ?? ""} />
           {/* Picking or removing a tag changes only its hidden input, which fires no change event on the form */}
-          <TagsInput name="tags" label="Tags" placeholder="z. B. Vegetarisch, Schnell" data={tagOptions}
+          <TagsInput name="tags" label="Tags" placeholder="z. B. Vegetarisch, Schnell" data={tagOptions.map((t) => t.name)}
             defaultValue={tags} onChange={markUnsaved} clearable
+            renderPill={({ value, onRemove, disabled }) => {
+              const color = tagColors.get(value?.toLocaleLowerCase("de") ?? "");
+              return (
+                <Pill withRemoveButton={!disabled} onRemove={onRemove}
+                  style={color ? { background: `var(--mantine-color-${color}-light)`, color: `var(--mantine-color-${color}-light-color)` } : undefined}>
+                  {value}
+                </Pill>
+              );
+            }}
             description="Zum Filtern der Rezepte und beim Auffüllen des Speiseplans" />
           <Checkbox name="autoFill" label="Beim Auffüllen berücksichtigen" defaultChecked={recipe.autoFill}
             description="Aus für gelegentliche Gerichte: Die kommen dann nur von Hand auf den Speiseplan" />

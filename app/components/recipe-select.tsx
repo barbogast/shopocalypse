@@ -1,6 +1,8 @@
-import { Badge, type ComboboxItem, Group, type OptionsFilter, Select, type SelectProps, Text } from "@mantine/core";
+import { type ComboboxItem, Group, type OptionsFilter, Select, type SelectProps, Text } from "@mantine/core";
+import { TagBadge } from "~/components/tag-badge";
+import type { Tag } from "~/db/tags.server";
 
-export type SelectableRecipe = { id: number; name: string; tags: string[] };
+export type SelectableRecipe = { id: number; name: string; tags: Pick<Tag, "name" | "color">[] };
 
 // Searchable recipe picker whose options show each recipe's tags; typing a tag finds its recipes
 export function RecipeSelect({ recipes, ...props }: { recipes: SelectableRecipe[] } & Omit<SelectProps, "data">) {
@@ -9,7 +11,7 @@ export function RecipeSelect({ recipes, ...props }: { recipes: SelectableRecipe[
     const query = search.trim().toLocaleLowerCase();
     return (options as ComboboxItem[]).filter((o) =>
       o.label.toLocaleLowerCase().includes(query)
-      || tagsById.get(o.value)?.some((t) => t.toLocaleLowerCase().includes(query)));
+      || tagsById.get(o.value)?.some((t) => t.name.toLocaleLowerCase().includes(query)));
   };
 
   return (
@@ -21,7 +23,7 @@ export function RecipeSelect({ recipes, ...props }: { recipes: SelectableRecipe[
       renderOption={({ option }) => (
         <Group gap={6} wrap="wrap">
           <Text size="sm">{option.label}</Text>
-          {tagsById.get(option.value)?.map((tag) => <Badge key={tag} size="xs" variant="light">{tag}</Badge>)}
+          {tagsById.get(option.value)?.map((tag) => <TagBadge key={tag.name} {...tag} />)}
         </Group>
       )}
     />

@@ -225,6 +225,13 @@
       "when": 1794253064109,
       "tag": "0031_recipe_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1794257375804,
+      "tag": "0032_tag_colors",
+      "breakpoints": true
     }
   ]
 }

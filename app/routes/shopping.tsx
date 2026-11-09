@@ -68,7 +68,7 @@ export async function loader() {
     .orderBy(sql`${schema.recipes.name} collate nocase`)
     .then(async (rows) => {
       const tags = await tagsByRecipe();
-      return rows.map((r) => ({ ...r, tags: tags.get(r.id)?.map((t) => t.name) ?? [] }));
+      return rows.map((r) => ({ ...r, tags: tags.get(r.id) ?? [] }));
     });
 
   return {

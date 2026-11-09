@@ -2,8 +2,9 @@ import { asc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "./client";
 import * as schema from "./schema";
 import type { Tx } from "./shopping.server";
+import { nextTagColor, type TagColor } from "~/tag-colors";
 
-export type Tag = { id: number; name: string };
+export type Tag = { id: number; name: string; color: TagColor };
 
 // Trimmed, inner spaces collapsed, empty ones and case-insensitive repeats dropped (the first spelling wins)
 export function normalizeTagNames(names: string[]) {
@@ -26,7 +27,7 @@ export function allTags() {
 // Each recipe's tags by name; recipes without tags are missing from the map
 export async function tagsByRecipe(recipeIds?: number[]) {
   const rows = await db
-    .select({ recipeId: schema.recipeTags.recipeId, id: schema.tags.id, name: schema.tags.name })
+    .select({ recipeId: schema.recipeTags.recipeId, id: schema.tags.id, name: schema.tags.name, color: schema.tags.color })
     .from(schema.recipeTags)
     .innerJoin(schema.tags, eq(schema.recipeTags.tagId, schema.tags.id))
     .where(recipeIds ? inArray(schema.recipeTags.recipeId, recipeIds) : undefined)
@@ -42,15 +43,21 @@ export async function deleteUnusedTags(tx: Tx) {
   await tx.delete(schema.tags).where(notInArray(schema.tags.id, used)).run();
 }
 
-// Gives the recipe exactly these tags, reusing existing ones that differ only in case
+// Gives the recipe exactly these tags, reusing existing ones that differ only in case. New ones get
+// the color fewest tags have
 export async function setRecipeTags(recipeId: number, names: string[]) {
   await db.transaction(async (tx) => {
     const existing = await tx.select().from(schema.tags);
     const byKey = new Map(existing.map((t) => [t.name.toLocaleLowerCase("de"), t.id]));
+    const usedColors = existing.map((t) => t.color);
     const tagIds: number[] = [];
     for (const name of normalizeTagNames(names)) {
       let id = byKey.get(name.toLocaleLowerCase("de"));
-      if (id === undefined) [{ id }] = await tx.insert(schema.tags).values({ name }).returning({ id: schema.tags.id });
+      if (id === undefined) {
+        const color = nextTagColor(usedColors);
+        usedColors.push(color);
+        [{ id }] = await tx.insert(schema.tags).values({ name, color }).returning({ id: schema.tags.id });
+      }
       tagIds.push(id);
     }
     await tx.delete(schema.recipeTags).where(eq(schema.recipeTags.recipeId, recipeId)).run();

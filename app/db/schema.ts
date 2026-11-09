@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { type AnySQLiteColumn, blob, check, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { ListNote } from "../shopping-list";
+import type { TagColor } from "../tag-colors";
 import type { Amount, UnitKey } from "../units";
 
 export const stores = sqliteTable("stores", {
@@ -59,6 +60,8 @@ export const recipes = sqliteTable("recipes", {
 export const tags = sqliteTable("tags", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  // One of TAG_COLORS, chosen when the tag is created (nextTagColor)
+  color: text("color").$type<TagColor>().notNull().default("blue"),
 }, (t) => [
   // Backstop for setRecipeTags, which reuses a tag differing only in case
   uniqueIndex("tags_name_unique").on(sql`${t.name} collate nocase`),
