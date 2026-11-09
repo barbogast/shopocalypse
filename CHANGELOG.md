@@ -4,6 +4,11 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-09
+
+- Rezepte können Tags haben, z. B. „Vegetarisch“ oder „Schnell“: auf der Rezeptseite unter „Tags“ eintragen. In der Rezeptliste lässt sich danach filtern.
+- Beim Auffüllen des Speiseplans lässt sich „Nur mit Tag“ wählen. Für einen Mix einfach mehrmals auffüllen, jeweils mit einem anderen Tag.
+
 ## 2026-11-06
 
 - Ein Tipp auf eine Mahlzeit im Speiseplan öffnet jetzt direkt die Kochseite.

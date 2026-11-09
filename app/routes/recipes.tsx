@@ -1,11 +1,12 @@
-import { ActionIcon, Badge, Button, Container, Group, SegmentedControl, Switch, Table, Text, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Button, Chip, Container, Group, SegmentedControl, Switch, Table, Text, Title, Tooltip } from "@mantine/core";
 import { IconArchive, IconArchiveOff, IconFileImport, IconMessageCircle, IconPlayerPlay, IconPlus, IconTrash } from "@tabler/icons-react";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { Form, Link, useSearchParams } from "react-router";
 import { RecipePhotoButton } from "~/components/recipe-photo-button";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
+import { allTags, recipesWithTag, tagsByRecipe } from "~/db/tags.server";
 import { confirmFirst, int } from "~/forms";
 import { pageTitle } from "~/page-title";
 import type { Route } from "./+types/recipes";
@@ -17,14 +18,22 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;
   const showArchived = params.has("archived");
+  const tagId = Number(params.get("tag")) || null;
   const all = await db
     .select()
     .from(schema.recipes)
-    .where(showArchived ? undefined : eq(schema.recipes.archived, false))
+    .where(and(
+      showArchived ? undefined : eq(schema.recipes.archived, false),
+      tagId ? inArray(schema.recipes.id, recipesWithTag(tagId)) : undefined,
+    ))
     .orderBy(...(params.get("by") === "added" ? [desc(schema.recipes.createdAt), desc(schema.recipes.id)] : [schema.recipes.name]));
   const cooked = await db.selectDistinct({ recipeId: schema.mealHistory.recipeId }).from(schema.mealHistory);
   const cookedIds = new Set(cooked.map((c) => c.recipeId));
-  return { recipes: all.map((r) => ({ ...r, cooked: cookedIds.has(r.id) })) };
+  const tags = await tagsByRecipe();
+  return {
+    recipes: all.map((r) => ({ ...r, cooked: cookedIds.has(r.id), tags: tags.get(r.id) ?? [] })),
+    allTags: await allTags(),
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -45,10 +54,11 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Recipes({ loaderData }: Route.ComponentProps) {
-  const { recipes: all } = loaderData;
+  const { recipes: all, allTags } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
   const showArchived = searchParams.has("archived");
   const byAdded = searchParams.get("by") === "added";
+  const tagFilter = searchParams.get("tag");
   const setParam = (name: string, value: string | null) =>
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -92,6 +102,18 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
         />
       </Group>
 
+      {allTags.length > 0 && (
+        // Tapping the chosen tag again shows all recipes
+        <Group gap="xs" mb="md">
+          {allTags.map((tag) => (
+            <Chip key={tag.id} size="xs" checked={tagFilter === String(tag.id)}
+              onChange={(checked) => setParam("tag", checked ? String(tag.id) : null)}>
+              {tag.name}
+            </Chip>
+          ))}
+        </Group>
+      )}
+
       <Table highlightOnHover>
         <Table.Tbody>
           {all.map((recipe) => (
@@ -107,6 +129,9 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
                 {!recipe.archived && !recipe.autoFill && (
                   <Badge size="xs" variant="outline" color="gray" ml="xs">nicht auffüllen</Badge>
                 )}
+                {recipe.tags.map((tag) => (
+                  <Badge key={tag.id} size="xs" variant="light" ml="xs">{tag.name}</Badge>
+                ))}
               </Table.Td>
               <Table.Td c="dimmed" style={{ width: 80 }}>
                 für {recipe.servingSize}
@@ -145,7 +170,7 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
           ))}
           {all.length === 0 && (
             <Table.Tr>
-              <Table.Td c="dimmed">Noch keine Rezepte.</Table.Td>
+              <Table.Td c="dimmed">{tagFilter ? "Kein Rezept mit diesem Tag." : "Noch keine Rezepte."}</Table.Td>
             </Table.Tr>
           )}
         </Table.Tbody>

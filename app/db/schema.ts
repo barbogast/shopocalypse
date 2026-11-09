@@ -54,6 +54,25 @@ export const recipes = sqliteTable("recipes", {
   autoFill: integer("auto_fill", { mode: "boolean" }).notNull().default(true),
 });
 
+// Labels chosen by the household ("Vegetarisch", "Schnell"), for filtering recipes and auto-fill.
+// A tag no recipe uses any more is deleted, so there's no list of tags to keep tidy
+export const tags = sqliteTable("tags", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+}, (t) => [
+  // Backstop for setRecipeTags, which reuses a tag differing only in case
+  uniqueIndex("tags_name_unique").on(sql`${t.name} collate nocase`),
+]);
+
+export const recipeTags = sqliteTable("recipe_tags", {
+  recipeId: integer("recipe_id")
+    .notNull()
+    .references(() => recipes.id),
+  tagId: integer("tag_id")
+    .notNull()
+    .references(() => tags.id),
+}, (t) => [primaryKey({ columns: [t.recipeId, t.tagId] }), index("recipe_tags_tag").on(t.tagId)]);
+
 // A recipe's photo of the dish, as a JPEG resized in the browser. Kept apart from recipes, so
 // queries for recipes don't load it, and not versioned
 export const recipePhotos = sqliteTable("recipe_photos", {

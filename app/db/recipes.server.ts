@@ -7,6 +7,7 @@ import { db } from "./client";
 import { recordRecipeVersion } from "./recipe-versions";
 import type { Tx } from "./shopping.server";
 import * as schema from "./schema";
+import { deleteUnusedTags } from "./tags.server";
 
 // Cook dates are stored as YYYY-MM-DD; format on the server so client and server render the same string
 export function formatCookedAt(cookedAt: string) {
@@ -30,6 +31,8 @@ export async function deleteOrArchiveRecipe(recipeId: number) {
       await tx.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, recipeId)).run();
       await tx.delete(schema.recipeVersions).where(eq(schema.recipeVersions.recipeId, recipeId)).run();
       await tx.delete(schema.recipePhotos).where(eq(schema.recipePhotos.recipeId, recipeId)).run();
+      await tx.delete(schema.recipeTags).where(eq(schema.recipeTags.recipeId, recipeId)).run();
+      await deleteUnusedTags(tx);
       // A rework still open becomes a draft for a new recipe
       await tx.update(schema.recipeDrafts).set({ recipeId: null }).where(eq(schema.recipeDrafts.recipeId, recipeId)).run();
       await tx.delete(schema.recipes).where(eq(schema.recipes.id, recipeId)).run();

@@ -1,8 +1,9 @@
-import { and, asc, eq, max } from "drizzle-orm";
+import { and, asc, eq, inArray, max } from "drizzle-orm";
 import { rotationOrder } from "~/meal-schedule";
 import { sameIds } from "~/reorder";
 import { db } from "./client";
 import * as schema from "./schema";
+import { recipesWithTag } from "./tags.server";
 
 // Puts the scheduled meals in the given order of their positions. The positions stay
 // (cook links refer to them); the meals move between them. Ignored when the positions
@@ -38,8 +39,9 @@ export async function scheduleRecipe(recipeId: number, servings: number | null) 
 }
 
 // Adds `count` meals from the auto-fill recipes in rotation order (see rotationOrder),
-// going round again if more meals are asked for than there are recipes
-export async function autoFill(count: number, servings: number | null) {
+// going round again if more meals are asked for than there are recipes. With a tag, only
+// recipes carrying it are picked; run it once per tag to mix them.
+export async function autoFill(count: number, servings: number | null, tagId: number | null = null) {
   const queue = await db
     .select({ recipeId: schema.mealSchedule.recipeId })
     .from(schema.mealSchedule)
@@ -51,10 +53,18 @@ export async function autoFill(count: number, servings: number | null) {
   const recipes = await db
     .select({ id: schema.recipes.id })
     .from(schema.recipes)
-    .where(and(eq(schema.recipes.archived, false), eq(schema.recipes.autoFill, true)));
+    .where(and(
+      eq(schema.recipes.archived, false),
+      eq(schema.recipes.autoFill, true),
+      tagId ? inArray(schema.recipes.id, recipesWithTag(tagId)) : undefined,
+    ));
 
   const rotation = rotationOrder(recipes, queue.map((r) => r.recipeId), new Map(lastCooked.map((r) => [r.recipeId, r.lastDate])));
-  if (rotation.length === 0) return { error: "Kein Rezept ist für das automatische Auffüllen vorgesehen." };
+  if (rotation.length === 0) {
+    return { error: tagId
+      ? "Kein Rezept mit diesem Tag ist für das automatische Auffüllen vorgesehen."
+      : "Kein Rezept ist für das automatische Auffüllen vorgesehen." };
+  }
 
   const start = await nextPosition();
   await db.insert(schema.mealSchedule).values(

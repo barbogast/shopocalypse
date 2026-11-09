@@ -15,6 +15,7 @@ import { Weblink } from "~/components/weblink";
 import { db } from "~/db/client";
 import { setPlural } from "~/db/items.server";
 import { createDraft, deleteDraft, getDraft, listDrafts, saveChat, saveDraft } from "~/db/recipe-drafts.server";
+import { copyRecipeTags } from "~/db/tags.server";
 import { AcceptedSchema, applySuggestions } from "~/item-suggest.server";
 import type { action as suggestAction } from "~/routes/items.suggest";
 import { recipeText } from "~/db/recipe-versions";
@@ -193,6 +194,9 @@ export async function action({ request }: Route.ActionArgs) {
     saved = { ...await updateRecipeFromText(recipeId, parsed), updated: true };
   } else {
     saved = { ...await importRecipe(parsed), updated: false };
+    // A variant of a recipe starts with its tags
+    const originalId = draftId ? (await getDraft(draftId))?.recipeId : null;
+    if (originalId) await copyRecipeTags(originalId, saved.id);
   }
   if (draftId) await deleteDraft(draftId);
   return { error: null, imported: { ...saved, name: recipe.name } };

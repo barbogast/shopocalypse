@@ -10,6 +10,7 @@ import {
   NumberInput,
   Select,
   Stack,
+  TagsInput,
   Text,
   Textarea,
   TextInput,
@@ -40,6 +41,7 @@ import {
 } from "~/db/recipes.server";
 import { scheduleRecipe } from "~/db/schedule.server";
 import * as schema from "~/db/schema";
+import { allTags, setRecipeTags, tagsByRecipe } from "~/db/tags.server";
 import { confirmFirst, int, optionalText, optionalUrl, text } from "~/forms";
 import { DEFAULT_UNIT, formatAmount, parseAmount, UNIT_OPTIONS } from "~/units";
 import { pageTitle } from "~/page-title";
@@ -82,8 +84,11 @@ export async function loader({ params }: Route.LoaderArgs) {
     .where(eq(schema.mealSchedule.recipeId, id))
     .get() ?? { scheduledCount: 0 };
 
+  const tags = (await tagsByRecipe([id])).get(id)?.map((t) => t.name) ?? [];
+  const tagOptions = (await allTags()).map((t) => t.name);
+
   return {
-    recipe, ingredients, allItems, ...await loadItemFormOptions(), cookedDates, versionCount, scheduledCount,
+    recipe, ingredients, allItems, tags, tagOptions, ...await loadItemFormOptions(), cookedDates, versionCount, scheduledCount,
     photoUrl: await recipePhotoUrl(id),
   };
 }
@@ -104,6 +109,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       if (!name || !servingSize) return { error: "Name und eine ganze Zahl als Portionen sind erforderlich." };
       if (weblink === undefined) return { error: "Der Weblink muss eine Webadresse sein, z. B. https://example.com/rezept." };
       await db.update(schema.recipes).set({ name, servingSize, instructions, comments, weblink, autoFill }).where(eq(schema.recipes.id, id));
+      // TagsInput submits them comma-separated; its split characters keep commas out of tag names
+      await setRecipeTags(id, String(form.get("tags") ?? "").split(","));
       await recordRecipeVersion(db, id);
       return { saved: true };
     }
@@ -204,7 +211,7 @@ function SaveButton({ saved }: { saved: boolean }) {
 }
 
 export default function RecipeDetail({ loaderData, actionData }: Route.ComponentProps) {
-  const { recipe, ingredients, allItems, allStores, allShelves, parents, cookedDates, versionCount, scheduledCount, photoUrl } = loaderData;
+  const { recipe, ingredients, allItems, tags, tagOptions, allStores, allShelves, parents, cookedDates, versionCount, scheduledCount, photoUrl } = loaderData;
   const cooked = cookedDates.length > 0;
   const usedItemIds = new Set(ingredients.map((i) => i.itemId));
   const [orderedIngredients, saveIngredientOrder] = useReorder(ingredients, (i) => i.itemId, "reorder-ingredients");
@@ -297,6 +304,10 @@ export default function RecipeDetail({ loaderData, actionData }: Route.Component
           <TextInput name="name" label="Name" defaultValue={recipe.name} required />
           <NumberInput name="servingSize" label="Portionen" defaultValue={recipe.servingSize} min={1} allowDecimal={false} required />
           <TextInput name="weblink" label="Weblink" placeholder="https://…" inputMode="url" defaultValue={recipe.weblink ?? ""} />
+          {/* Picking or removing a tag changes only its hidden input, which fires no change event on the form */}
+          <TagsInput name="tags" label="Tags" placeholder="z. B. Vegetarisch, Schnell" data={tagOptions}
+            defaultValue={tags} onChange={markUnsaved} clearable
+            description="Zum Filtern der Rezepte und beim Auffüllen des Speiseplans" />
           <Checkbox name="autoFill" label="Beim Auffüllen berücksichtigen" defaultChecked={recipe.autoFill}
             description="Aus für gelegentliche Gerichte: Die kommen dann nur von Hand auf den Speiseplan" />
           <FormError error={actionData && "error" in actionData ? actionData.error : null} />

@@ -31,6 +31,7 @@ import { photoUrl } from "~/db/recipe-photos.server";
 import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
 import { autoFill, reorderSchedule, scheduleRecipe } from "~/db/schedule.server";
 import * as schema from "~/db/schema";
+import { allTags } from "~/db/tags.server";
 import { confirmFirst, int, text } from "~/forms";
 import { pageTitle } from "~/page-title";
 import { parseOrder } from "~/reorder";
@@ -71,7 +72,7 @@ export async function loader() {
     .limit(10)
     .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
 
-  return { scheduled, allRecipes, recentlyCooked };
+  return { scheduled, allRecipes, recentlyCooked, allTags: await allTags() };
 }
 
 // Guards against a typo like 300 filling the schedule for a year
@@ -124,7 +125,7 @@ export async function action({ request }: Route.ActionArgs) {
     case "auto-fill": {
       const count = int(form, "count");
       if (!count || count > MAX_AUTO_FILL) return { autoFillError: `Bitte eine Zahl von 1 bis ${MAX_AUTO_FILL} wählen.` };
-      const { error } = await autoFill(count, newServings);
+      const { error } = await autoFill(count, newServings, int(form, "tagId"));
       if (error) return { autoFillError: error };
       break;
     }
@@ -150,7 +151,7 @@ function MealThumbnail({ url }: { url: string | null }) {
 }
 
 export default function Home({ loaderData, actionData }: Route.ComponentProps) {
-  const { allRecipes, recentlyCooked } = loaderData;
+  const { allRecipes, recentlyCooked, allTags } = loaderData;
   const [scheduled, reorder] = useReorder(loaderData.scheduled, (m) => m.position, "reorder");
   const availableRecipes = allRecipes.map((r) => ({ value: String(r.id), label: r.name }));
   // Shared by the add and auto-fill forms
@@ -276,6 +277,17 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
                 defaultValue={3}
                 style={{ width: 100 }}
               />
+              {allTags.length > 0 && (
+                <Select
+                  name="tagId"
+                  label="Nur mit Tag"
+                  description="Für einen Mix mehrmals auffüllen"
+                  data={allTags.map((t) => ({ value: String(t.id), label: t.name }))}
+                  placeholder="Alle Rezepte"
+                  clearable
+                  style={{ flex: 1, minWidth: 140 }}
+                />
+              )}
               <SubmitButton variant="light" leftSection={<IconRefresh size={16} />}>
                 Auffüllen
               </SubmitButton>

@@ -1,9 +1,10 @@
 import "./test-db";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "./client";
 import { autoFill, reorderSchedule, scheduleRecipe } from "./schedule.server";
 import * as schema from "./schema";
+import { setRecipeTags } from "./tags.server";
 
 const schedule = () => db.select().from(schema.mealSchedule).orderBy(asc(schema.mealSchedule.position));
 
@@ -23,6 +24,25 @@ describe("autoFill", () => {
       [3, a.id, 4],
       [4, b.id, 4],
     ]);
+  });
+});
+
+describe("autoFill with a tag", () => {
+  it("only picks recipes carrying it", async () => {
+    await db.delete(schema.mealSchedule);
+    const [fish, veg] = await db.insert(schema.recipes).values([{ name: "Fisch", servingSize: 2 }, { name: "Gemüse", servingSize: 2 }]).returning();
+    await setRecipeTags(fish.id, ["Fisch"]);
+    await setRecipeTags(veg.id, ["Vegetarisch"]);
+    const [tag] = await db.select().from(schema.tags).where(eq(schema.tags.name, "Fisch"));
+    expect(await autoFill(2, null, tag.id)).toEqual({ error: null });
+    expect((await schedule()).map((m) => m.recipeId)).toEqual([fish.id, fish.id]);
+  });
+
+  it("says so when no auto-fill recipe carries it", async () => {
+    const [r] = await db.insert(schema.recipes).values({ name: "Selten", servingSize: 2, autoFill: false }).returning();
+    await setRecipeTags(r.id, ["Festtag"]);
+    const [tag] = await db.select().from(schema.tags).where(eq(schema.tags.name, "Festtag"));
+    expect(await autoFill(1, null, tag.id)).toEqual({ error: "Kein Rezept mit diesem Tag ist für das automatische Auffüllen vorgesehen." });
   });
 });
 

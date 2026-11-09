@@ -38,6 +38,19 @@
 - archived (boolean) — recipes that have been cooked or are on a shopping list are archived instead of deleted, to keep meal history and the lists intact
 - auto_fill (boolean, default true) — whether auto-filling the schedule may pick it; off for occasional dishes, which are then only added by hand
 - ingredients: list of RecipeIngredient
+- tags: list of Tag
+
+### Tag
+
+- id
+- name — unique, ignoring case; never contains a comma
+
+Chosen freely on the recipe page ("Vegetarisch", "Schnell"). The recipe list can be filtered by one, and auto-fill can be limited to recipes with one. A tag no recipe uses any more is deleted. Tags aren't part of a recipe's versions; a variant saved from a rework starts with the original's tags
+
+### RecipeTag _(join between Recipe and Tag)_
+
+- recipe_id
+- tag_id
 
 ### RecipeIngredient _(join between Recipe and Ingredient)_
 
@@ -104,6 +117,7 @@ A recipe appears once per scheduled meal, so it can be listed more than once. Me
 ## Key relationships
 
 - Recipe ↔ Item: many-to-many via RecipeIngredient
+- Recipe ↔ Tag: many-to-many via RecipeTag
 - RecipeVersion → Recipe: many-to-one
 - Stock → Item: one-to-one
 - MealSchedule → Recipe: many-to-one
