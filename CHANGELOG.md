@@ -10,6 +10,7 @@ heading per day.
 - Beim Auffüllen des Speiseplans lässt sich „Nur mit Tag“ wählen. Für einen Mix einfach mehrmals auffüllen, jeweils mit einem anderen Tag.
 - Beim Hinzufügen einer Mahlzeit zum Speiseplan oder zur Einkaufsliste zeigt die Rezeptauswahl die Tags. Die Suche findet Rezepte auch über ihren Tag.
 - Jeder Tag hat seine eigene Farbe, überall wo er auftaucht.
+- Die Kochseite zeigt die Tags des Rezepts unter dem Namen.
 
 ## 2026-11-06
 

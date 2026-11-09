@@ -8,6 +8,7 @@ import { IngredientName } from "~/components/ingredient-name";
 import { Markdown } from "~/components/markdown";
 import { ServingsStepper } from "~/components/servings";
 import { SubmitButton } from "~/components/submit-button";
+import { TagBadge } from "~/components/tag-badge";
 import { ThawWarning } from "~/components/thaw-warning";
 import { Weblink } from "~/components/weblink";
 import { daysBefore, isDateString, localDate, weekdayName } from "~/dates";
@@ -16,6 +17,7 @@ import { recipePhotoUrl } from "~/db/recipe-photos.server";
 import { recordRecipeVersion } from "~/db/recipe-versions";
 import { withIngredients } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
+import { tagsByRecipe } from "~/db/tags.server";
 import { optionalText } from "~/forms";
 import { formatAmount } from "~/units";
 import { pageTitle } from "~/page-title";
@@ -50,7 +52,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const chosen = Number(new URL(request.url).searchParams.get("servings"));
   const servings = Number.isInteger(chosen) && chosen >= 1 ? chosen : meal?.servings ?? recipe.servingSize;
   const [{ ingredients }] = await withIngredients([{ ...recipe, servings }]);
-  return { recipe, servings, ingredients, position: meal?.position ?? null, photoUrl: await recipePhotoUrl(id) };
+  const tags = (await tagsByRecipe([id])).get(id) ?? [];
+  return { recipe, servings, ingredients, tags, position: meal?.position ?? null, photoUrl: await recipePhotoUrl(id) };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -110,7 +113,7 @@ function useToday() {
 const OTHER_DAY = "other";
 
 export default function Cook({ loaderData }: Route.ComponentProps) {
-  const { recipe, servings, ingredients, position, photoUrl } = loaderData;
+  const { recipe, servings, ingredients, tags, position, photoUrl } = loaderData;
   const navigate = useNavigate();
   // "default" means this is the first page of the visit (opened from a link or bookmark)
   const cameFromApp = useLocation().key !== "default";
@@ -137,7 +140,12 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
           Bearbeiten
         </Button>
       </Group>
-      {recipe.weblink && <Weblink href={recipe.weblink} display="block" mt="-sm" mb="lg" />}
+      {(recipe.weblink || tags.length > 0) && (
+        <Group gap="xs" mt="-sm" mb="lg">
+          {recipe.weblink && <Weblink href={recipe.weblink} />}
+          {tags.map((tag) => <TagBadge key={tag.id} {...tag} size="sm" />)}
+        </Group>
+      )}
       {photoUrl && <Image src={photoUrl} alt="" radius="md" mah={240} fit="cover" mb="lg" />}
 
       <ThawWarning ingredients={ingredients} mb="md" />
