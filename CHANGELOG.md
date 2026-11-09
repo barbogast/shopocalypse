@@ -11,6 +11,7 @@ heading per day.
 - Beim Hinzufügen einer Mahlzeit zum Speiseplan oder zur Einkaufsliste zeigt die Rezeptauswahl die Tags. Die Suche findet Rezepte auch über ihren Tag.
 - Jeder Tag hat seine eigene Farbe, überall wo er auftaucht.
 - Die Kochseite zeigt die Tags des Rezepts unter dem Namen.
+- Mahlzeiten kommen jetzt über „Mahlzeiten hinzufügen“ auf den Speiseplan oder die Einkaufsliste: alle Rezepte als Kacheln mit Foto, ein Tipp fügt eins hinzu, „−“ nimmt es wieder weg. Portionen und Tag-Filter oben gelten auch fürs Auffüllen. Rezepte, die das Auffüllen überspringt, sind markiert.
 
 ## 2026-11-06
 

@@ -10,30 +10,26 @@ import {
   Group,
   Image,
   NumberInput,
-  Select,
   Stack,
   Table,
   Text,
   Title,
   UnstyledButton,
 } from "@mantine/core";
-import { IconPhoto, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconUsers, IconX } from "@tabler/icons-react";
+import { IconPhoto, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconX } from "@tabler/icons-react";
 import { asc, desc, eq } from "drizzle-orm";
-import { useEffect, useState } from "react";
-import { Form, Link } from "react-router";
-import { FormError } from "~/components/form-error";
-import { RecipeSelect } from "~/components/recipe-select";
+import { useState } from "react";
+import { Form, Link, useFetcher } from "react-router";
+import { type PickableRecipe, RecipePicker } from "~/components/recipe-picker";
 import { ServingsControl } from "~/components/servings";
 import { SortableList, useReorder } from "~/components/sortable-list";
-import { SubmitButton } from "~/components/submit-button";
-import { TagBadge } from "~/components/tag-badge";
 import { ThawWarning } from "~/components/thaw-warning";
 import { db } from "~/db/client";
 import { photoUrl } from "~/db/recipe-photos.server";
-import { formatCookedAt, mealServings, withIngredients } from "~/db/recipes.server";
+import { formatCookedAt, mealServings, pickableRecipes, withIngredients } from "~/db/recipes.server";
 import { autoFill, reorderSchedule, scheduleRecipe } from "~/db/schedule.server";
 import * as schema from "~/db/schema";
-import { allTags, tagsByRecipe } from "~/db/tags.server";
+import type { Tag } from "~/db/tags.server";
 import { confirmFirst, int, text } from "~/forms";
 import { pageTitle } from "~/page-title";
 import { parseOrder } from "~/reorder";
@@ -60,15 +56,7 @@ export async function loader() {
     .then(withIngredients)
     .then((meals) => meals.map(({ photoUpdatedAt, ...m }) => ({ ...m, thumbnailUrl: photoUrl(m.id, photoUpdatedAt, "thumbnail") })));
 
-  const allRecipes = await db
-    .select({ id: schema.recipes.id, name: schema.recipes.name })
-    .from(schema.recipes)
-    .where(eq(schema.recipes.archived, false))
-    .orderBy(schema.recipes.name)
-    .then(async (rows) => {
-      const tags = await tagsByRecipe();
-      return rows.map((r) => ({ ...r, tags: tags.get(r.id) ?? [] }));
-    });
+  const allRecipes = await pickableRecipes();
 
   const recentlyCooked = await db
     .select({ id: schema.mealHistory.id, recipeId: schema.recipes.id, name: schema.recipes.name, cookedAt: schema.mealHistory.cookedAt })
@@ -78,7 +66,7 @@ export async function loader() {
     .limit(10)
     .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
 
-  return { scheduled, allRecipes, recentlyCooked, allTags: await allTags() };
+  return { scheduled, allRecipes, recentlyCooked };
 }
 
 // Guards against a typo like 300 filling the schedule for a year
@@ -124,8 +112,7 @@ export async function action({ request }: Route.ActionArgs) {
       if (!recipeId) return { addError: "Bitte zuerst ein Rezept wählen." };
       const { error } = await scheduleRecipe(recipeId, newServings);
       if (error) return { addError: error };
-      // Tells the page to clear its recipe picker
-      return { added: true };
+      break;
     }
 
     case "auto-fill": {
@@ -156,16 +143,12 @@ function MealThumbnail({ url }: { url: string | null }) {
   );
 }
 
-export default function Home({ loaderData, actionData }: Route.ComponentProps) {
-  const { allRecipes, recentlyCooked, allTags } = loaderData;
+export default function Home({ loaderData }: Route.ComponentProps) {
+  const { allRecipes, recentlyCooked } = loaderData;
   const [scheduled, reorder] = useReorder(loaderData.scheduled, (m) => m.position, "reorder");
-  // Shared by the add and auto-fill forms
-  const [newServings, setNewServings] = useState<string | number>(4);
-  // The add form's recipe, cleared once it's added but kept when adding fails
-  const [addRecipeId, setAddRecipeId] = useState<string | null>(null);
-  useEffect(() => {
-    if (actionData && "added" in actionData) setAddRecipeId(null);
-  }, [actionData]);
+  const [picking, setPicking] = useState(false);
+  const scheduledCounts = new Map<number, number>();
+  for (const m of scheduled) scheduledCounts.set(m.id, (scheduledCounts.get(m.id) ?? 0) + 1);
   // Rows without a photo get an empty square, so the names stay aligned; none at all when no meal has one
   const showThumbnails = scheduled.some((m) => m.thumbnailUrl);
 
@@ -228,82 +211,28 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
         </Stack>
       )}
 
-      <Divider mb="lg" />
-
-      <Stack gap="md">
-        {allRecipes.length > 0 && (
-          <NumberInput
-            label="Portionen"
-            description="Für die unten hinzugefügten Mahlzeiten; leer heißt: wie im Rezept"
-            placeholder="Wie im Rezept"
-            min={1}
-            allowDecimal={false}
-            value={newServings}
-            onChange={setNewServings}
-            leftSection={<IconUsers size={16} />}
-            error={actionData && "servingsError" in actionData ? actionData.servingsError : undefined}
-            maw={260}
-          />
-        )}
-
-        {allRecipes.length > 0 && (
-          <Form method="post">
-            <input type="hidden" name="intent" value="add" />
-            <input type="hidden" name="servings" value={newServings} />
-            <Group align="flex-end">
-              <RecipeSelect
-                name="recipeId"
-                label="Zum Speiseplan hinzufügen"
-                recipes={allRecipes}
-                value={addRecipeId}
-                onChange={setAddRecipeId}
-                placeholder="Rezept wählen…"
-                style={{ flex: 1 }}
-              />
-              <SubmitButton leftSection={<IconPlus size={16} />}>Hinzufügen</SubmitButton>
-            </Group>
-            <FormError error={actionData && "addError" in actionData ? actionData.addError : null} mt="xs" />
-          </Form>
-        )}
-
-        {allRecipes.length > 0 && (
-          <Form method="post">
-            <input type="hidden" name="intent" value="auto-fill" />
-            <input type="hidden" name="servings" value={newServings} />
-            <Group align="flex-end">
-              <NumberInput
-                name="count"
-                label="Auffüllen"
-                description="Hängt die am längsten nicht gekochten Rezepte an"
-                min={1}
-                max={MAX_AUTO_FILL}
-                allowDecimal={false}
-                defaultValue={3}
-                style={{ width: 100 }}
-              />
-              {allTags.length > 0 && (
-                <Select
-                  name="tagId"
-                  label="Nur mit Tag"
-                  description="Für einen Mix mehrmals auffüllen"
-                  data={allTags.map((t) => ({ value: String(t.id), label: t.name }))}
-                  placeholder="Alle Rezepte"
-                  clearable
-                  renderOption={({ option }) => {
-                    const tag = allTags.find((t) => String(t.id) === option.value);
-                    return tag ? <TagBadge {...tag} size="sm" /> : option.label;
-                  }}
-                  style={{ flex: 1, minWidth: 140 }}
-                />
-              )}
-              <SubmitButton variant="light" leftSection={<IconRefresh size={16} />}>
-                Auffüllen
-              </SubmitButton>
-            </Group>
-            <FormError error={actionData && "autoFillError" in actionData ? actionData.autoFillError : null} mt="xs" />
-          </Form>
-        )}
-      </Stack>
+      {allRecipes.length > 0 && (
+        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => setPicking(true)}>
+          Mahlzeiten hinzufügen
+        </Button>
+      )}
+      <RecipePicker
+        opened={picking}
+        onClose={() => setPicking(false)}
+        title="Zum Speiseplan hinzufügen"
+        recipes={allRecipes}
+        counts={scheduledCounts}
+        countLabel="im Speiseplan"
+        defaultServings={4}
+        addIntent="add"
+        // The last one, which is the furthest off
+        removeFields={(recipeId) => {
+          const meal = [...scheduled].reverse().find((m) => m.id === recipeId);
+          return meal ? { intent: "remove", position: String(meal.position) } : null;
+        }}
+        markNoAutoFill
+        footer={({ tag, servings }) => <AutoFill recipes={allRecipes} tag={tag} servings={servings} />}
+      />
 
       <Divider my="lg" />
 
@@ -334,5 +263,31 @@ export default function Home({ loaderData, actionData }: Route.ComponentProps) {
         </Table>
       )}
     </Container>
+  );
+}
+
+// Appends the recipes cooked longest ago, only those with the picker's tag when one is chosen
+function AutoFill({ recipes, tag, servings }: { recipes: PickableRecipe[]; tag: Tag | null; servings: string }) {
+  const fetcher = useFetcher<typeof action>();
+  const available = recipes.some((r) => r.autoFill && (!tag || r.tags.some((t) => t.id === tag.id)));
+  const error = fetcher.data && "autoFillError" in fetcher.data ? fetcher.data.autoFillError : null;
+
+  return (
+    <fetcher.Form method="post">
+      <input type="hidden" name="intent" value="auto-fill" />
+      <input type="hidden" name="servings" value={servings} />
+      {tag && <input type="hidden" name="tagId" value={tag.id} />}
+      <Group gap="xs" wrap="nowrap">
+        <NumberInput name="count" aria-label="Anzahl" min={1} max={MAX_AUTO_FILL} allowDecimal={false} defaultValue={3} w={70} />
+        <Button type="submit" variant="light" leftSection={<IconRefresh size={16} />} loading={fetcher.state !== "idle"} disabled={!available}>
+          Auffüllen
+        </Button>
+      </Group>
+      <Text size="xs" c={available && !error ? "dimmed" : "red"} mt={4}>
+        {error ?? (available
+          ? `Hängt die am längsten nicht gekochten Rezepte${tag ? ` mit „${tag.name}“` : ""} an`
+          : "Kein Rezept mit diesem Tag ist fürs Auffüllen vorgesehen.")}
+      </Text>
+    </fetcher.Form>
   );
 }

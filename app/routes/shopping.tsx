@@ -30,7 +30,7 @@ import {
   setBought,
 } from "~/db/shopping.server";
 import * as schema from "~/db/schema";
-import { tagsByRecipe } from "~/db/tags.server";
+import { pickableRecipes } from "~/db/recipes.server";
 import { confirmFirst, int, text } from "~/forms";
 import { pageTitle } from "~/page-title";
 import { parseItemsText } from "~/recipe-import";
@@ -61,15 +61,7 @@ export async function loader() {
     .orderBy(sql`${schema.items.name} collate nocase`)
     .then((all) => all.map((i) => ({ ...i, listed: listedItemIds.has(i.id) })));
 
-  const allRecipes = await db
-    .select({ id: schema.recipes.id, name: schema.recipes.name, servingSize: schema.recipes.servingSize })
-    .from(schema.recipes)
-    .where(eq(schema.recipes.archived, false))
-    .orderBy(sql`${schema.recipes.name} collate nocase`)
-    .then(async (rows) => {
-      const tags = await tagsByRecipe();
-      return rows.map((r) => ({ ...r, tags: tags.get(r.id) ?? [] }));
-    });
+  const allRecipes = await pickableRecipes();
 
   return {
     activeList,
@@ -150,8 +142,7 @@ export async function action({ request }: Route.ActionArgs) {
       if (text(form, "servings") && !servings) return { addRecipeError: "Die Portionen müssen eine ganze Zahl ab 1 sein." };
       const { error } = await addMeal(activeList, recipeId, servings);
       if (error) return { addRecipeError: error };
-      // Tells the page to clear its recipe picker
-      return { recipeAdded: true };
+      break;
     }
 
     case "remove-recipe": {

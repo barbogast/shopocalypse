@@ -7,7 +7,8 @@ import { db } from "./client";
 import { recordRecipeVersion } from "./recipe-versions";
 import type { Tx } from "./shopping.server";
 import * as schema from "./schema";
-import { deleteUnusedTags } from "./tags.server";
+import { photoUrl } from "./recipe-photos.server";
+import { deleteUnusedTags, tagsByRecipe } from "./tags.server";
 
 // Cook dates are stored as YYYY-MM-DD; format on the server so client and server render the same string
 export function formatCookedAt(cookedAt: string) {
@@ -182,4 +183,26 @@ export async function updateRecipeFromText(id: number, { ingredients, ...recipe 
 
     return { id, newItems, storeName };
   });
+}
+
+// The recipes a meal can be picked from, by name, with what the picker shows of each
+export async function pickableRecipes() {
+  const rows = await db
+    .select({
+      id: schema.recipes.id,
+      name: schema.recipes.name,
+      servingSize: schema.recipes.servingSize,
+      autoFill: schema.recipes.autoFill,
+      photoUpdatedAt: schema.recipePhotos.updatedAt,
+    })
+    .from(schema.recipes)
+    .leftJoin(schema.recipePhotos, eq(schema.recipePhotos.recipeId, schema.recipes.id))
+    .where(eq(schema.recipes.archived, false))
+    .orderBy(sql`${schema.recipes.name} collate nocase`);
+  const tags = await tagsByRecipe();
+  return rows.map(({ photoUpdatedAt, ...r }) => ({
+    ...r,
+    thumbnailUrl: photoUrl(r.id, photoUpdatedAt, "thumbnail"),
+    tags: tags.get(r.id) ?? [],
+  }));
 }

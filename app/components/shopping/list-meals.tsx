@@ -1,13 +1,12 @@
-import { Anchor, Button, Collapse, Group, List, NumberInput, Stack } from "@mantine/core";
+import { Anchor, Button, Collapse, Group, List, Stack } from "@mantine/core";
 import { IconChevronDown, IconChevronRight, IconPlus, IconTrash } from "@tabler/icons-react";
-import { useEffect, useState } from "react";
-import { Form, useActionData } from "react-router";
-import { FormError } from "~/components/form-error";
+import { useState } from "react";
+import { Form } from "react-router";
 import { RecipeDrawer } from "~/components/recipe-drawer";
-import { RecipeSelect } from "~/components/recipe-select";
+import { RecipePicker } from "~/components/recipe-picker";
 import { Servings } from "~/components/servings";
 import { SubmitButton } from "~/components/submit-button";
-import type { action, ActiveListData, ListRecipe } from "~/routes/shopping";
+import type { ActiveListData, ListRecipe } from "~/routes/shopping";
 
 // The list's meals, folded away behind a toggle to keep the page short;
 // tapping a recipe opens its details without leaving the list
@@ -16,7 +15,11 @@ export function ListMeals({ recipes, allRecipes }: { recipes: ListRecipe[]; allR
   const [openKey, setOpenKey] = useState<string | null>(null);
   const open = recipes.find((r) => r.key === openKey);
 
+  const [picking, setPicking] = useState(false);
+
   const mealCount = recipes.reduce((sum, r) => sum + r.count, 0);
+  const counts = new Map<number, number>();
+  for (const r of recipes) counts.set(r.id, (counts.get(r.id) ?? 0) + r.count);
 
   return (
     <>
@@ -59,10 +62,29 @@ export function ListMeals({ recipes, allRecipes }: { recipes: ListRecipe[]; allR
                 ))}
               </List>
             )}
-            {allRecipes.length > 0 && <AddRecipeForm recipes={allRecipes} />}
+            {allRecipes.length > 0 && (
+              <Button variant="light" size="xs" leftSection={<IconPlus size={14} />} onClick={() => setPicking(true)}>
+                Mahlzeiten hinzufügen
+              </Button>
+            )}
           </Stack>
         </Collapse>
       </Stack>
+
+      <RecipePicker
+        opened={picking}
+        onClose={() => setPicking(false)}
+        title="Zur Einkaufsliste hinzufügen"
+        recipes={allRecipes}
+        counts={counts}
+        countLabel="auf der Liste"
+        defaultServings=""
+        addIntent="add-recipe"
+        removeFields={(recipeId) => {
+          const meal = [...recipes].reverse().find((r) => r.id === recipeId);
+          return meal ? { intent: "remove-recipe", id: String(meal.listRecipeId) } : null;
+        }}
+      />
 
       <RecipeDrawer
         recipe={open}
@@ -70,46 +92,5 @@ export function ListMeals({ recipes, allRecipes }: { recipes: ListRecipe[]; allR
         onClose={() => setOpenKey(null)}
       />
     </>
-  );
-}
-
-// Adds a meal to the list, and what it needs to the items
-function AddRecipeForm({ recipes }: { recipes: ActiveListData["allRecipes"] }) {
-  const [recipeId, setRecipeId] = useState<string | null>(null);
-  const actionData = useActionData<typeof action>();
-  const servingSize = recipes.find((r) => String(r.id) === recipeId)?.servingSize;
-
-  // Clear the picker once the meal is on the list
-  useEffect(() => {
-    if (actionData && "recipeAdded" in actionData) setRecipeId(null);
-  }, [actionData]);
-
-  return (
-    <Form method="post">
-      <input type="hidden" name="intent" value="add-recipe" />
-      <Group align="flex-end" gap="xs">
-        <RecipeSelect
-          name="recipeId"
-          label="Mahlzeit hinzufügen"
-          recipes={recipes}
-          value={recipeId}
-          onChange={setRecipeId}
-          placeholder="Rezept wählen…"
-          style={{ flex: 1, minWidth: 140 }}
-        />
-        {/* Empty uses the recipe's serving size */}
-        <NumberInput
-          key={recipeId}
-          name="servings"
-          label="Portionen"
-          min={1}
-          allowDecimal={false}
-          placeholder={servingSize ? String(servingSize) : "—"}
-          style={{ width: 80 }}
-        />
-        <SubmitButton leftSection={<IconPlus size={16} />}>Hinzufügen</SubmitButton>
-      </Group>
-      <FormError error={actionData && "addRecipeError" in actionData ? actionData.addRecipeError : null} mt="xs" />
-    </Form>
   );
 }
