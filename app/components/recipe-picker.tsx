@@ -127,7 +127,7 @@ export function RecipePicker({
         {shown.length === 0 ? (
           <Text c="dimmed" size="sm">Kein passendes Rezept.</Text>
         ) : (
-          <SimpleGrid cols={{ base: 3, sm: 4 }} spacing="xs">
+          <SimpleGrid cols={{ base: 4, sm: 5 }} spacing="xs">
             {shown.map((recipe) => {
               const count = (counts.get(recipe.id) ?? 0) + (pending.get(recipe.id) ?? 0);
               const remove = removeFields(recipe.id);
@@ -177,21 +177,23 @@ function RecipeCard({ recipe, count, countLabel, noAutoFill, onAdd, onRemove }: 
   return (
     <Box pos="relative">
       <UnstyledButton onClick={onAdd} w="100%" h="100%" aria-label={`${recipe.name} hinzufügen`}>
-        <Card withBorder radius="md" p={0} h="100%"
+        <Card withBorder radius="md" p={4} h="100%"
           style={count > 0 ? { borderColor: "var(--mantine-color-green-6)" } : undefined}>
-          <AspectRatio ratio={1}>
+          {/* Framed rather than edge to edge, so a grid of photos stays calm */}
+          <AspectRatio ratio={1}
+            style={{ border: "1px solid var(--mantine-color-default-border)", borderRadius: "var(--mantine-radius-sm)", overflow: "hidden" }}>
             {recipe.thumbnailUrl ? (
               <Image src={recipe.thumbnailUrl} alt="" />
             ) : (
               <Center bg="var(--mantine-color-default-hover)">
-                <IconPhoto size={22} color="var(--mantine-color-dimmed)" />
+                <IconPhoto size={18} color="var(--mantine-color-dimmed)" />
               </Center>
             )}
           </AspectRatio>
-          <Stack gap={4} p={6}>
-            <Text size="xs" fw={500} lineClamp={2}>{recipe.name}</Text>
+          <Stack gap={2} px={2} pt={4} pb={2}>
+            <Text size="xs" lh={1.25} lineClamp={3} style={{ hyphens: "auto", overflowWrap: "break-word" }}>{recipe.name}</Text>
             {recipe.tags.length > 0 && (
-              <Group gap={4}>
+              <Group gap={2}>
                 {recipe.tags.map((tag) => <TagBadge key={tag.id} {...tag} />)}
               </Group>
             )}
@@ -200,19 +202,19 @@ function RecipeCard({ recipe, count, countLabel, noAutoFill, onAdd, onRemove }: 
       </UnstyledButton>
 
       {noAutoFill && (
-        <Center pos="absolute" top={4} left={4} p={3} bg="var(--mantine-color-body)" c="dimmed"
+        <Center pos="absolute" top={8} left={8} p={2} bg="var(--mantine-color-body)" c="dimmed"
           style={{ borderRadius: "var(--mantine-radius-xl)" }} title="Wird beim Auffüllen übersprungen">
-          <IconRefreshOff size={14} aria-label="Wird beim Auffüllen übersprungen" />
+          <IconRefreshOff size={12} aria-label="Wird beim Auffüllen übersprungen" />
         </Center>
       )}
 
       {count > 0 && (
-        <Group pos="absolute" top={4} right={4} gap={2} wrap="nowrap">
-          <ActionIcon size="sm" radius="xl" variant="default" disabled={!onRemove} onClick={onRemove ?? undefined}
+        <Group pos="absolute" top={8} right={8} gap={2} wrap="nowrap">
+          <ActionIcon size="xs" radius="xl" variant="default" disabled={!onRemove} onClick={onRemove ?? undefined}
             aria-label={`${recipe.name} einmal entfernen`}>
-            <IconMinus size={12} />
+            <IconMinus size={10} />
           </ActionIcon>
-          <Badge color="green" variant="filled" size="sm" aria-label={`${count}× ${countLabel}`}>×{count}</Badge>
+          <Badge color="green" variant="filled" size="xs" aria-label={`${count}× ${countLabel}`}>×{count}</Badge>
         </Group>
       )}
     </Box>
