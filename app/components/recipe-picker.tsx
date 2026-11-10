@@ -177,7 +177,7 @@ function RecipeCard({ recipe, count, countLabel, noAutoFill, onAdd, onRemove }: 
   return (
     <Box pos="relative">
       <UnstyledButton onClick={onAdd} w="100%" h="100%" aria-label={`${recipe.name} hinzufügen`}>
-        <Card withBorder radius="md" p={4} h="100%"
+        <Card withBorder radius="md" p={12} h="100%"
           style={count > 0 ? { borderColor: "var(--mantine-color-green-6)" } : undefined}>
           {/* Framed rather than edge to edge, so a grid of photos stays calm */}
           <AspectRatio ratio={1}
@@ -190,7 +190,7 @@ function RecipeCard({ recipe, count, countLabel, noAutoFill, onAdd, onRemove }: 
               </Center>
             )}
           </AspectRatio>
-          <Stack gap={2} px={2} pt={4} pb={2}>
+          <Stack gap={2} pt={6}>
             <Text size="xs" lh={1.25} lineClamp={3} style={{ hyphens: "auto", overflowWrap: "break-word" }}>{recipe.name}</Text>
             {recipe.tags.length > 0 && (
               <Group gap={2}>
@@ -202,14 +202,14 @@ function RecipeCard({ recipe, count, countLabel, noAutoFill, onAdd, onRemove }: 
       </UnstyledButton>
 
       {noAutoFill && (
-        <Center pos="absolute" top={8} left={8} p={2} bg="var(--mantine-color-body)" c="dimmed"
+        <Center pos="absolute" top={16} left={16} p={2} bg="var(--mantine-color-body)" c="dimmed"
           style={{ borderRadius: "var(--mantine-radius-xl)" }} title="Wird beim Auffüllen übersprungen">
           <IconRefreshOff size={12} aria-label="Wird beim Auffüllen übersprungen" />
         </Center>
       )}
 
       {count > 0 && (
-        <Group pos="absolute" top={8} right={8} gap={2} wrap="nowrap">
+        <Group pos="absolute" top={16} right={16} gap={2} wrap="nowrap">
           <ActionIcon size="xs" radius="xl" variant="default" disabled={!onRemove} onClick={onRemove ?? undefined}
             aria-label={`${recipe.name} einmal entfernen`}>
             <IconMinus size={10} />
