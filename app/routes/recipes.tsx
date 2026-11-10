@@ -1,9 +1,9 @@
-import { ActionIcon, Badge, Button, Chip, Container, Group, SegmentedControl, Switch, Table, Text, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Button, Container, Group, SegmentedControl, Switch, Table, Text, Title, Tooltip } from "@mantine/core";
 import { IconArchive, IconArchiveOff, IconFileImport, IconMessageCircle, IconPlayerPlay, IconPlus, IconTrash } from "@tabler/icons-react";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Form, Link, useSearchParams } from "react-router";
 import { RecipePhotoButton } from "~/components/recipe-photo-button";
-import { TagBadge } from "~/components/tag-badge";
+import { TagBadge, TagChip } from "~/components/tag-badge";
 import { db } from "~/db/client";
 import { deleteOrArchiveRecipe, restoreRecipe } from "~/db/recipes.server";
 import * as schema from "~/db/schema";
@@ -107,10 +107,8 @@ export default function Recipes({ loaderData }: Route.ComponentProps) {
         // Tapping the chosen tag again shows all recipes
         <Group gap="xs" mb="md">
           {allTags.map((tag) => (
-            <Chip key={tag.id} size="xs" color={tag.color} checked={tagFilter === String(tag.id)}
-              onChange={(checked) => setParam("tag", checked ? String(tag.id) : null)}>
-              {tag.name}
-            </Chip>
+            <TagChip key={tag.id} name={tag.name} color={tag.color} checked={tagFilter === String(tag.id)}
+              onChange={(checked) => setParam("tag", checked ? String(tag.id) : null)} />
           ))}
         </Group>
       )}

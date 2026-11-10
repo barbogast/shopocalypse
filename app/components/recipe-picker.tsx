@@ -6,7 +6,6 @@ import {
   Button,
   Card,
   Center,
-  Chip,
   Drawer,
   Group,
   Image,
@@ -20,7 +19,7 @@ import {
 import { IconMinus, IconPhoto, IconRefreshOff, IconSearch, IconUsers } from "@tabler/icons-react";
 import { type ReactNode, useState } from "react";
 import { useFetchers, useSubmit } from "react-router";
-import { TagBadge } from "~/components/tag-badge";
+import { TagBadge, TagChip } from "~/components/tag-badge";
 import type { Tag } from "~/db/tags.server";
 
 export type PickableRecipe = { id: number; name: string; autoFill: boolean; thumbnailUrl: string | null; tags: Tag[] };
@@ -116,10 +115,8 @@ export function RecipePicker({
           // Tapping the chosen tag again shows all recipes
           <Group gap="xs">
             {tags.map((t) => (
-              <Chip key={t.id} size="xs" color={t.color} checked={tagId === t.id}
-                onChange={(checked) => setTagId(checked ? t.id : null)}>
-                {t.name}
-              </Chip>
+              <TagChip key={t.id} name={t.name} color={t.color} checked={tagId === t.id}
+                onChange={(checked) => setTagId(checked ? t.id : null)} />
             ))}
           </Group>
         )}
