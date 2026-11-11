@@ -135,8 +135,8 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
     <Container size="sm" pt="xl">
       <Group justify="space-between" align="baseline" mb="lg">
         <Title>{recipe.name}</Title>
-        <Button component={Link} to={`/recipes/${recipe.id}`} variant="subtle" size="xs"
-          leftSection={<IconPencil size={14} />}>
+        <Button component={Link} to={`/recipes/${recipe.id}`} variant="light"
+          leftSection={<IconPencil size={16} />}>
           Bearbeiten
         </Button>
       </Group>

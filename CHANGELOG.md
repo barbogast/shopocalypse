@@ -4,6 +4,10 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-11
+
+- Der Knopf „Bearbeiten“ auf der Kochseite ist jetzt besser zu sehen.
+
 ## 2026-11-09
 
 - Rezepte können Tags haben, z. B. „Vegetarisch“ oder „Schnell“: auf der Rezeptseite unter „Tags“ eintragen. In der Rezeptliste lässt sich danach filtern.
