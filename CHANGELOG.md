@@ -6,6 +6,7 @@ heading per day.
 
 ## 2026-11-13
 
+- Beim Abschließen eines Rezepts wird das Datum jetzt mit Pfeilen tageweise vor- und zurückgestellt, der Wochentag steht daneben.
 - Beim Filtern nach Tag gleiten die Rezepte in der Rezeptauswahl an ihren neuen Platz.
 - In der Rezeptauswahl einen Tag zweimal antippen, um Rezepte mit diesem Tag auszublenden, z. B. alles ohne „Fisch“. Das Auffüllen hält sich auch daran.
 - Das „−“ auf den Kacheln der Rezeptauswahl ist größer und auf dem Handy leichter zu treffen.

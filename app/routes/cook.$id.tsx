@@ -1,5 +1,5 @@
-import { Box, Button, Container, Group, Image, Radio, Stack, Table, Text, Textarea, TextInput, Title } from "@mantine/core";
-import { IconCheck, IconPencil } from "@tabler/icons-react";
+import { ActionIcon, Box, Button, Container, Group, Image, Stack, Table, Text, Textarea, TextInput, Title } from "@mantine/core";
+import { IconCheck, IconChevronLeft, IconChevronRight, IconPencil } from "@tabler/icons-react";
 import { and, eq } from "drizzle-orm";
 import { useEffect, useState } from "react";
 import { Form, Link, redirect, useLocation, useNavigate } from "react-router";
@@ -110,24 +110,17 @@ function useToday() {
   return today;
 }
 
-const OTHER_DAY = "other";
-
 export default function Cook({ loaderData }: Route.ComponentProps) {
   const { recipe, servings, ingredients, tags, position, photoUrl } = loaderData;
   const navigate = useNavigate();
   // "default" means this is the first page of the visit (opened from a link or bookmark)
   const cameFromApp = useLocation().key !== "default";
   const today = useToday();
-  // How many days ago the meal was cooked, or OTHER_DAY for the date field
-  const [cookedDay, setCookedDay] = useState("0");
-  const [otherDate, setOtherDate] = useState("");
-  const cookedOn = cookedDay === OTHER_DAY ? otherDate : today && daysBefore(today, Number(cookedDay));
-  const dayOptions = [
-    { value: "0", label: "Heute" },
-    { value: "1", label: "Gestern" },
-    ...(today ? [2, 3].map((days) => ({ value: String(days), label: weekdayName(daysBefore(today, days)) })) : []),
-    { value: OTHER_DAY, label: "Anderes Datum" },
-  ];
+  // The day the meal was cooked; empty means today, which keeps up past midnight
+  const [chosenDate, setChosenDate] = useState("");
+  const cookedOn = chosenDate || today;
+  const relativeDay = cookedOn === today ? "heute" : cookedOn === daysBefore(today, 1) ? "gestern" : null;
+  const shiftDay = (days: number) => setChosenDate(daysBefore(cookedOn, -days));
   useWakeLock();
 
   return (
@@ -195,33 +188,32 @@ export default function Cook({ loaderData }: Route.ComponentProps) {
             autosize
             minRows={2}
           />
-          {/* The date field only exists for "Anderes Datum", so the date goes in its own input */}
-          <input type="hidden" name="cookedOn" value={cookedOn} />
-          <Stack gap="xs">
-            <Radio.Group
-              label="Gekocht am"
-              value={cookedDay}
-              onChange={(day) => {
-                // The field starts from the day chosen so far
-                if (day === OTHER_DAY) setOtherDate(cookedOn);
-                setCookedDay(day);
-              }}
-            >
-              <Group gap="md" mt="xs">
-                {dayOptions.map((option) => <Radio key={option.value} {...option} />)}
-              </Group>
-            </Radio.Group>
-            {cookedDay === OTHER_DAY && (
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>Gekocht am</Text>
+            <Group gap="xs" wrap="nowrap">
+              <ActionIcon variant="default" size="input-sm" aria-label="Einen Tag früher"
+                disabled={!cookedOn} onClick={() => shiftDay(-1)}>
+                <IconChevronLeft size={18} />
+              </ActionIcon>
               <TextInput
                 type="date"
-                aria-label="Datum"
+                name="cookedOn"
+                aria-label="Gekocht am"
                 value={cookedOn}
                 max={today}
-                required
-                onChange={(e) => setOtherDate(e.currentTarget.value)}
-                maw={200}
+                onChange={(e) => setChosenDate(e.currentTarget.value)}
+                w={160}
               />
-            )}
+              <ActionIcon variant="default" size="input-sm" aria-label="Einen Tag später"
+                disabled={!cookedOn || cookedOn >= today} onClick={() => shiftDay(1)}>
+                <IconChevronRight size={18} />
+              </ActionIcon>
+              {cookedOn && (
+                <Text size="sm" c="dimmed">
+                  {weekdayName(cookedOn)}{relativeDay && ` · ${relativeDay}`}
+                </Text>
+              )}
+            </Group>
           </Stack>
           <Group>
             <SubmitButton color="green" leftSection={<IconCheck size={16} />}>
