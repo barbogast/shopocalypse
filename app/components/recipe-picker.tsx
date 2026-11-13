@@ -28,7 +28,8 @@ type Fields = Record<string, string>;
 
 // Picks meals from a grid of recipe cards. Each tap adds one in the background and the
 // drawer stays open, so several meals take just as many taps. The servings and the tag
-// filter at the top apply to everything added here, the footer's auto-fill included.
+// filter at the top apply to everything added here, the footer's auto-fill included. A tag
+// chip cycles through "only with", "without" and off; one tag filters at a time.
 export function RecipePicker({
   opened,
   onClose,
@@ -57,10 +58,11 @@ export function RecipePicker({
   removeFields: (recipeId: number) => Fields | null;
   // Marks the recipes auto-fill skips
   markNoAutoFill?: boolean;
-  footer?: (filter: { tag: Tag | null; servings: string }) => ReactNode;
+  footer?: (filter: { tag: Tag | null; excludeTag: boolean; servings: string }) => ReactNode;
 }) {
   const [servings, setServings] = useState<string | number>(defaultServings);
   const [tagId, setTagId] = useState<number | null>(null);
+  const [excludeTag, setExcludeTag] = useState(false);
   const [search, setSearch] = useState("");
   const submit = useSubmit();
 
@@ -82,9 +84,22 @@ export function RecipePicker({
   const tags = [...new Map(recipes.flatMap((r) => r.tags).map((t) => [t.id, t])).values()]
     .sort((a, b) => a.name.localeCompare(b.name, "de"));
   const tag = tags.find((t) => t.id === tagId) ?? null;
+
+  function cycleTag(id: number) {
+    if (tagId !== id) {
+      setTagId(id);
+      setExcludeTag(false);
+    } else if (!excludeTag) {
+      setExcludeTag(true);
+    } else {
+      setTagId(null);
+      setExcludeTag(false);
+    }
+  }
+
   const query = search.trim().toLocaleLowerCase();
   const shown = recipes.filter((r) =>
-    (!tag || r.tags.some((t) => t.id === tag.id))
+    (!tag || r.tags.some((t) => t.id === tag.id) !== excludeTag)
     && (!query || r.name.toLocaleLowerCase().includes(query) || r.tags.some((t) => t.name.toLocaleLowerCase().includes(query))));
 
   return (
@@ -112,13 +127,21 @@ export function RecipePicker({
         </Group>
 
         {tags.length > 0 && (
-          // Tapping the chosen tag again shows all recipes
-          <Group gap="xs">
-            {tags.map((t) => (
-              <TagChip key={t.id} name={t.name} color={t.color} checked={tagId === t.id}
-                onChange={(checked) => setTagId(checked ? t.id : null)} />
-            ))}
-          </Group>
+          <Stack gap={4}>
+            <Group gap="xs">
+              {tags.map((t) => (
+                <TagChip key={t.id} name={t.name} color={t.color}
+                  checked={tagId === t.id && !excludeTag} excluded={tagId === t.id && excludeTag}
+                  onChange={() => cycleTag(t.id)} />
+              ))}
+            </Group>
+            {/* Says what the next tap does, as the cycle isn't obvious */}
+            {tag && (
+              <Text size="xs" c="dimmed">
+                {excludeTag ? `Ohne „${tag.name}“ · nochmal tippen zeigt alle` : `Nur „${tag.name}“ · nochmal tippen zeigt alle ohne`}
+              </Text>
+            )}
+          </Stack>
         )}
 
         {shown.length === 0 ? (
@@ -154,7 +177,7 @@ export function RecipePicker({
         <Box pos="sticky" bottom={0} py="sm" bg="var(--mantine-color-body)"
           style={{ borderTop: "1px solid var(--mantine-color-default-border)", zIndex: 1 }}>
           <Group justify="space-between" align="flex-start" wrap="nowrap">
-            <Box style={{ flex: 1, minWidth: 0 }}>{footer?.({ tag, servings: String(servings) })}</Box>
+            <Box style={{ flex: 1, minWidth: 0 }}>{footer?.({ tag, excludeTag, servings: String(servings) })}</Box>
             <Button variant="default" onClick={onClose}>Fertig</Button>
           </Group>
         </Box>

@@ -38,6 +38,16 @@ describe("autoFill with a tag", () => {
     expect((await schedule()).map((m) => m.recipeId)).toEqual([fish.id, fish.id]);
   });
 
+  it("leaves out recipes carrying it when excluding", async () => {
+    await db.delete(schema.mealSchedule);
+    const [tag] = await db.select().from(schema.tags).where(eq(schema.tags.name, "Fisch"));
+    const [fish] = await db.select().from(schema.recipes).where(eq(schema.recipes.name, "Fisch"));
+    expect(await autoFill(6, null, tag.id, true)).toEqual({ error: null });
+    const picked = (await schedule()).map((m) => m.recipeId);
+    expect(picked).toHaveLength(6);
+    expect(picked).not.toContain(fish.id);
+  });
+
   it("says so when no auto-fill recipe carries it", async () => {
     const [r] = await db.insert(schema.recipes).values({ name: "Selten", servingSize: 2, autoFill: false }).returning();
     await setRecipeTags(r.id, ["Festtag"]);

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, max } from "drizzle-orm";
+import { and, asc, eq, inArray, max, notInArray } from "drizzle-orm";
 import { rotationOrder } from "~/meal-schedule";
 import { sameIds } from "~/reorder";
 import { db } from "./client";
@@ -40,8 +40,9 @@ export async function scheduleRecipe(recipeId: number, servings: number | null) 
 
 // Adds `count` meals from the auto-fill recipes in rotation order (see rotationOrder),
 // going round again if more meals are asked for than there are recipes. With a tag, only
-// recipes carrying it are picked; run it once per tag to mix them.
-export async function autoFill(count: number, servings: number | null, tagId: number | null = null) {
+// recipes carrying it are picked (or, with excludeTag, only those without it); run it once
+// per tag to mix them.
+export async function autoFill(count: number, servings: number | null, tagId: number | null = null, excludeTag = false) {
   const queue = await db
     .select({ recipeId: schema.mealSchedule.recipeId })
     .from(schema.mealSchedule)
@@ -56,13 +57,13 @@ export async function autoFill(count: number, servings: number | null, tagId: nu
     .where(and(
       eq(schema.recipes.archived, false),
       eq(schema.recipes.autoFill, true),
-      tagId ? inArray(schema.recipes.id, recipesWithTag(tagId)) : undefined,
+      tagId ? (excludeTag ? notInArray : inArray)(schema.recipes.id, recipesWithTag(tagId)) : undefined,
     ));
 
   const rotation = rotationOrder(recipes, queue.map((r) => r.recipeId), new Map(lastCooked.map((r) => [r.recipeId, r.lastDate])));
   if (rotation.length === 0) {
     return { error: tagId
-      ? "Kein Rezept mit diesem Tag ist für das automatische Auffüllen vorgesehen."
+      ? `Kein Rezept ${excludeTag ? "ohne" : "mit"} diesem Tag ist für das automatische Auffüllen vorgesehen.`
       : "Kein Rezept ist für das automatische Auffüllen vorgesehen." };
   }
 

@@ -118,7 +118,7 @@ export async function action({ request }: Route.ActionArgs) {
     case "auto-fill": {
       const count = int(form, "count");
       if (!count || count > MAX_AUTO_FILL) return { autoFillError: `Bitte eine Zahl von 1 bis ${MAX_AUTO_FILL} wählen.` };
-      const { error } = await autoFill(count, newServings, int(form, "tagId"));
+      const { error } = await autoFill(count, newServings, int(form, "tagId"), form.get("excludeTag") === "1");
       if (error) return { autoFillError: error };
       break;
     }
@@ -231,7 +231,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           return meal ? { intent: "remove", position: String(meal.position) } : null;
         }}
         markNoAutoFill
-        footer={({ tag, servings }) => <AutoFill recipes={allRecipes} tag={tag} servings={servings} />}
+        footer={({ tag, excludeTag, servings }) => <AutoFill recipes={allRecipes} tag={tag} excludeTag={excludeTag} servings={servings} />}
       />
 
       <Divider my="lg" />
@@ -266,10 +266,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   );
 }
 
-// Appends the recipes cooked longest ago, only those with the picker's tag when one is chosen
-function AutoFill({ recipes, tag, servings }: { recipes: PickableRecipe[]; tag: Tag | null; servings: string }) {
+// Appends the recipes cooked longest ago, only those with (or without) the picker's tag when one is chosen
+function AutoFill({ recipes, tag, excludeTag, servings }: { recipes: PickableRecipe[]; tag: Tag | null; excludeTag: boolean; servings: string }) {
   const fetcher = useFetcher<typeof action>();
-  const available = recipes.some((r) => r.autoFill && (!tag || r.tags.some((t) => t.id === tag.id)));
+  const available = recipes.some((r) => r.autoFill && (!tag || r.tags.some((t) => t.id === tag.id) !== excludeTag));
   const error = fetcher.data && "autoFillError" in fetcher.data ? fetcher.data.autoFillError : null;
 
   return (
@@ -277,6 +277,7 @@ function AutoFill({ recipes, tag, servings }: { recipes: PickableRecipe[]; tag: 
       <input type="hidden" name="intent" value="auto-fill" />
       <input type="hidden" name="servings" value={servings} />
       {tag && <input type="hidden" name="tagId" value={tag.id} />}
+      {tag && excludeTag && <input type="hidden" name="excludeTag" value="1" />}
       <Group gap="xs" wrap="nowrap">
         <NumberInput name="count" aria-label="Anzahl" min={1} max={MAX_AUTO_FILL} allowDecimal={false} defaultValue={3} w={70} />
         <Button type="submit" variant="light" leftSection={<IconRefresh size={16} />} loading={fetcher.state !== "idle"} disabled={!available}>
@@ -285,8 +286,8 @@ function AutoFill({ recipes, tag, servings }: { recipes: PickableRecipe[]; tag: 
       </Group>
       <Text size="xs" c={available && !error ? "dimmed" : "red"} mt={4}>
         {error ?? (available
-          ? `Hängt die am längsten nicht gekochten Rezepte${tag ? ` mit „${tag.name}“` : ""} an`
-          : "Kein Rezept mit diesem Tag ist fürs Auffüllen vorgesehen.")}
+          ? `Hängt die am längsten nicht gekochten Rezepte${tag ? ` ${excludeTag ? "ohne" : "mit"} „${tag.name}“` : ""} an`
+          : `Kein Rezept ${excludeTag ? "ohne" : "mit"} diesem Tag ist fürs Auffüllen vorgesehen.`)}
       </Text>
     </fetcher.Form>
   );

@@ -6,6 +6,7 @@ heading per day.
 
 ## 2026-11-13
 
+- In der Rezeptauswahl einen Tag zweimal antippen, um Rezepte mit diesem Tag auszublenden, z. B. alles ohne „Fisch“. Das Auffüllen hält sich auch daran.
 - Das „−“ auf den Kacheln der Rezeptauswahl ist größer und auf dem Handy leichter zu treffen.
 
 ## 2026-11-11
