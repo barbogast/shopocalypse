@@ -207,10 +207,13 @@ function RecipeCard({ recipe, count, countLabel, noAutoFill, onAdd, onRemove }: 
 
       {count > 0 && (
         <Group pos="absolute" top={16} right={16} gap={2} wrap="nowrap">
-          <ActionIcon size="xs" radius="xl" variant="default" disabled={!onRemove} onClick={onRemove ?? undefined}
-            aria-label={`${recipe.name} einmal entfernen`}>
-            <IconMinus size={10} />
-          </ActionIcon>
+          {/* The padding catches taps around the small circle, which would otherwise add the meal instead */}
+          <UnstyledButton disabled={!onRemove} onClick={onRemove ?? undefined} p={10} my={-10} ml={-10}
+            aria-label={`${recipe.name} einmal entfernen`} style={{ display: "flex" }}>
+            <ActionIcon component="span" size="sm" radius="xl" variant="default" disabled={!onRemove}>
+              <IconMinus size={12} />
+            </ActionIcon>
+          </UnstyledButton>
           <Badge color="green" variant="filled" size="xs" aria-label={`${count}× ${countLabel}`}>×{count}</Badge>
         </Group>
       )}

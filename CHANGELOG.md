@@ -4,6 +4,10 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-13
+
+- Das „−“ auf den Kacheln der Rezeptauswahl ist größer und auf dem Handy leichter zu treffen.
+
 ## 2026-11-11
 
 - Der Knopf „Bearbeiten“ auf der Kochseite ist jetzt besser zu sehen.
