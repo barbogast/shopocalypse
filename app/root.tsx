@@ -1,5 +1,6 @@
 import { ColorSchemeScript, MantineProvider, mantineHtmlProps } from "@mantine/core";
 import "@mantine/core/styles.css";
+import "./view-transitions.css";
 import {
   IconCalendarEvent,
   IconChefHat,

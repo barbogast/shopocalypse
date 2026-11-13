@@ -17,7 +17,7 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { IconMinus, IconPhoto, IconRefreshOff, IconSearch, IconUsers } from "@tabler/icons-react";
-import { type ReactNode, useState } from "react";
+import { addTransitionType, type ReactNode, startTransition, useState, ViewTransition } from "react";
 import { useFetchers, useSubmit } from "react-router";
 import { TagBadge, TagChip } from "~/components/tag-badge";
 import type { Tag } from "~/db/tags.server";
@@ -25,6 +25,8 @@ import type { Tag } from "~/db/tags.server";
 export type PickableRecipe = { id: number; name: string; autoFill: boolean; thumbnailUrl: string | null; tags: Tag[] };
 
 type Fields = Record<string, string>;
+
+const ONLY_FILTER = { filter: "auto", default: "none" };
 
 // Picks meals from a grid of recipe cards. Each tap adds one in the background and the
 // drawer stays open, so several meals take just as many taps. The servings and the tag
@@ -132,7 +134,10 @@ export function RecipePicker({
               {tags.map((t) => (
                 <TagChip key={t.id} name={t.name} color={t.color}
                   checked={tagId === t.id && !excludeTag} excluded={tagId === t.id && excludeTag}
-                  onChange={() => cycleTag(t.id)} />
+                  onChange={() => startTransition(() => {
+                    addTransitionType("filter");
+                    cycleTag(t.id);
+                  })} />
               ))}
             </Group>
             {/* Says what the next tap does, as the cycle isn't obvious */}
@@ -151,17 +156,20 @@ export function RecipePicker({
             {shown.map((recipe) => {
               const count = (counts.get(recipe.id) ?? 0) + (pending.get(recipe.id) ?? 0);
               const remove = removeFields(recipe.id);
+              // Only a tag tap animates. React Router's updates are transitions too, and animating
+              // those would swallow quick taps while each meal is added.
               return (
-                <RecipeCard
-                  key={recipe.id}
-                  recipe={recipe}
-                  count={count}
-                  countLabel={countLabel}
-                  noAutoFill={markNoAutoFill && !recipe.autoFill}
-                  onAdd={() => send(recipe.id, 1, { intent: addIntent, recipeId: String(recipe.id), servings: String(servings) })}
-                  // One removal at a time: the next one would take off the same meal
-                  onRemove={remove && !removing.has(recipe.id) ? () => send(recipe.id, -1, remove) : null}
-                />
+                <ViewTransition key={recipe.id} enter={ONLY_FILTER} exit={ONLY_FILTER} update={ONLY_FILTER} default="none">
+                  <RecipeCard
+                    recipe={recipe}
+                    count={count}
+                    countLabel={countLabel}
+                    noAutoFill={markNoAutoFill && !recipe.autoFill}
+                    onAdd={() => send(recipe.id, 1, { intent: addIntent, recipeId: String(recipe.id), servings: String(servings) })}
+                    // One removal at a time: the next one would take off the same meal
+                    onRemove={remove && !removing.has(recipe.id) ? () => send(recipe.id, -1, remove) : null}
+                  />
+                </ViewTransition>
               );
             })}
           </SimpleGrid>
@@ -174,13 +182,16 @@ export function RecipePicker({
           </Group>
         )}
 
-        <Box pos="sticky" bottom={0} py="sm" bg="var(--mantine-color-body)"
-          style={{ borderTop: "1px solid var(--mantine-color-default-border)", zIndex: 1 }}>
-          <Group justify="space-between" align="flex-start" wrap="nowrap">
-            <Box style={{ flex: 1, minWidth: 0 }}>{footer?.({ tag, excludeTag, servings: String(servings) })}</Box>
-            <Button variant="default" onClick={onClose}>Fertig</Button>
-          </Group>
-        </Box>
+        {/* Slides along with the tiles, rather than jumping beneath the ones fading out */}
+        <ViewTransition update={ONLY_FILTER} default="none">
+          <Box pos="sticky" bottom={0} py="sm" bg="var(--mantine-color-body)"
+            style={{ borderTop: "1px solid var(--mantine-color-default-border)", zIndex: 1 }}>
+            <Group justify="space-between" align="flex-start" wrap="nowrap">
+              <Box style={{ flex: 1, minWidth: 0 }}>{footer?.({ tag, excludeTag, servings: String(servings) })}</Box>
+              <Button variant="default" onClick={onClose}>Fertig</Button>
+            </Group>
+          </Box>
+        </ViewTransition>
       </Stack>
     </Drawer>
   );

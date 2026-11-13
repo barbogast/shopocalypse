@@ -1,0 +1,6 @@
+/* Only the parts with their own <ViewTransition> animate. Without this, the rest of the
+   page cross-fades too, and the recipe picker's chips and footer ghost while its tiles move. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
