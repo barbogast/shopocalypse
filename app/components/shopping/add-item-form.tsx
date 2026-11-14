@@ -27,6 +27,7 @@ export function AddItemForm({ items, stores, shelves, parents, shelf, onAdded }:
   const [itemId, setItemId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [unit, setUnit] = useState<string | null>(DEFAULT_UNIT);
+  const [quantity, setQuantity] = useState<string | number>("");
   // The one-off's name while adding one, null while picking an item
   const [oneOff, setOneOff] = useState<string | null>(null);
   // What the new item's form starts from; kept after closing, so the fields don't empty during the close animation
@@ -56,17 +57,16 @@ export function AddItemForm({ items, stores, shelves, parents, shelf, onAdded }:
     setCreateOpened(true);
   };
 
-  // Once a one-off is on the list, the next thing added is most likely an item again
-  useEffect(() => {
-    if (actionData && "oneOffAdded" in actionData) backToPicker();
-  }, [actionData]);
-
-  // Idle again once the list has reloaded, so it already shows what was added
+  // Idle again once the list has reloaded, so it already shows what was added.
+  // Then the form starts over; after a one-off, the next thing added is most likely an item again.
   useEffect(() => {
     if (fetcher.state === "submitting") sent.current = true;
     if (fetcher.state === "idle" && sent.current) {
       sent.current = false;
-      if (!(actionData && "addError" in actionData)) onAdded?.();
+      if (actionData && "addError" in actionData) return;
+      backToPicker();
+      setQuantity("");
+      onAdded?.();
     }
   }, [fetcher.state]);
 
@@ -113,7 +113,7 @@ export function AddItemForm({ items, stores, shelves, parents, shelf, onAdded }:
             style={{ flex: 1, minWidth: 140 }}
           />
         )}
-        <NumberInput ref={quantityRef} name="quantity" label="Menge" min={0} decimalScale={2} decimalSeparator=","
+        <NumberInput ref={quantityRef} name="quantity" label="Menge" value={quantity} onChange={setQuantity} min={0} decimalScale={2} decimalSeparator=","
           placeholder="—" style={{ width: 70 }} />
         <Select name="unit" label="Einheit" data={UNIT_OPTIONS} value={unit} onChange={setUnit} style={{ width: 120 }} />
         {/* A one-off's fields take more rows, so its buttons go below them */}

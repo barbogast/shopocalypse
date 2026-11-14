@@ -4,6 +4,10 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-14
+
+- Nach dem Hinzufügen zur Einkaufsliste ist das Formular wieder leer und bereit für die nächste Zutat.
+
 ## 2026-11-13
 
 - Beim Abschließen eines Rezepts wird das Datum jetzt mit Pfeilen tageweise vor- und zurückgestellt, der Wochentag steht daneben.

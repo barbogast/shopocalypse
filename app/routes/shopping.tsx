@@ -113,8 +113,7 @@ export async function action({ request }: Route.ActionArgs) {
         amount: parsed.amount,
       });
       if (error) return { addError: error };
-      // Tells the form to go back to picking an item
-      return { oneOffAdded: true };
+      break;
     }
 
     // Items pasted as text, one per line like a recipe's ingredients
