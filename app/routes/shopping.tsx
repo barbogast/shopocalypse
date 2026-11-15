@@ -312,21 +312,6 @@ export type ActiveListData = Extract<Awaited<ReturnType<typeof loader>>, { activ
 export type ListRecipe = ActiveListData["listRecipes"][number];
 export type ListItem = ActiveListData["listItems"][number];
 
-// Applies ticks and removals that are still on their way to the server
-function withPendingChanges(listItems: ListItem[], fetchers: ReturnType<typeof useFetchers>) {
-  const pending = new Map<number, FormDataEntryValue | null>();
-  for (const f of fetchers) {
-    const intent = f.formData?.get("intent");
-    if (intent === "tick" || intent === "untick" || intent === "remove-item") pending.set(Number(f.formData!.get("id")), intent);
-  }
-  return listItems
-    .filter((i) => pending.get(i.id) !== "remove-item")
-    .map((i) => {
-      const intent = pending.get(i.id);
-      return intent === "tick" ? { ...i, bought: true } : intent === "untick" ? { ...i, bought: false } : i;
-    });
-}
-
 export default function Shopping({ loaderData }: Route.ComponentProps) {
   // The first load comes with the page, past clientLoader
   useEffect(() => {
@@ -350,7 +335,7 @@ function ListView({
 }: ActiveListData) {
   const entries = useSyncExternalStore(outbox.subscribe, outbox.getSnapshot, outbox.getServerSnapshot);
   const fetchers = useFetchers();
-  const listItems = withPendingChanges(outbox.applyEntries(loadedItems, entries), fetchers);
+  const listItems = outbox.withPendingChanges(outbox.applyEntries(loadedItems, entries), fetchers);
   // Not counting ticks still on their way, so a tick that goes through doesn't flash this up
   const sending = new Set(fetchers.filter((f) => f.formData).map((f) => Number(f.formData!.get("id"))));
   const unsentCount = outbox.unsynced(entries).filter((e) => !sending.has(e.id)).length;

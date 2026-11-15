@@ -80,3 +80,22 @@ export function settle(rows: { id: number; bought: boolean }[]) {
 export function applyEntries<T extends { id: number; bought: boolean }>(rows: T[], entries: Entries): T[] {
   return rows.map((r) => (r.id in entries && entries[r.id].bought !== r.bought ? { ...r, bought: entries[r.id].bought } : r));
 }
+
+// Applies ticks and removals that are still on their way to the server, from
+// the fetchers that are sending them
+export function withPendingChanges<T extends { id: number; bought: boolean }>(
+  rows: T[],
+  fetchers: { formData?: FormData }[],
+): T[] {
+  const pending = new Map<number, FormDataEntryValue | null>();
+  for (const f of fetchers) {
+    const intent = f.formData?.get("intent");
+    if (intent === "tick" || intent === "untick" || intent === "remove-item") pending.set(Number(f.formData!.get("id")), intent);
+  }
+  return rows
+    .filter((r) => pending.get(r.id) !== "remove-item")
+    .map((r) => {
+      const intent = pending.get(r.id);
+      return intent === "tick" ? { ...r, bought: true } : intent === "untick" ? { ...r, bought: false } : r;
+    });
+}

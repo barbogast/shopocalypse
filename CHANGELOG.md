@@ -6,6 +6,7 @@ heading per day.
 
 ## 2026-11-15
 
+- Unten in der Leiste zeigt eine Zahl, wie viele Mahlzeiten auf dem Speiseplan stehen und wie viel auf der Einkaufsliste noch nicht abgehakt ist.
 - Auf der Einkaufsliste die Menge antippen, um sie zu ändern, z. B. wenn schon etwas zu Hause ist.
 
 ## 2026-11-14
