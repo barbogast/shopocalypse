@@ -106,9 +106,7 @@ function AmountsEditor({ item, amounts }: { item: ListItem; amounts: Amount[] })
     <Popover opened={opened} onChange={setOpened} position="bottom-start" shadow="md" trapFocus>
       <Popover.Target>
         <UnstyledButton onClick={() => (opened ? setOpened(false) : open())} aria-label={`Menge von ${item.itemName} ändern`}>
-          <Text c="dimmed" td="underline" style={{ textDecorationStyle: "dotted", textUnderlineOffset: 3 }}>
-            {formatAmounts(amounts)}
-          </Text>
+          <Text c="dimmed">{formatAmounts(amounts)}</Text>
         </UnstyledButton>
       </Popover.Target>
       <Popover.Dropdown>
