@@ -17,6 +17,7 @@ import {
   prepareList,
   removeMeal,
   setBought,
+  setListAmounts,
 } from "./shopping.server";
 
 // Only one list can be active, so each test starts without one
@@ -158,5 +159,22 @@ describe("setBought", () => {
     await finishList(list.id);
     await setBought(row.id, true);
     expect(await listItemsInOrder(list.id)).toMatchObject([{ bought: false }]);
+  });
+});
+
+describe("setListAmounts", () => {
+  it("replaces the amounts, and meals removed later take off only what they need", async () => {
+    const { recipeId } = await scheduleRecipe("Bulgur");
+    const { position } = await scheduleRecipe("Bulgur");
+    await prepareList([position], false);
+    const list = await activeList();
+    await addMeal(list, recipeId, null);
+    const [row] = await listItemsInOrder(list.id);
+    // 400 g needed, 100 g of it is at home
+    await setListAmounts(row.id, [{ quantity: 300, unit: "g" }]);
+    expect(await listItemsInOrder(list.id)).toMatchObject([{ amounts: [{ quantity: 300, unit: "g" }] }]);
+    const [, second] = await listMealsWithRecipes(list.id);
+    await removeMeal(list, second.listRecipeId);
+    expect(await listItemsInOrder(list.id)).toMatchObject([{ amounts: [{ quantity: 100, unit: "g" }] }]);
   });
 });

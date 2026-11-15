@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { combineAmounts, formatAmount, formatAmounts, mergeAmounts, nameForAmounts, parseAmount, roundUpToBuy, scaleAmount, subtractAmounts } from "./units";
+import { combineAmounts, formatAmount, formatAmounts, mergeAmounts, nameForAmounts, parseAmount, parseAmounts, roundUpToBuy, scaleAmount, subtractAmounts } from "./units";
 
 function form(fields: Record<string, string>) {
   const f = new FormData();
@@ -153,5 +153,26 @@ describe("nameForAmounts", () => {
 
   it("uses the name when there's no plural", () => {
     expect(nameForAmounts({ name: "Salz", plural: null }, [{ quantity: 5, unit: "g" }])).toBe("Salz");
+  });
+});
+
+describe("parseAmounts", () => {
+  const pairs = (...entries: [string, string][]) => {
+    const f = new FormData();
+    for (const [quantity, unit] of entries) {
+      f.append("quantity", quantity);
+      f.append("unit", unit);
+    }
+    return f;
+  };
+
+  it("reads several pairs, adds them up and leaves out emptied ones", () => {
+    expect(parseAmounts(pairs(["2", "pcs"], ["", "g"], ["500", "g"], ["0,5", "kg"]))).toEqual({
+      amounts: [{ quantity: 2, unit: "pcs" }, { quantity: 1, unit: "kg" }],
+    });
+  });
+
+  it("rejects a bad quantity in any pair", () => {
+    expect(parseAmounts(pairs(["2", "pcs"], ["0", "g"]))).toHaveProperty("error");
   });
 });

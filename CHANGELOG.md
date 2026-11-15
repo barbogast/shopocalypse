@@ -4,6 +4,10 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-15
+
+- Auf der Einkaufsliste die Menge antippen, um sie zu ändern, z. B. wenn schon etwas zu Hause ist.
+
 ## 2026-11-14
 
 - Nach dem Hinzufügen zur Einkaufsliste ist das Formular wieder leer und bereit für die nächste Zutat.

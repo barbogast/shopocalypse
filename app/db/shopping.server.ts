@@ -261,6 +261,12 @@ export async function setBought(listItemId: number, bought: boolean) {
   await db.update(schema.shoppingListItems).set({ bought }).where(onActiveList(listItemId));
 }
 
+// Replaces an item's amounts with ones entered by hand. Its notes stay. Meals added or removed
+// later still add or take off what they need, so a lowered amount (some is at home) holds.
+export async function setListAmounts(listItemId: number, amounts: Amount[]) {
+  await db.update(schema.shoppingListItems).set({ amounts: combineAmounts(amounts) }).where(onActiveList(listItemId));
+}
+
 export async function removeListItem(listItemId: number) {
   await db.delete(schema.shoppingListItems).where(onActiveList(listItemId));
 }
@@ -307,6 +313,8 @@ export async function listItemsInOrder(listId: number) {
       isVariant: isVariant.mapWith(Boolean),
       itemName: name,
       itemPlural: schema.items.plural,
+      // What an item without an amount starts on when one is entered; null for a one-off
+      defaultUnit: schema.items.defaultUnit,
       amounts: schema.shoppingListItems.amounts,
       notes: schema.shoppingListItems.notes,
       bought: schema.shoppingListItems.bought,

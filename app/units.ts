@@ -49,10 +49,26 @@ export function isUnitKey(value: unknown): value is UnitKey {
 // Reads an optional quantity + unit pair from a form; an empty quantity means no quantity.
 // The quantity may use a decimal comma ("1,5").
 export function parseAmount(form: FormData): { amount: Amount } | { error: string } {
-  const rawQuantity = String(form.get("quantity") ?? "").trim();
-  if (!rawQuantity) return { amount: { quantity: null, unit: null } };
-  const quantity = Number(rawQuantity.replace(",", "."));
-  const unit = form.get("unit");
+  return parsePair(form.get("quantity"), form.get("unit"));
+}
+
+// Reads several quantity + unit pairs from a form, as parseAmount does one, and adds them up.
+// Pairs with an empty quantity are left out, so emptying one takes it off.
+export function parseAmounts(form: FormData): { amounts: Amount[] } | { error: string } {
+  const units = form.getAll("unit");
+  const amounts: Amount[] = [];
+  for (const [i, quantity] of form.getAll("quantity").entries()) {
+    const parsed = parsePair(quantity, units[i] ?? null);
+    if ("error" in parsed) return parsed;
+    amounts.push(parsed.amount);
+  }
+  return { amounts: combineAmounts(amounts) };
+}
+
+function parsePair(rawQuantity: FormDataEntryValue | null, unit: FormDataEntryValue | null): { amount: Amount } | { error: string } {
+  const trimmed = String(rawQuantity ?? "").trim();
+  if (!trimmed) return { amount: { quantity: null, unit: null } };
+  const quantity = Number(trimmed.replace(",", "."));
   if (!(quantity > 0)) return { error: "Die Menge muss größer als 0 sein." };
   if (!isUnitKey(unit)) return { error: "Bitte eine Einheit wählen." };
   return { amount: { quantity, unit } };

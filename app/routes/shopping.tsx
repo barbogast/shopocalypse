@@ -28,6 +28,7 @@ import {
   removeListItem,
   removeMeal,
   setBought,
+  setListAmounts,
 } from "~/db/shopping.server";
 import * as schema from "~/db/schema";
 import { pickableRecipes } from "~/db/recipes.server";
@@ -37,7 +38,7 @@ import { parseItemsText } from "~/recipe-import";
 import { listAsText } from "~/shopping-list";
 import * as outbox from "~/tick-outbox";
 import { groupByStoreAndShelf } from "~/store-shelf-groups";
-import { parseAmount } from "~/units";
+import { parseAmount, parseAmounts } from "~/units";
 import type { Route } from "./+types/shopping";
 
 export function meta() {
@@ -160,6 +161,15 @@ export async function action({ request }: Route.ActionArgs) {
       break;
     }
 
+    case "set-amounts": {
+      const id = int(form, "id");
+      if (!id) return null;
+      const parsed = parseAmounts(form);
+      if ("error" in parsed) return { amountsError: parsed.error };
+      await setListAmounts(id, parsed.amounts);
+      break;
+    }
+
     case "remove-item": {
       const id = int(form, "id");
       if (!id) return null;
@@ -226,6 +236,13 @@ export async function clientAction({ request, serverAction }: Route.ClientAction
       return { removeError: "Konnte nicht entfernt werden. Bitte noch mal versuchen." };
     }
   }
+  if (intent === "set-amounts") {
+    try {
+      return await serverAction();
+    } catch {
+      return { amountsError: "Konnte nicht gespeichert werden. Bitte noch mal versuchen." };
+    }
+  }
   return serverAction();
 }
 
@@ -236,7 +253,7 @@ export function shouldRevalidate({ formData, actionResult, defaultShouldRevalida
   const intent = formData?.get("intent");
   if (intent === "tick" || intent === "untick") return false;
   // The reload would fail the same way, and show the error page
-  if (actionResult?.removeError) return false;
+  if (actionResult?.removeError || actionResult?.amountsError) return false;
   return defaultShouldRevalidate;
 }
 
@@ -299,7 +316,8 @@ export type ListItem = ActiveListData["listItems"][number];
 function withPendingChanges(listItems: ListItem[], fetchers: ReturnType<typeof useFetchers>) {
   const pending = new Map<number, FormDataEntryValue | null>();
   for (const f of fetchers) {
-    if (f.formData) pending.set(Number(f.formData.get("id")), f.formData.get("intent"));
+    const intent = f.formData?.get("intent");
+    if (intent === "tick" || intent === "untick" || intent === "remove-item") pending.set(Number(f.formData!.get("id")), intent);
   }
   return listItems
     .filter((i) => pending.get(i.id) !== "remove-item")
