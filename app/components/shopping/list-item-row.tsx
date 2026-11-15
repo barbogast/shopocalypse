@@ -26,6 +26,9 @@ export function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[]
           <Text td={ticked ? "line-through" : undefined}>
             {nameForAmounts({ name: item.itemName, plural: item.itemPlural }, amounts)}
           </Text>
+          {item.source === "manual" && (
+            <Badge size="xs" variant="outline" color="gray" style={{ flexShrink: 0 }}>manuell</Badge>
+          )}
           {/* Which meals need it, on request only, so it doesn't crowd the list */}
           {usedIn && (
             <Popover position="bottom-start" shadow="sm">
@@ -45,9 +48,6 @@ export function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[]
             {n.amounts.length > 0 && `${formatAmounts(n.amounts)} `}{n.note}
           </Text>
         ))}
-        {item.source === "manual" && (
-          <Badge size="xs" variant="outline" color="gray">manuell</Badge>
-        )}
         <FormError error={fetcher.data && "removeError" in fetcher.data ? fetcher.data.removeError : null} mt="xs" />
       </Table.Td>
       <Table.Td style={{ width: 60 }}>
