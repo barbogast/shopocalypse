@@ -26,9 +26,6 @@ export function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[]
           <Text td={ticked ? "line-through" : undefined}>
             {nameForAmounts({ name: item.itemName, plural: item.itemPlural }, amounts)}
           </Text>
-          {item.source === "manual" && (
-            <Badge size="xs" variant="outline" color="gray" style={{ flexShrink: 0 }}>manuell</Badge>
-          )}
           {/* Which meals need it, on request only, so it doesn't crowd the list */}
           {usedIn && (
             <Popover position="bottom-start" shadow="sm">
@@ -41,6 +38,9 @@ export function ListItemRow({ item, usedIn }: { item: ListItem; usedIn: string[]
                 {usedIn.map((name) => <Text key={name} size="sm">{name}</Text>)}
               </Popover.Dropdown>
             </Popover>
+          )}
+          {item.source === "manual" && (
+            <Badge size="xs" variant="outline" color="gray" style={{ flexShrink: 0 }}>manuell</Badge>
           )}
         </Group>
         {item.notes.map((n) => (
