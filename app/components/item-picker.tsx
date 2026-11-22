@@ -9,11 +9,12 @@ import type * as schema from "~/db/schema";
 import { itemKey, itemKeys } from "~/item-names";
 import type { action as createAction } from "~/routes/items.create";
 
-export type PickerItem = { id: number; name: string; plural: string | null; defaultUnit: string | null };
+// Group-only items are shown but can't be picked, so searching for one tells why it isn't there
+export type PickerItem = { id: number; name: string; plural: string | null; defaultUnit: string | null; groupOnly?: boolean };
 
 type Stores = (typeof schema.stores.$inferSelect)[];
 type Shelves = (typeof schema.itemCategories.$inferSelect)[];
-type Parents = { id: number; name: string; storeId: number | null; categoryId: number | null }[];
+type Parents = { id: number; name: string; storeId: number | null; categoryId: number | null; groupOnly?: boolean }[];
 
 // A searchable item select for a form, submitted as `name`. Searching for an item that doesn't
 // exist yet offers to create it in a modal; the new item is then picked through onCreated.
@@ -64,7 +65,11 @@ export function ItemPicker<T extends PickerItem>({
   // Offer the searched-for name when no item has it as name or plural yet
   const searchName = search.trim();
   const isNew = searchName !== "" && !items.some((i) => itemKeys(i).includes(itemKey(searchName)));
-  const options = items.filter((i) => !hidden?.(i)).map((i) => ({ value: String(i.id), label: optionLabel(i) }));
+  const options: { value: string; label: string; disabled?: boolean }[] = items
+    .filter((i) => !hidden?.(i))
+    .map((i) => (i.groupOnly
+      ? { value: String(i.id), label: `${optionLabel(i)} (nur Gruppe)`, disabled: true }
+      : { value: String(i.id), label: optionLabel(i) }));
   if (isNew && onOneOff) options.push({ value: "__one_off__", label: `+ „${searchName}“ hinzufügen` });
   else if (isNew) options.push({ value: "__create__", label: `+ „${searchName}“ anlegen` });
 
@@ -139,7 +144,7 @@ export function CreateItemModal({ opened, onClose, onCreated, defaults, stores, 
     <Modal opened={opened} onClose={onClose} title="Neue Zutat" returnFocus={false}>
       <fetcher.Form method="post" action="/items/create" onSubmit={(e) => e.stopPropagation()}>
         <Stack>
-          <ItemFields stores={stores} shelves={shelves} parents={parents} defaults={defaults} autoFocus />
+          <ItemFields stores={stores} shelves={shelves} parents={parents} defaults={defaults} autoFocus canBeGroup={false} />
           <FormError error={error} />
           <Group justify="flex-end">
             <Button variant="subtle" onClick={onClose}>Abbrechen</Button>

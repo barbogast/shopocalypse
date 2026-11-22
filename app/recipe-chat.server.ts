@@ -23,15 +23,20 @@ ${FORMAT_RULES}
 
 const ResponseSchema = z.object({ reply: z.string(), text: z.string().nullable() });
 
-type Item = { name: string; plural: string | null };
+type Item = { name: string; plural: string | null; groupOnly?: boolean };
 export type KnownRecipe = { name: string; ingredients: string[] };
 
 // The household's items, so ingredients match them rather than becoming new items. Cached, as it's the same every turn.
+// Group-only items ("Käse") aren't bought themselves, so the import refuses them; they're listed apart.
 function itemsBlock(items: Item[]) {
-  const names = items.map((i) => (i.plural ? `${i.name} (${i.plural})` : i.name)).sort((a, b) => a.localeCompare(b, "de"));
+  const names = items.filter((i) => !i.groupOnly).map((i) => (i.plural ? `${i.name} (${i.plural})` : i.name)).sort((a, b) => a.localeCompare(b, "de"));
+  const groups = items.filter((i) => i.groupOnly).map((i) => i.name).sort((a, b) => a.localeCompare(b, "de"));
+  const groupsText = groups.length
+    ? `\n\nThese only group other items and can't be an ingredient; name a specific kind instead (Gouda rather than Käse):\n${groups.join("\n")}`
+    : "";
   return {
     type: "text" as const,
-    text: `The items they already buy, with plurals in parentheses. When an ingredient is one of these, use its name (or its plural for several pieces), exactly as written:\n${names.join("\n")}`,
+    text: `The items they already buy, with plurals in parentheses. When an ingredient is one of these, use its name (or its plural for several pieces), exactly as written:\n${names.join("\n")}${groupsText}`,
     cache_control: { type: "ephemeral" as const },
   };
 }

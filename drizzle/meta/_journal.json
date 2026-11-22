@@ -232,6 +232,13 @@
       "when": 1794257375804,
       "tag": "0032_tag_colors",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1795353280920,
+      "tag": "0033_item_group_only",
+      "breakpoints": true
     }
   ]
 }

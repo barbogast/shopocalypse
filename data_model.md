@@ -25,6 +25,7 @@
 - default_unit (optional) — prefilled when adding the item to a recipe or the shopping list
 - always_available (boolean) — assumed to be in stock (salt, oil…); left off prepared shopping lists unless "Include items in stock" is checked
 - needs_thawing (boolean) — has to come out of the freezer ahead of cooking (fish, but not spinach that goes in frozen, so the shelf can't tell). Warned about on the next meal's card and the cook page, and marked with a snowflake in ingredient lists
+- group_only (boolean) — only groups its variants (Käse for Gouda, Parmesan…) and isn't bought itself: it has no store or shelf and can't be a variant. It can't be a recipe ingredient or go on the shopping list: the pickers show it greyed out, and imported recipe or list lines naming it are an error asking for a variant. An item a recipe uses can't become one, and nothing can be merged into one. Not offered when creating an item from a picker, since that item is picked right away
 
 ### Recipe
 

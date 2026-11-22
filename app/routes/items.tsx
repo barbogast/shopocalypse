@@ -54,6 +54,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       defaultUnit: schema.items.defaultUnit,
       alwaysAvailable: schema.items.alwaysAvailable,
       needsThawing: schema.items.needsThawing,
+      groupOnly: schema.items.groupOnly,
       shelfName: schema.itemCategories.name,
       storeName: schema.stores.name,
     })
@@ -265,6 +266,9 @@ function ItemRow({ item, usedIn, showPlace }: { item: ItemRowData; usedIn: UsedI
     <Table.Tr>
       <Table.Td pl={item.isVariant ? "xl" : undefined}>
         <Anchor component={Link} to={editPath} c="inherit">{item.name}</Anchor>
+        {item.groupOnly && (
+          <Badge size="xs" variant="outline" color="grape" ml={6}>Gruppe</Badge>
+        )}
         {item.alwaysAvailable && (
           <Badge size="xs" variant="outline" color="gray" ml={6}>immer vorrätig</Badge>
         )}

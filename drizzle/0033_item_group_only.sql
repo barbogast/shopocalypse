@@ -1,0 +1,1 @@
+ALTER TABLE `items` ADD `group_only` integer DEFAULT false NOT NULL;

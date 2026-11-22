@@ -12,7 +12,7 @@ import { ListMeals } from "~/components/shopping/list-meals";
 import { PrepareList } from "~/components/shopping/prepare-list";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { loadItemFormOptions } from "~/db/items.server";
+import { groupOnlyError, loadItemFormOptions } from "~/db/items.server";
 import {
   addItemsToList,
   addItemToList,
@@ -57,7 +57,7 @@ export async function loader() {
   const listedItemIds = new Set(listItems.map((i) => i.itemId));
   const allItems = await db
     .select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit,
-      storeId: schema.items.storeId, categoryId: schema.items.categoryId })
+      storeId: schema.items.storeId, categoryId: schema.items.categoryId, groupOnly: schema.items.groupOnly })
     .from(schema.items)
     .orderBy(sql`${schema.items.name} collate nocase`)
     .then((all) => all.map((i) => ({ ...i, listed: listedItemIds.has(i.id) })));
@@ -94,6 +94,8 @@ export async function action({ request }: Route.ActionArgs) {
       const parsed = parseAmount(form);
       if (!itemId) return { addError: "Bitte zuerst eine Zutat wählen." };
       if ("error" in parsed) return { addError: parsed.error };
+      const groupError = await groupOnlyError(itemId);
+      if (groupError) return { addError: groupError };
       await addItemToList(activeList.id, itemId, parsed.amount);
       break;
     }
@@ -123,7 +125,7 @@ export async function action({ request }: Route.ActionArgs) {
       if (!activeList) return null;
 
       // Parsed again here rather than trusting the preview
-      const allItems = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
+      const allItems = await db.select({ name: schema.items.name, plural: schema.items.plural, groupOnly: schema.items.groupOnly }).from(schema.items);
       const { items, errors } = parseItemsText(text(form, "text"), allItems);
       if (errors.length) return { importError: "Bitte zuerst die Fehler im Text beheben." };
       if (items.length === 0) return { importError: "Mindestens eine Zutat angeben." };

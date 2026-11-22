@@ -50,7 +50,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const allItems = await db.select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural }).from(schema.items);
+  const allItems = await db.select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, groupOnly: schema.items.groupOnly }).from(schema.items);
   const recipeNames = await db.select({ name: schema.recipes.name }).from(schema.recipes).where(eq(schema.recipes.archived, false));
   // Names for the suggested stores and shelves of new items
   const allStores = await db.select({ id: schema.stores.id, name: schema.stores.name }).from(schema.stores);
@@ -141,7 +141,7 @@ export async function action({ request }: Route.ActionArgs) {
     const draft = draftId ? await getDraft(draftId) : null;
     if (draftId && !draft) return { error: "Diesen Entwurf gibt es nicht mehr: Er wurde importiert oder verworfen.", imported: null };
     const draftText = String(form.get("text") ?? "");
-    const items = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
+    const items = await db.select({ name: schema.items.name, plural: schema.items.plural, groupOnly: schema.items.groupOnly }).from(schema.items);
     const preferences = await getSetting("recipePreferences");
     const result = await chatRecipe({ chat: draft?.chat ?? [], draftText, message, items, recipes: await knownRecipes(), preferences });
     if ("error" in result) return { error: result.error, imported: null };
@@ -176,7 +176,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Parsed again here rather than trusting the preview
-  const allItems = await db.select({ name: schema.items.name, plural: schema.items.plural }).from(schema.items);
+  const allItems = await db.select({ name: schema.items.name, plural: schema.items.plural, groupOnly: schema.items.groupOnly }).from(schema.items);
   const { recipe, errors } = parseRecipeText(text(form, "text"), allItems);
   if (errors.length || recipe.servingSize == null) return { error: "Bitte zuerst die Fehler im Text beheben.", imported: null };
 

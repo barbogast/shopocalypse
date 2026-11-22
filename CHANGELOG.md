@@ -6,6 +6,7 @@ heading per day.
 
 ## 2026-11-22
 
+- Zutaten wie „Käse“ lassen sich als „Nur Gruppe“ markieren: Sie fassen Varianten zusammen, brauchen keinen Laden und kommen nicht in Rezepte oder auf die Einkaufsliste.
 - Im Rezept-Chat ändert Claude nur noch, worum du bittest, und lässt den Rest des Rezepts unverändert.
 
 ## 2026-11-15

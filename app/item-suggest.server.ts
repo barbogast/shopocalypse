@@ -108,7 +108,8 @@ export async function applySuggestions(accepted: z.infer<typeof AcceptedSchema>)
   const shelved: number[] = [];
   for (const { itemId, ...raw } of accepted) {
     const item = await db.select().from(schema.items).where(eq(schema.items.id, itemId)).get();
-    if (!item) continue;
+    // A group gets no store, shelf or parent; it can only have become one since the suggestions were made
+    if (!item || item.groupOnly) continue;
     const s = sanitizeSuggestion(raw, item.name, await loadCatalog([itemId]));
     const storeId = item.storeId ?? s.storeId;
     // The suggested shelf is in the suggested store, so it only fits where that's the item's store
@@ -124,6 +125,7 @@ export async function applySuggestions(accepted: z.infer<typeof AcceptedSchema>)
       defaultUnit: item.defaultUnit ?? s.defaultUnit,
       alwaysAvailable: item.alwaysAvailable,
       needsThawing: item.needsThawing,
+      groupOnly: false,
     });
     if (categoryId != null) shelved.push(itemId);
   }

@@ -273,6 +273,14 @@ describe("parseItemsText", () => {
     // Without the item, they're two new ones
     expect(parseItemsText("1 Zwiebel\n2 Zwiebeln").errors).toEqual([]);
   });
+
+  it("asks for a variant instead of a group-only item, also by its plural", () => {
+    const items = [{ name: "Käse", plural: "Käsesorten", groupOnly: true }, { name: "Gouda", plural: null }];
+    expect(parseItemsText("100 g Gouda\n200 g käse\nKäsesorten", items).errors).toEqual([
+      { line: 2, message: "„Käse“ ist nur eine Gruppe; bitte eine bestimmte Sorte angeben." },
+      { line: 3, message: "„Käse“ ist nur eine Gruppe; bitte eine bestimmte Sorte angeben." },
+    ]);
+  });
 });
 
 describe("ingredientToText", () => {

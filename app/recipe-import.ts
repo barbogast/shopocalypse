@@ -20,7 +20,7 @@
 
 // With extensions, so scripts/ can load this file with plain Node (for backfilling recipe versions)
 import { webUrl } from "./forms.ts";
-import { itemKey, itemKeyIn } from "./item-names.ts";
+import { itemKey, itemKeyIn, itemKeys } from "./item-names.ts";
 import { nameForAmounts, UNITS, type UnitKey } from "./units.ts";
 
 export type ParsedIngredient = {
@@ -145,15 +145,31 @@ export function parseIngredient(text: string): Omit<ParsedIngredient, "line"> | 
   return { name, quantity, unit: unit ?? "pcs", note };
 }
 
+// The existing items the parsers match ingredient lines against
+type KnownItem = { name: string; plural: string | null; groupOnly?: boolean };
+
+// Finds the group-only item a name is, so a line for it can ask for a variant instead
+function groupOnlyIn(items: KnownItem[]) {
+  const groups = new Map(items.filter((i) => i.groupOnly).flatMap((i) => itemKeys(i).map((key) => [key, i.name] as const)));
+  return (name: string) => groups.get(itemKey(name));
+}
+
 // Parses one ingredient line onto the list, or notes why it can't; blank lines are skipped.
-// Two lines for the same item are an error, also when one uses its name and the other its plural.
+// Two lines for the same item are an error, also when one uses its name and the other its plural,
+// and so is a line for a group-only item.
 function addIngredientLine(
-  ingredients: ParsedIngredient[], errors: ImportError[], line: number, trimmed: string, keyOf: (name: string) => string,
+  ingredients: ParsedIngredient[], errors: ImportError[], line: number, trimmed: string,
+  keyOf: (name: string) => string, groupOf: (name: string) => string | undefined,
 ) {
   if (!trimmed) return;
   const parsed = parseIngredient(trimmed);
   if ("error" in parsed) {
     errors.push({ line, message: parsed.error });
+    return;
+  }
+  const group = groupOf(parsed.name);
+  if (group) {
+    errors.push({ line, message: `„${group}“ ist nur eine Gruppe; bitte eine bestimmte Sorte angeben.` });
     return;
   }
   const duplicate = ingredients.find((ing) => keyOf(ing.name) === keyOf(parsed.name));
@@ -168,14 +184,15 @@ function addIngredientLine(
 }
 
 // Items for a shopping list, one per line, written like a recipe's ingredients.
-// `items` are the existing ones, to catch two lines for the same item.
+// `items` are the existing ones, to catch two lines for the same item and lines for group-only items.
 export function parseItemsText(
-  text: string, items: { name: string; plural: string | null }[] = [],
+  text: string, items: KnownItem[] = [],
 ): { items: ParsedIngredient[]; errors: ImportError[] } {
   const parsed: ParsedIngredient[] = [];
   const errors: ImportError[] = [];
   const keyOf = itemKeyIn(items);
-  text.split(/\r?\n/).forEach((raw, i) => addIngredientLine(parsed, errors, i + 1, raw.trim(), keyOf));
+  const groupOf = groupOnlyIn(items);
+  text.split(/\r?\n/).forEach((raw, i) => addIngredientLine(parsed, errors, i + 1, raw.trim(), keyOf, groupOf));
   return { items: parsed, errors };
 }
 
@@ -187,11 +204,12 @@ function sectionOf(line: string): Section | null {
   return SECTION_WORDS.get(word) ?? null;
 }
 
-// `items` are the existing ones, to catch two ingredient lines for the same item
+// `items` are the existing ones, to catch two ingredient lines for the same item and lines for group-only items
 export function parseRecipeText(
-  text: string, items: { name: string; plural: string | null }[] = [],
+  text: string, items: KnownItem[] = [],
 ): { recipe: ParsedRecipe; errors: ImportError[] } {
   const keyOf = itemKeyIn(items);
+  const groupOf = groupOnlyIn(items);
   const lines = text.split(/\r?\n/);
   const errors: ImportError[] = [];
   const recipe: ParsedRecipe = { name: "", servingSize: null, weblink: null, ingredients: [], instructions: null, comments: null };
@@ -256,7 +274,7 @@ export function parseRecipeText(
       }
 
       case "ingredients":
-        addIngredientLine(recipe.ingredients, errors, line, trimmed, keyOf);
+        addIngredientLine(recipe.ingredients, errors, line, trimmed, keyOf, groupOf);
         return;
 
       default:

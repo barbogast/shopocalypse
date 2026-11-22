@@ -14,7 +14,8 @@ export async function listShelves() {
 // Items that can be picked as another item's parent: those that aren't variants themselves
 export async function listParents(exceptId?: number) {
   return (await db
-    .select({ id: schema.items.id, name: schema.items.name, parentId: schema.items.parentId, storeId: schema.items.storeId, categoryId: schema.items.categoryId })
+    .select({ id: schema.items.id, name: schema.items.name, parentId: schema.items.parentId, storeId: schema.items.storeId,
+      categoryId: schema.items.categoryId, groupOnly: schema.items.groupOnly })
     .from(schema.items)
     .orderBy(sql`${schema.items.name} collate nocase`)
     .all())
@@ -32,14 +33,16 @@ export async function loadItemFormOptions(exceptId?: number) {
 
 // Reads the item form's name/plural/parent/store/shelf/unit fields; a shelf must belong to the chosen store.
 // Names and plurals must be unique across all items, so each one matches a single item.
+// A group-only item gets no parent, store or shelf, and can't be one a recipe uses.
 // Pass the item's own id when editing, so keeping its name isn't a clash.
 export async function parseItemForm(form: FormData, itemId?: number) {
   const name = text(form, "name");
-  const parentId = int(form, "parentId");
+  const groupOnly = form.get("groupOnly") === "on";
+  const parentId = groupOnly ? null : int(form, "parentId");
   const rawPlural = optionalText(form, "plural");
   const plural = rawPlural && itemKey(rawPlural) !== itemKey(name) ? rawPlural : null;
-  const storeId = int(form, "storeId");
-  const categoryId = int(form, "categoryId");
+  const storeId = groupOnly ? null : int(form, "storeId");
+  const categoryId = groupOnly ? null : int(form, "categoryId");
   const rawUnit = form.get("defaultUnit");
   const defaultUnit = isUnitKey(rawUnit) ? rawUnit : null;
   const alwaysAvailable = form.get("alwaysAvailable") === "on";
@@ -48,6 +51,18 @@ export async function parseItemForm(form: FormData, itemId?: number) {
   if (!name) return { error: "Bitte einen Namen angeben." } as const;
   const clash = await nameClash([name, plural], itemId);
   if (clash) return { error: clash } as const;
+  if (groupOnly && itemId != null) {
+    const uses = await db
+      .selectDistinct({ name: schema.recipes.name })
+      .from(schema.recipeIngredients)
+      .innerJoin(schema.recipes, eq(schema.recipeIngredients.recipeId, schema.recipes.id))
+      .where(eq(schema.recipeIngredients.itemId, itemId))
+      .orderBy(schema.recipes.name)
+      .all();
+    if (uses.length > 0) {
+      return { error: `Wird in ${uses.map((r) => `„${r.name}“`).join(", ")} verwendet und kann deshalb keine reine Gruppe sein.` } as const;
+    }
+  }
   if (parentId != null) {
     const parent = await db.select().from(schema.items).where(eq(schema.items.id, parentId)).get();
     if (!parent || parent.id === itemId) return { error: "Bitte eine andere Zutat als Oberbegriff wählen." } as const;
@@ -60,17 +75,26 @@ export async function parseItemForm(form: FormData, itemId?: number) {
     const shelf = await db.select().from(schema.itemCategories).where(eq(schema.itemCategories.id, categoryId)).get();
     if (!shelf || shelf.storeId !== storeId) return { error: "Dieses Regal gehört nicht zum gewählten Laden." } as const;
   }
-  return { values: { name, plural, parentId, storeId, categoryId, defaultUnit, alwaysAvailable, needsThawing } } as const;
+  return { values: { name, plural, parentId, storeId, categoryId, defaultUnit, alwaysAvailable, needsThawing, groupOnly } } as const;
+}
+
+// Why the item can't go into a recipe or onto a shopping list, or null when it can
+export async function groupOnlyError(itemId: number) {
+  const item = await db.select({ name: schema.items.name, groupOnly: schema.items.groupOnly }).from(schema.items)
+    .where(eq(schema.items.id, itemId)).get();
+  return item?.groupOnly ? `„${item.name}“ ist nur eine Gruppe; bitte eine Variante wählen.` : null;
 }
 
 type ItemValues = NonNullable<Awaited<ReturnType<typeof parseItemForm>>["values"]>;
 
-// Saves an edited item; variants on its old store and shelf move along, variants elsewhere stay put
+// Saves an edited item; variants on its old store and shelf move along, variants elsewhere stay put.
+// Becoming group-only drops the item's store and shelf, but its variants keep theirs.
 export async function updateItem(id: number, values: ItemValues) {
   await db.transaction(async (tx) => {
     const old = await tx.select().from(schema.items).where(eq(schema.items.id, id)).get();
     if (!old) return;
     await tx.update(schema.items).set(values).where(eq(schema.items.id, id)).run();
+    if (values.groupOnly) return;
     await tx
       .update(schema.items)
       .set({ storeId: values.storeId, categoryId: values.categoryId })
@@ -176,6 +200,10 @@ export async function mergeItem(duplicateId: number, keepId: number) {
     const duplicate = await tx.select().from(schema.items).where(eq(schema.items.id, duplicateId)).get();
     const keep = await tx.select().from(schema.items).where(eq(schema.items.id, keepId)).get();
     if (!duplicate || !keep || duplicateId === keepId) return { error: "Bitte eine andere Zutat zum Zusammenführen wählen." } as const;
+    // Its recipes and shopping list entries would move onto an item that can't be in them
+    if (keep.groupOnly && !duplicate.groupOnly) {
+      return { error: `„${keep.name}“ ist nur eine Gruppe; bitte eine Zutat wählen, die selbst gekauft wird.` } as const;
+    }
 
     // Recipes listing both: fold the duplicate's ingredient into the kept one
     const dupIngredients = await tx.select().from(schema.recipeIngredients).where(eq(schema.recipeIngredients.itemId, duplicateId)).all();

@@ -35,6 +35,9 @@ export const items = sqliteTable("items", {
   alwaysAvailable: integer("always_available", { mode: "boolean" }).notNull().default(false),
   // Has to come out of the freezer ahead of cooking: warned about on the schedule and when cooking
   needsThawing: integer("needs_thawing", { mode: "boolean" }).notNull().default(false),
+  // Only groups its variants ("Käse" for Gouda, Parmesan…) and isn't bought itself: no store or shelf,
+  // not a variant, and never in a recipe or on a shopping list
+  groupOnly: integer("group_only", { mode: "boolean" }).notNull().default(false),
 }, (t) => [
   // Backstop for parseItemForm's check, which also catches non-ASCII case differences
   uniqueIndex("items_name_unique").on(sql`${t.name} collate nocase`),

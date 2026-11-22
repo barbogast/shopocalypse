@@ -28,7 +28,7 @@ import { ItemPicker, type PickerItem } from "~/components/item-picker";
 import { SortableList, useReorder } from "~/components/sortable-list";
 import { SubmitButton } from "~/components/submit-button";
 import { db } from "~/db/client";
-import { loadItemFormOptions } from "~/db/items.server";
+import { groupOnlyError, loadItemFormOptions } from "~/db/items.server";
 import { createDraft, draftForRecipe } from "~/db/recipe-drafts.server";
 import { deleteRecipePhoto, MAX_PHOTO_BYTES, recipePhotoUrl, setRecipePhoto } from "~/db/recipe-photos.server";
 import { recipeText, recordRecipeVersion } from "~/db/recipe-versions";
@@ -61,7 +61,8 @@ export async function loader({ params }: Route.LoaderArgs) {
   const [{ ingredients }] = await withIngredients([{ ...recipe, servings: recipe.servingSize }]);
 
   const allItems = await db
-    .select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit })
+    .select({ id: schema.items.id, name: schema.items.name, plural: schema.items.plural, defaultUnit: schema.items.defaultUnit,
+      groupOnly: schema.items.groupOnly })
     .from(schema.items)
     .orderBy(sql`${schema.items.name} collate nocase`);
 
@@ -120,6 +121,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     case "add-ingredient": {
       const itemId = int(form, "itemId");
       if (!itemId) return { ingredientError: "Bitte eine Zutat wählen." };
+      const groupError = await groupOnlyError(itemId);
+      if (groupError) return { ingredientError: groupError };
       const parsed = parseAmount(form);
       if ("error" in parsed) return { ingredientError: parsed.error };
       const { quantity, unit } = parsed.amount;

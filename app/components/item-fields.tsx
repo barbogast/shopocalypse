@@ -19,6 +19,7 @@ type Values = {
   defaultUnit?: string | null;
   alwaysAvailable?: boolean;
   needsThawing?: boolean;
+  groupOnly?: boolean;
 };
 
 // The item form's fields, read on the server by parseItemForm
@@ -29,23 +30,28 @@ export function ItemFields({
   itemId,
   defaults = {},
   autoFocus = false,
+  canBeGroup = true,
 }: {
   stores: Store[];
   shelves: Shelf[];
   // Items it can be a variant of; leave out when it can't be one (it has variants itself)
-  parents?: { id: number; name: string; storeId: number | null; categoryId: number | null }[];
+  parents?: { id: number; name: string; storeId: number | null; categoryId: number | null; groupOnly?: boolean }[];
   // The item being edited, left out of the examples its suggestion is based on
   itemId?: number;
   defaults?: Values;
   autoFocus?: boolean;
+  // Off where the new item gets picked right away, for a recipe or the shopping list, which a group can't be in
+  canBeGroup?: boolean;
 }) {
   // The fields start from these; a suggestion replaces them and remounts the fields
   const [base, setBase] = useState<Values>(defaults);
   const [version, setVersion] = useState(0);
   const [parentId, setParentId] = useState(base.parentId ? String(base.parentId) : null);
-  // Picking another parent prefills its store and shelf
+  // A group has no parent, store or shelf, so those fields go while it's ticked
+  const [groupOnly, setGroupOnly] = useState(canBeGroup && !!base.groupOnly);
+  // Picking another parent prefills its store and shelf; a group has none to give
   const newParent = parentId !== (base.parentId ? String(base.parentId) : null)
-    ? parents?.find((p) => String(p.id) === parentId)
+    ? parents?.find((p) => String(p.id) === parentId && !p.groupOnly)
     : undefined;
   const location = newParent ?? base;
 
@@ -86,7 +92,16 @@ export function ItemFields({
         description="Wird beim Rezeptimport auch erkannt"
         defaultValue={base.plural ?? undefined}
       />
-      {parents && (
+      {canBeGroup && (
+        <Checkbox
+          name="groupOnly"
+          label="Nur Gruppe"
+          description="Fasst Varianten zusammen (Käse für Gouda, Parmesan…), wird aber nicht selbst gekauft. Kann nicht in Rezepten oder auf der Einkaufsliste stehen"
+          checked={groupOnly}
+          onChange={(e) => setGroupOnly(e.currentTarget.checked)}
+        />
+      )}
+      {parents && !groupOnly && (
         <Select
           name="parentId"
           label="Variante von"
@@ -99,13 +114,15 @@ export function ItemFields({
           placeholder="Keine"
         />
       )}
-      <StoreShelfFields
-        key={`${version}-${parentId ?? "none"}`}
-        stores={stores}
-        shelves={shelves}
-        defaultStoreId={location.storeId}
-        defaultShelfId={location.categoryId}
-      />
+      {!groupOnly && (
+        <StoreShelfFields
+          key={`${version}-${parentId ?? "none"}`}
+          stores={stores}
+          shelves={shelves}
+          defaultStoreId={location.storeId}
+          defaultShelfId={location.categoryId}
+        />
+      )}
       <Select
         key={`unit-${version}`}
         name="defaultUnit"
