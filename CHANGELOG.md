@@ -4,6 +4,10 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-22
+
+- Im Rezept-Chat ändert Claude nur noch, worum du bittest, und lässt den Rest des Rezepts unverändert.
+
 ## 2026-11-15
 
 - Unten in der Leiste zeigt eine Zahl, wie viele Mahlzeiten auf dem Speiseplan stehen und wie viel auf der Einkaufsliste noch nicht abgehakt ist.

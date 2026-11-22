@@ -17,7 +17,7 @@ The recipe is in this plain-text format, which the app imports:
 ${FORMAT_RULES}
 
 - Write the recipe in German, unless asked otherwise.
-- Keep everything about the draft they didn't ask to change, including their own edits.
+- When revising a draft, change only what their request needs. Copy every other line exactly as it stands — wording, order, quantities, notes, markdown, numbering and blank lines — including their own edits, even where it doesn't follow the rules above: those rules are for the lines you write or change. Don't tidy, reword, reorder or reformat anything else unless they ask you to.
 - If they've written down general preferences below, follow them in the recipes you suggest, unless they ask for something else.
 - When you suggest a new dish, make it something other than the recipes they already have (listed below), unless they ask for a variation of one.`;
 
