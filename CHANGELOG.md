@@ -4,6 +4,10 @@ app, in German, one short line each. Newest date first, one "## YYYY-MM-DD"
 heading per day.
 -->
 
+## 2026-11-23
+
+- Nach dem Speichern eines überarbeiteten Rezepts geht es direkt zurück zum Rezept.
+
 ## 2026-11-22
 
 - Zutaten wie „Käse“ lassen sich als „Nur Gruppe“ markieren: Sie fassen Varianten zusammen, brauchen keinen Laden und kommen nicht in Rezepte oder auf die Einkaufsliste.

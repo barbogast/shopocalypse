@@ -192,6 +192,11 @@ export async function action({ request }: Route.ActionArgs) {
     const recipeId = draftId ? (await getDraft(draftId))?.recipeId : null;
     if (!recipeId) return { error: "Diesen Entwurf gibt es nicht mehr: Er wurde gespeichert oder verworfen.", imported: null };
     saved = { ...await updateRecipeFromText(recipeId, parsed), updated: true };
+    // Straight back to the recipe, unless new ingredients still need a shelf
+    if (!saved.newItems.length) {
+      await deleteDraft(draftId!);
+      return redirect(`/recipes/${recipeId}`);
+    }
   } else {
     saved = { ...await importRecipe(parsed), updated: false };
     // A variant of a recipe starts with its tags
