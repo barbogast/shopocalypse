@@ -10,6 +10,7 @@ import {
   Group,
   Image,
   NumberInput,
+  SimpleGrid,
   Stack,
   Table,
   Text,
@@ -20,10 +21,12 @@ import { IconPhoto, IconPlayerPlay, IconPlus, IconRefresh, IconTrash, IconX } fr
 import { asc, desc, eq } from "drizzle-orm";
 import { useState } from "react";
 import { Form, Link, useFetcher } from "react-router";
+import { CookingCalendar } from "~/components/cooking-calendar";
 import { type PickableRecipe, RecipePicker } from "~/components/recipe-picker";
 import { ServingsControl } from "~/components/servings";
 import { SortableList, useReorder } from "~/components/sortable-list";
 import { ThawWarning } from "~/components/thaw-warning";
+import { localDate } from "~/dates";
 import { db } from "~/db/client";
 import { photoUrl } from "~/db/recipe-photos.server";
 import { formatCookedAt, mealServings, pickableRecipes, withIngredients } from "~/db/recipes.server";
@@ -66,7 +69,22 @@ export async function loader() {
     .limit(10)
     .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
 
-  return { scheduled, allRecipes, recentlyCooked };
+  // Every meal ever cooked, for the calendar to page through; a few hundred short rows at most
+  const cookedMeals = await db
+    .select({
+      cookedAt: schema.mealHistory.cookedAt,
+      recipeId: schema.recipes.id,
+      name: schema.recipes.name,
+      photoUpdatedAt: schema.recipePhotos.updatedAt,
+    })
+    .from(schema.mealHistory)
+    .innerJoin(schema.recipes, eq(schema.mealHistory.recipeId, schema.recipes.id))
+    .leftJoin(schema.recipePhotos, eq(schema.recipePhotos.recipeId, schema.recipes.id))
+    .orderBy(asc(schema.mealHistory.id))
+    .then((rows) => rows.map(({ photoUpdatedAt, ...m }) => ({ ...m, thumbnailUrl: photoUrl(m.recipeId, photoUpdatedAt, "thumbnail") })));
+
+  // From the server, so the first render matches when hydrating; only a day off around midnight
+  return { scheduled, allRecipes, recentlyCooked, cookedMeals, today: localDate() };
 }
 
 // Guards against a typo like 300 filling the schedule for a year
@@ -144,7 +162,7 @@ function MealThumbnail({ url }: { url: string | null }) {
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { allRecipes, recentlyCooked } = loaderData;
+  const { allRecipes, recentlyCooked, cookedMeals, today } = loaderData;
   const [scheduled, reorder] = useReorder(loaderData.scheduled, (m) => m.position, "reorder");
   const [picking, setPicking] = useState(false);
   const scheduledCounts = new Map<number, number>();
@@ -240,27 +258,30 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       {recentlyCooked.length === 0 ? (
         <Text size="sm" c="dimmed">Noch nichts gekocht.</Text>
       ) : (
-        <Table>
-          <Table.Tbody>
-            {recentlyCooked.map((entry) => (
-              <Table.Tr key={entry.id}>
-                <Table.Td c="dimmed" style={{ width: 130, whiteSpace: "nowrap" }}>{entry.cookedAt}</Table.Td>
-                <Table.Td>
-                  <Anchor component={Link} to={`/recipes/${entry.recipeId}`} c="inherit">{entry.name}</Anchor>
-                </Table.Td>
-                <Table.Td style={{ width: 40 }}>
-                  <Form method="post" onSubmit={confirmFirst(`${entry.name} vom ${entry.cookedAt} aus dem Verlauf entfernen?`)}>
-                    <input type="hidden" name="intent" value="remove-history" />
-                    <input type="hidden" name="id" value={entry.id} />
-                    <ActionIcon type="submit" variant="subtle" color="gray" aria-label={`${entry.name} vom ${entry.cookedAt} aus dem Verlauf entfernen`}>
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Form>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
+          <CookingCalendar meals={cookedMeals} today={today} />
+          <Table>
+            <Table.Tbody>
+              {recentlyCooked.map((entry) => (
+                <Table.Tr key={entry.id}>
+                  <Table.Td c="dimmed" style={{ width: 130, whiteSpace: "nowrap" }}>{entry.cookedAt}</Table.Td>
+                  <Table.Td>
+                    <Anchor component={Link} to={`/recipes/${entry.recipeId}`} c="inherit">{entry.name}</Anchor>
+                  </Table.Td>
+                  <Table.Td style={{ width: 40 }}>
+                    <Form method="post" onSubmit={confirmFirst(`${entry.name} vom ${entry.cookedAt} aus dem Verlauf entfernen?`)}>
+                      <input type="hidden" name="intent" value="remove-history" />
+                      <input type="hidden" name="id" value={entry.id} />
+                      <ActionIcon type="submit" variant="subtle" color="gray" aria-label={`${entry.name} vom ${entry.cookedAt} aus dem Verlauf entfernen`}>
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Form>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </SimpleGrid>
       )}
     </Container>
   );

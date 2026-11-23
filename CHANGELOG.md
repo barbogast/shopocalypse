@@ -6,6 +6,7 @@ heading per day.
 
 ## 2026-11-23
 
+- Unter „Zuletzt gekocht“ zeigt ein Kalender, was an welchem Tag gekocht wurde – mit Foto oder Namen des Rezepts.
 - Nach dem Speichern eines überarbeiteten Rezepts geht es direkt zurück zum Rezept.
 
 ## 2026-11-22
