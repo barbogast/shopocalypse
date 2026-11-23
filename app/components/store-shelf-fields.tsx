@@ -5,17 +5,20 @@ import type * as schema from "~/db/schema";
 type Store = typeof schema.stores.$inferSelect;
 type Shelf = typeof schema.itemCategories.$inferSelect;
 
-// Store and shelf pickers for the item form; only the chosen store's shelves are offered
+// Store and shelf pickers for the item form; only the chosen store's shelves are offered.
+// Disabled, they show and submit neither, but turned back on they have the choice from before.
 export function StoreShelfFields({
   stores,
   shelves,
   defaultStoreId = null,
   defaultShelfId = null,
+  disabled = false,
 }: {
   stores: Store[];
   shelves: Shelf[];
   defaultStoreId?: number | null;
   defaultShelfId?: number | null;
+  disabled?: boolean;
 }) {
   const [storeId, setStoreId] = useState(defaultStoreId ? String(defaultStoreId) : null);
   const [shelfId, setShelfId] = useState(defaultShelfId ? String(defaultShelfId) : null);
@@ -27,7 +30,8 @@ export function StoreShelfFields({
         name="storeId"
         label="Laden"
         data={stores.map((s) => ({ value: String(s.id), label: s.name }))}
-        value={storeId}
+        value={disabled ? null : storeId}
+        disabled={disabled}
         onChange={(value) => {
           setStoreId(value);
           setShelfId(null);
@@ -39,11 +43,11 @@ export function StoreShelfFields({
         name="categoryId"
         label="Regal"
         data={storeShelves.map((s) => ({ value: String(s.id), label: s.name }))}
-        value={shelfId}
+        value={disabled ? null : shelfId}
         onChange={setShelfId}
-        disabled={!storeId}
+        disabled={disabled || !storeId}
         clearable
-        placeholder={!storeId ? "Zuerst einen Laden wählen" : storeShelves.length ? "Keins" : "Dieser Laden hat noch keine Regale"}
+        placeholder={disabled ? "Keins" : !storeId ? "Zuerst einen Laden wählen" : storeShelves.length ? "Keins" : "Dieser Laden hat noch keine Regale"}
       />
     </>
   );

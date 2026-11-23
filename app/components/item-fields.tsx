@@ -47,7 +47,7 @@ export function ItemFields({
   const [base, setBase] = useState<Values>(defaults);
   const [version, setVersion] = useState(0);
   const [parentId, setParentId] = useState(base.parentId ? String(base.parentId) : null);
-  // A group has no parent, store or shelf, so those fields go while it's ticked
+  // A group has no parent, store or shelf: the parent field goes and the store and shelf are off while it's ticked
   const [groupOnly, setGroupOnly] = useState(canBeGroup && !!base.groupOnly);
   // Picking another parent prefills its store and shelf; a group has none to give
   const newParent = parentId !== (base.parentId ? String(base.parentId) : null)
@@ -114,15 +114,14 @@ export function ItemFields({
           placeholder="Keine"
         />
       )}
-      {!groupOnly && (
-        <StoreShelfFields
-          key={`${version}-${parentId ?? "none"}`}
-          stores={stores}
-          shelves={shelves}
-          defaultStoreId={location.storeId}
-          defaultShelfId={location.categoryId}
-        />
-      )}
+      <StoreShelfFields
+        key={`${version}-${parentId ?? "none"}`}
+        stores={stores}
+        shelves={shelves}
+        defaultStoreId={location.storeId}
+        defaultShelfId={location.categoryId}
+        disabled={groupOnly}
+      />
       <Select
         key={`unit-${version}`}
         name="defaultUnit"
