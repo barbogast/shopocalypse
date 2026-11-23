@@ -259,7 +259,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       {recentlyCooked.length === 0 ? (
         <Text size="sm" c="dimmed">Noch nichts gekocht.</Text>
       ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" style={{ alignItems: "start" }}>
+          {/* Top-aligned: stretched to the calendar's height, the table would spread its rows apart */}
           <CookingCalendar meals={cookedMeals} today={today} />
           <Table>
             <Table.Tbody>
