@@ -11,9 +11,9 @@ import { photoUrl } from "./recipe-photos.server";
 import { deleteUnusedTags, tagsByRecipe } from "./tags.server";
 
 // Cook dates are stored as YYYY-MM-DD; format on the server so client and server render the same string
-export function formatCookedAt(cookedAt: string) {
+export function formatCookedAt(cookedAt: string, { withYear = true } = {}) {
   return new Date(`${cookedAt}T00:00:00Z`).toLocaleDateString("de-DE", {
-    weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+    weekday: "short", day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}), timeZone: "UTC",
   });
 }
 

@@ -67,7 +67,8 @@ export async function loader() {
     .innerJoin(schema.recipes, eq(schema.mealHistory.recipeId, schema.recipes.id))
     .orderBy(desc(schema.mealHistory.cookedAt), desc(schema.mealHistory.id))
     .limit(10)
-    .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt) })));
+    // The calendar beside the list shows the month and year
+    .then((rows) => rows.map((r) => ({ ...r, cookedAt: formatCookedAt(r.cookedAt, { withYear: false }) })));
 
   // Every meal ever cooked, for the calendar to page through; a few hundred short rows at most
   const cookedMeals = await db
@@ -264,7 +265,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <Table.Tbody>
               {recentlyCooked.map((entry) => (
                 <Table.Tr key={entry.id}>
-                  <Table.Td c="dimmed" style={{ width: 130, whiteSpace: "nowrap" }}>{entry.cookedAt}</Table.Td>
+                  <Table.Td c="dimmed" style={{ width: 110, whiteSpace: "nowrap" }}>{entry.cookedAt}</Table.Td>
                   <Table.Td>
                     <Anchor component={Link} to={`/recipes/${entry.recipeId}`} c="inherit">{entry.name}</Anchor>
                   </Table.Td>
