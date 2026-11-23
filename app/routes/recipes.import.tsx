@@ -237,12 +237,14 @@ function FormatHelp() {
 
 // Asks Claude for a recipe or a change to the draft. Sends the text as it stands, which Claude's answer
 // may replace; the form then starts afresh from the draft, so the textarea is read-only meanwhile.
-function RecipeChat({ fetcher, draftId, chat, text, preferences }: {
+function RecipeChat({ fetcher, draftId, chat, text, preferences, reworking }: {
   fetcher: FetcherWithComponents<Awaited<ReturnType<typeof action>>>;
   draftId: number | null;
   chat: ChatMessage[];
   text: string;
   preferences: string | null;
+  // Changing a saved recipe rather than writing a new one
+  reworking: boolean;
 }) {
   const [message, setMessage] = useState("");
   const busy = fetcher.state !== "idle";
@@ -274,7 +276,7 @@ function RecipeChat({ fetcher, draftId, chat, text, preferences }: {
         <Group align="flex-end" gap="xs" wrap="nowrap">
           <Textarea
             aria-label="Nachricht an Claude"
-            placeholder={chat.length ? "Was soll anders werden?" : "Was möchtest du kochen?"}
+            placeholder={chat.length || reworking ? "Was soll anders werden?" : "Was möchtest du kochen?"}
             value={message}
             onChange={(e) => setMessage(e.currentTarget.value)}
             onKeyDown={(e) => {
@@ -659,7 +661,7 @@ function ImportForm({ loaderData, actionData }: Route.ComponentProps) {
             ) : (
               input.trim() === "" && !chatOpen && <DraftList drafts={drafts} />
             )}
-            {chatOpen && <RecipeChat fetcher={chatFetcher} draftId={draft?.id ?? null} chat={draft?.chat ?? []} text={input} preferences={preferences} />}
+            {chatOpen && <RecipeChat fetcher={chatFetcher} draftId={draft?.id ?? null} chat={draft?.chat ?? []} text={input} preferences={preferences} reworking={original != null} />}
             <Textarea
               name="text"
               label="Rezepttext"
